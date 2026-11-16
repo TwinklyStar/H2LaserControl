@@ -213,6 +213,25 @@ Source: Thorlabs *ELLx modules protocol manual* (Issue 10). 📖 (to verify)
 `IN` reply decoded: type `0E` (=14, ELL14) · serial `11401124` · year `2025` · firmware `18` ·
 hardware `01` · travel `0168` (=360°) · pulses per travel `00023000` (=143 360 → 398.2 pulses/°).
 
+### ELLO panel → operations we need (user: "all these functions are needed", 2026-11-16)
+Values shown in ELLO for our unit: position 31.025°, **home offset 3.214°**, **home direction
+anticlockwise**, **jog step 5.0°** (0.0 = continuous). Expected commands from the ELLx manual 📖 —
+**all to be confirmed by capture** 🔍:
+
+| ELLO control | Expected command(s) | Moves? | Writes to device? |
+|---|---|---|---|
+| Position → Update | `gp` → `PO` | no | no |
+| Home (direction CW/CCW) | `ho0` / `ho1` → `PO` | **yes** | no |
+| Home Offset Get / Set | `go` → `HO` / `so<hex>` | no | **yes** |
+| Home Direction | (local choice of `ho0`/`ho1`?) | no | ? |
+| Jog Step Get / Set | `gj` → `GJ` / `sj<hex>` | no | **yes** |
+| Jog Backward / Forward | `bw` / `fw` → `PO` | **yes** | no |
+| Move Absolute | `ma<8 hex>` → `PO` | **yes** | no |
+| Move Relative | `mr<8 hex>` → `PO` | **yes** | no |
+| Clean Device | `cm` (long, full-range motion) | **yes** | ? |
+| Clean and Optimize | `om` (long; re-tunes motor frequencies) | **yes** | **yes** |
+| Stop | `st` | stops | no |
+
 ---
 
 ## Thorlabs MFF101/M (×2, not installed yet) — flip mount

@@ -70,9 +70,15 @@
 - **User requirement recorded:** homing F = 1000000 units/s (via `B:` before `H:`, S/R/M kept).
   In implementation-plan 1.6, design-document F2, protocols.md. Read `?:B0/?:B1` first.
 
+- **ELL14 scope (user):** all ELLO panel functions are needed (home + direction, home offset
+  get/set, jog step get/set, jog fw/bw, move abs/rel, update, clean, clean & optimize, stop).
+  Current ELLO values: offset 3.214°, home anticlockwise, jog 5.0°. Expected commands listed in
+  protocols.md (📖, to confirm by capture). Design doc F4 updated.
+
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
-- ELL14 capture with ELLO (step 0.4 for ELL14) — which operations does the user actually use?
+- ELL14 capture: may rotation happen freely (optic in beam path?); Set = re-enter same values;
+  Clean/Optimize = long and Optimize rewrites motor tuning — capture or not?
 
 ## Next step
 - 0.4 for ELL14: capture ELLO operations (needs user's go-ahead for any rotation).
