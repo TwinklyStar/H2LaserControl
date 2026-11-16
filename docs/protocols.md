@@ -50,8 +50,23 @@ To be confirmed which mode our unit / the vendor software uses.
 
 `Q:S` slave status bits: 0 −LS, 1 +LS, 2 ORG, 3 Near, 4 Z-limit, 5 Scale alarm, 6 DRV alarm.
 
-### To verify by capture / on hardware
-- Actual baud rate & mode set on our unit; axis numbers of the two linear feedthroughs.
+### Read-only probe of our unit ✅ (2026-11-16, `tools/probe_readonly.py`)
+| Query | Reply | Meaning |
+|---|---|---|
+| `?:N` | `HIT-MV    ` | name, **right-padded with spaces** → strip replies |
+| `?:V` | `V1.20-001` | firmware |
+| `?:Z` | `1` | **HIT mode** active |
+| `Q:` | `30000000,30000000,,,,,,` | axes **0 and 1** connected, both at 300.000 mm; axes 2–7 not connected |
+| `Q:S` | `00,00,00,,,,,,` | last command OK; axes 0/1: no limit, no alarm |
+| `!:` | `0,0,,,,,,` | both ready |
+| `?:P` | `0.10,…` | 0.10 µm per pulse (all axes) |
+| `?:S` | `20,…` | microstep divide 20 |
+
+Works at **38400 baud, 8N1, RTS/CTS**, CR+LF both ways (factory defaults).
+Note: `?:P`/`?:S` list all 8 slots even for unconnected axes; `Q:` leaves them empty.
+
+### Still to verify
+- Which axis (0/1) is which feedthrough, and the IN/OUT target positions.
 - Which commands the vendor software sends for "insert"/"retract".
 - Whether the vendor software changes speed (`D:`) before moves.
 
@@ -64,6 +79,17 @@ Source: Thorlabs *ELLx modules protocol manual* (Issue 10). 📖 (to verify)
 - Packet: `<addr><cmd>[data]`, data as uppercase ASCII hex; replies end with CR LF.
 - Planned subset: `in` (info, incl. pulses/rev), `gs` (status/error), `ho0` (home),
   `ma<8 hex>` (move absolute), `gp` (get position). Replies: `IN…`, `GS…`, `PO…`.
+- Commands are sent **without** terminator; replies end with CR LF. ✅
+
+### Read-only probe of our unit ✅ (2026-11-16)
+| Query | Reply |
+|---|---|
+| `0in` | `0IN0E1140112420251801016800023000` |
+| `0gs` | `0GS00` → status 0 = OK, no error |
+| `0gp` | `0PO00003040` → 0x3040 = 12352 pulses ≈ **31.02°** |
+
+`IN` reply decoded: type `0E` (=14, ELL14) · serial `11401124` · year `2025` · firmware `18` ·
+hardware `01` · travel `0168` (=360°) · pulses per travel `00023000` (=143 360 → 398.2 pulses/°).
 
 ---
 

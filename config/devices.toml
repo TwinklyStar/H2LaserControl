@@ -1,0 +1,27 @@
+# Device configuration. Ports are resolved by USB serial number (as reported by pyserial),
+# so COM renumbering does not matter. `port` is only a fallback.
+
+[devices.hitmv]
+type = "hitmv"
+usb_serial = "DU0DFFMCA"   # RS-232 -> USB adapter
+port = "COM4"
+baudrate = 38400
+rtscts = true
+mode = "HIT"
+
+[devices.hitmv.axes.0]
+name = "feedthrough_A"     # TODO: which physical feedthrough?
+# positions (0.01 um units) to be defined in Phase 1, e.g. IN = ..., OUT = ...
+
+[devices.hitmv.axes.1]
+name = "feedthrough_B"     # TODO: which physical feedthrough?
+
+[devices.ell14]
+type = "ell14"
+usb_serial = "DP06TVEFA"
+port = "COM3"
+baudrate = 9600
+address = "0"
+# named angles (deg) to be defined in Phase 1
+
+# [devices.mff101_1] / [devices.mff101_2] — added when installed
