@@ -25,7 +25,7 @@ small; we implement our own thin drivers and use existing libraries as reference
 ## Protocol references (primary sources)
 | Device | Protocol | Reference |
 |---|---|---|
-| ELL14 | ASCII, 9600 8N1, multidrop addresses `0`–`F`, data as ASCII hex | Thorlabs *ELLx modules protocol manual* (Issue 10) |
+| ELL14 | ASCII, 9600 8N1, multidrop addresses `0`–`F`, data as ASCII hex | Thorlabs *ELLx modules protocol manual* Issue 12 → `ref/etn032283-d03.pdf`; ELLO driver source in `C:\Program Files\Thorlabs\Elliptec\Source Code\ELLO_DLL\` |
 | MFF101/M | Thorlabs **APT** binary protocol (6-byte header + optional data), 115200 8N1, RTS/CTS | Thorlabs *APT Communications Protocol* PDF |
 | HIT-MV | Sigma Koki HIT-mode command set (ASCII, CR+LF), 38400 8N1 RTS/CTS default | `ref/HIT-MV_jp.pdf`; summary in `docs/protocols.md` |
 

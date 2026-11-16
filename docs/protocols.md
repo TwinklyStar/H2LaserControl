@@ -214,9 +214,9 @@ Notes from the check (not contradictions, but worth knowing):
 
 ## Thorlabs ELL14 (COM3) — Elliptec rotation mount
 
-Sources: Thorlabs *ELLx modules protocol manual* (Issue 10) — **PDF not obtained yet** (thorlabs.com
-blocks automated download); instead cross-checked against **Thorlabs' own ELLO driver source**
-installed at `C:\Program Files\Thorlabs\Elliptec\Source Code\ELLO_DLL\` (📖 = from that source).
+Sources: Thorlabs *ELLx OEM/Bare modules protocol manual* **Issue 12 (July 2026)** =
+`ref/etn032283-d03.pdf` (user-supplied), and **Thorlabs' own ELLO driver source** installed at
+`C:\Program Files\Thorlabs\Elliptec\Source Code\ELLO_DLL\`. Comparison: see "Cross-check vs. manual".
 - 9600 baud, 8N1, **no handshake**; ASCII; multidrop address `0`–`F` (default `0`). 📖✅
 - Packet: `<addr><cmd>[data]`, data as uppercase ASCII hex; replies end with CR LF.
 - Subset we use: see the ELLO table below (all panel functions). Home for our use = `ho1`.
@@ -313,6 +313,47 @@ fwd period, rev period; freq = 14740 / period kHz):
 | 1 (`0I1100005FFFFFFFF00B60093`) | on | off | 0005 | FFFF/FFFF | 81.0 kHz | 100.3 kHz |
 | 2 (`0I2100005FFFFFFFF00BC0095`) | on | off | 0005 | FFFF/FFFF | 78.4 kHz | 98.9 kHz |
 (Baseline for after a future "Clean and Optimize", which re-tunes these frequencies.)
+
+### Cross-check: capture vs. ELLx manual Issue 12 (2026-11-16)
+**Agrees with the capture** ✔
+- 9600 baud, 8N1, no parity, **no handshake** (§2.3). Replies end CR LF (§3).
+- `in` reply layout (p.10): type `0E`, SN, year, FW `18` (= 1.8), HW `01` (MSB 0 = metric, release 1),
+  travel `0168` = 360°, pulses `00023000`. Manual table (p.8): **ELL14 = 143360 pulses/rev,
+  398 pulse/deg, 2 motors** ✔.
+- `ho` (p.28): byte 3 = direction, **`0` = clockwise, `1` = CCW** → our `0ho1` = anticlockwise ✔.
+- `ho`/`ma`/`mr`/`fw`/`bw` reply: `GS` while not completed (e.g. busy/error), **`PO` when the move is
+  complete** ✔. Positions/offsets/jog are **signed 32-bit two's complement**, 8 hex digits ✔.
+- `go`/`so`, `gj`/`sj` formats ✔ (`HO`, `GJ`, 8 hex). `gp` → `PO` ✔.
+- `cm` (p.48): full-range back-and-forth for **a few minutes**; replies `GS09` while running,
+  `GS00` when done; any other message during cleaning → `GS09` ✔ (we saw `GS09`).
+- Status codes 0–13 identical to ELLO's list ✔. `i1`/`i2` layout and
+  period = 14 740 000 / frequency(Hz) ✔ (motor 1: 81.0 / 100.3 kHz).
+
+**Differences / new information** ⚠
+1. **Terminator.** The manual defines **no terminator** after commands; each module discards a
+   packet if > 2 s pass between bytes, and **CR clears the receive state machine** (aborts a
+   half-received command). `0x07` (ELLO) is **not mentioned**. Both forms work on our unit.
+2. **`st` reply.** Manual: `st` **replies `GS`** — `GS00` when the stop is complete (p.49), or
+   "`GS09` and/or `GS00`" when stopping a continuous jog (p.40). In our capture `st` + `gs` gave only
+   **one** `GS00` — so either `st` or `gs` was not answered. Driver: after `st`, read `GS` until
+   `GS00` (works either way). Still to check with our own driver.
+3. **`st` scope.** Manual: `st` stops **clean/optimize** and **continuous jog** (jog step 0). It is
+   not documented as stopping a normal `ma`/`mr`/`ho` move (those finish in ~1 s anyway).
+4. **Continuous jog is an overheating risk.** Jog step `0` ⇒ `fw`/`bw` rotate continuously until `st`;
+   the manual says velocity **must be 50–70 % (`sv`)** in that mode, "otherwise the unit could
+   overheat". ELLO's panel allows jog step 0 without warning. ⇒ our GUI should not allow jog step 0,
+   or must set `sv` first (decide in Phase 1/2).
+5. **Velocity `gv`/`sv`** (p.42) exists but is not on the ELLO panel; current value unknown
+   (read-only `0gv` → `GVxx`, hex %, `64` = 100 %). Not used by us so far.
+6. **Home offset** (p.32) is **factory-set** so the stage homes consistently; note it before
+   changing; for rotation stages it must be **> 0.7°**. Our factory value: **`0x500` = 3.214°**
+   (recorded 2026-11-16). ⇒ "Set Home Offset" in our GUI should be guarded.
+7. **Persistence.** `f1/b1/s1` changes must be saved with `us`; the manual does not say whether
+   `so`/`sj` are stored without `us` → unknown (ELLO never sends `us` for them).
+8. `gs`: "Once read the error value is cleared" — read status once and keep it.
+9. `om` (optimize) takes **several minutes** and occupies the bus; rewrites motor frequencies.
+10. Status code **14**: ELLO calls it "General error", manual says 14–255 reserved (harmless).
+11. ELLO's connect-time scan of addresses `1`–`F` is ELLO's own choice, not a protocol requirement.
 
 ---
 

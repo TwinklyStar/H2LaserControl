@@ -84,12 +84,19 @@
   (H/M/D/B rules, limits, busy→NG). ELL14 vs Thorlabs' ELLO driver source (installed with ELLO;
   the ELLx manual PDF could not be downloaded automatically). Fixed stale lines in protocols.md;
   noted the homing-speed "F fast, M/S near sensor" idea is an assumption; i1/i2 decoded.
+- ELLx manual **Issue 12** added by user (`ref/etn032283-d03.pdf`) and compared with the capture:
+  all commands/replies agree. New points: manual defines no terminator (CR aborts a partial
+  command; `0x07` not mentioned); `st` should reply `GS`; **continuous jog (jog step 0) needs
+  `sv` 50–70 % or the unit may overheat**; home offset is factory-set (ours 3.214°, must be > 0.7°);
+  persistence of `so`/`sj` without `us` unknown. Details in protocols.md.
 - **Step 0.4 done** (HIT-MV both axes + ELL14). **Phase 0 done** except MFF101 (not installed).
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
-- ELL14: send the `0x07` terminator like ELLO, or none like our probe? (proposal: like ELLO)
-- ELL14 `st` reply: none, or the `GS00` seen? Check with our driver in Phase 1.
+- ELL14: send the `0x07` terminator like ELLO, or none as the manual specifies? Both work.
+- ELL14 `st` reply: manual says `GS`; capture showed one `GS00` for `st`+`gs`. Check in Phase 1.
+- ELL14 GUI: allow continuous jog (jog step 0)? If yes, must set `sv` 50–70 % first (overheating).
+- ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
 - Phase 1: 1.1 transport layer → 1.2 operation log → 1.3 driver base/config.
