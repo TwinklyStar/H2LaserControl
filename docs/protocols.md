@@ -232,6 +232,40 @@ anticlockwise**, **jog step 5.0°** (0.0 = continuous). Expected commands from t
 | Clean and Optimize | `om` (long; re-tunes motor frequencies) | **yes** | **yes** |
 | Stop | `st` | stops | no |
 
+### ELLO capture — all panel functions 🔍 (2026-11-16 20:18–20:20)
+Compact log: `docs/captures/2026-11-16_ell14_ello_all_functions.txt`. Clean & Optimize not captured
+(by choice). All expected commands **confirmed**, with these details:
+
+- **ELLO ends every command with `0x07` (BEL)**, e.g. `30 69 6e 07` = `0in<BEL>`. Our probe sent
+  no terminator and also worked → the device accepts both. Replies always end CR LF.
+- Replies can arrive **split across reads** (e.g. `0` then `POFFFFFFFB\r\n`) → read until CR LF.
+- **Connect sequence:** `0in`, then address scan `1in`…`Fin` (no reply, ~1 s timeout each),
+  then `0i1`, `0i2` (motor info), `0go`, `0gj`, `0gp`.
+- Data = 8 uppercase hex digits, **signed 32-bit two's complement** (`FFFFFFFB` = −5,
+  `mrFFFFFFD8` = −40 pulses).
+
+| ELLO control | TX (all + `<07>`) | RX | Notes |
+|---|---|---|---|
+| Update | `0gp` | `0PO00003043` | 12355 p = 31.025° |
+| Home Offset Get | `0go` | `0HO00000500` | 1280 p = **3.214°** |
+| Home Offset Set | `0so00000500` | `0GS00` | same value re-written |
+| Jog Step Get | `0gj` | `0GJ000007C7` | 1991 p = **5.000°** |
+| Jog Step Set | `0sj000007C7` | `0GS00` | same value re-written |
+| Home Direction | — | — | **no traffic**: ELLO only remembers it, chooses `ho0`/`ho1` |
+| Home (anticlockwise) | `0ho1` | `0PO00000000` | **`ho1` = CCW** (so `ho0` = CW); ~1 s from 31° |
+| Forward | `0fw` | `0PO000007C4` | +1988 p = 4.992° (one jog step) |
+| Backward | `0bw` | `0POFFFFFFFB` | −5 p = −0.013° |
+| Move Absolute 31.025° | `0ma00003043` | `0PO00003044` | ELLO rounds deg → pulses |
+| Move Relative +0.1° | `0mr00000028` | `0PO0000306A` | 40 p commanded, +38 actual |
+| Move Relative −0.1° | `0mrFFFFFFD8` | `0PO00003045` | −40 p commanded, −37 actual |
+| Clean Device | `0cm` | `0GS09` | immediate reply, **status 9 = busy** |
+| Stop | `0st` then `0gs` | `0GS00` | only **one** `GS00` for the two commands — `st` reply ambiguous |
+
+- Motion commands: the `PO` reply comes **when the motion is finished**; ELLO does not poll
+  during motion. Repeatability: within ±3 pulses (≈ ±0.008°).
+- `cm` (clean) answers `GS09` at once and runs in the background; after `st`, `gs` → `GS00`.
+- `i1`/`i2` replies recorded raw (motor 1/2 info: frequencies etc.), not decoded yet.
+
 ---
 
 ## Thorlabs MFF101/M (×2, not installed yet) — flip mount

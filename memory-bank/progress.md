@@ -1,8 +1,8 @@
 # Progress
 
 ## Current status
-- **Phase 0 — nearly done.** 0.1 ✅, 0.2 ✅, 0.3 ✅ (HIT-MV/ELL14; MFF101 later),
-  0.4 ✅ for HIT-MV (mirror insert/retract captured), ELL14 capture pending. No driver code yet.
+- **Phase 0 — done** (MFF101 parts deferred until installed). 0.1 ✅, 0.2 ✅, 0.3 ✅, 0.4 ✅
+  (HIT-MV both axes, ELL14 all ELLO functions). No driver code yet. Next: Phase 1.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -75,11 +75,17 @@
   Current ELLO values: offset 3.214°, home anticlockwise, jog 5.0°. Expected commands listed in
   protocols.md (📖, to confirm by capture). Design doc F4 updated.
 
+- **ELL14 ELLO capture done** (20:18–20:20, user-operated; Clean & Optimize skipped by choice).
+  All expected commands confirmed; ELLO appends `0x07` to every command; replies may arrive split;
+  home = `ho1` (anticlockwise); Home Direction is ELLO-local; motion reply `PO` comes at the end
+  of motion; `cm` → `GS09` (busy) then `st`. Details in protocols.md, compact log in docs/captures/.
+  (`parse_spm_table.py` pairs by CR LF, so it doesn't split ELL14 TX — fix in Phase 1 tooling.)
+- **Step 0.4 done** (HIT-MV both axes + ELL14). **Phase 0 done** except MFF101 (not installed).
+
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
-- ELL14 capture: may rotation happen freely (optic in beam path?); Set = re-enter same values;
-  Clean/Optimize = long and Optimize rewrites motor tuning — capture or not?
+- ELL14: send the `0x07` terminator like ELLO, or none like our probe? (proposal: like ELLO)
+- ELL14 `st` reply: none, or the `GS00` seen? Check with our driver in Phase 1.
 
 ## Next step
-- 0.4 for ELL14: capture ELLO operations (needs user's go-ahead for any rotation).
-- Then Phase 1: 1.1 transport layer → 1.2 operation log → 1.3 driver base/config.
+- Phase 1: 1.1 transport layer → 1.2 operation log → 1.3 driver base/config.
