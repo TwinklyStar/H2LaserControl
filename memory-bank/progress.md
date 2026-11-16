@@ -10,6 +10,7 @@
 | Thorlabs ELL14 | 1 | COM3 | DP06TVEF | connected |
 | Sigma Koki HIT-MV (2 linear feedthroughs) | 1 | COM4 (RS-232→USB adapter) | DU0DFFMC | connected |
 | Thorlabs MFF101/M | 2 | — | — | **not installed yet** (future) |
+| SRS DG645 delay generator | 1 | RS-232 (LAN later?) | — | **not installed yet** (future); manual `ref/DG645m.pdf`, programming from printed p. 41 |
 
 ## Log
 ### 2026-11-16
@@ -99,4 +100,6 @@
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
+- ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
+  installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
 - Phase 1: 1.1 transport layer → 1.2 operation log → 1.3 driver base/config.

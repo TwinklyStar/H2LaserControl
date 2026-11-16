@@ -41,6 +41,14 @@ Working rules:
 - ✅ Validation: each needed operation has a captured command matching (or correcting)
   `docs/protocols.md`.
 
+**0.5 Revisit Phase 0 for devices installed later** (memo, user 2026-11-16)
+- **MFF101/M ×2** and **SRS DG645** are not installed yet. Phase 1 proceeds with HIT-MV + ELL14;
+  when each device is installed, come back and do 0.2 (port/serial), 0.3 (protocol subset in
+  `docs/protocols.md`), 0.4 (capture/verify) for it, then its Phase 1 driver step.
+- DG645: RS-232 now, possibly LAN later. Manual `ref/DG645m.pdf`, remote programming from
+  **printed page 41**. Which functions we need: ask the user at that time.
+- ✅ Validation: same as 0.2–0.4 for each new device.
+
 ---
 
 ## Phase 1 — Control via scripts
@@ -83,6 +91,10 @@ Working rules:
   `B:axis,s,f,r,m` sent before each `H:`, keeping S/R/M unchanged. First read current `?:B0/?:B1`.
   Validate on hardware with permission: insert ≈ 30 s, ends exactly at 0, overshoot acceptable.
 - ✅ Validation: on hardware, each feedthrough IN→OUT→IN, positions confirmed; stop works mid-move.
+
+**1.6b DG645 driver** (after 0.5 for DG645)
+- Text (SCPI-like) commands over RS-232; transport chosen so a LAN/TCP transport can replace it.
+- ✅ Validation: defined after the Phase 0 revisit.
 
 **1.7 Phase 1 demo script**
 - `scripts/demo_phase1.py`: connect all, report status, perform the real-world sequence

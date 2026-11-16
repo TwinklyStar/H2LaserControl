@@ -10,6 +10,7 @@ their **own vendor software**:
 | HIT-MV stage controller (2 linear feedthroughs) | Sigma Koki (OptoSigma) | In the VUV diagnostic chamber: axis 0 inserts the **VUV photodiode** (pulse energy), axis 1 inserts the **45° VUV mirror** that sends the 122 nm beam to the VUV beam profiler. Both normally **retracted (30000000 units = 60 mm real)**; inserted = 0 (mechanical origin) | Sigma Koki software |
 | ELL14 rotation mount | Thorlabs (Elliptec) | Rotate an optic | Elliptec software (ELLO) |
 | MFF101/M motorized flip mount | Thorlabs | Flip an optic in/out (e.g. dump a laser beam) | Thorlabs Kinesis |
+| DG645 digital delay generator (not installed yet) | Stanford Research Systems | Timing/delays; controlled via **RS-232** now, maybe **LAN** later | — (manual `ref/DG645m.pdf`, remote programming from printed p. 41) |
 
 Problems with this situation:
 
@@ -78,6 +79,8 @@ is where every command passes through.
   query position / busy state, stop, home (origin return). IN = origin return (as in SGSample),
   with **homing max speed raised to 1000000 units/s (2 mm/s real)** to halve the insert time.
 - F3. MFF101: flip to position 1 / 2 (named, e.g. "DUMP" / "PASS"), query current position.
+- F3b. DG645: functions to be defined when installed (Phase 0 revisit). Transport must allow
+  RS-232 now and LAN (TCP) later without changing the driver.
 - F4. ELL14: all functions of the ELLO panel — home (with direction), get/set home offset,
   get/set jog step, jog forward/backward, move absolute, move relative, query angle,
   clean device, clean & optimize, stop.
