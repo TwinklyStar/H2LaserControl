@@ -1,5 +1,6 @@
 # Device configuration. Ports are resolved by USB serial number (as reported by pyserial),
-# so COM renumbering does not matter. `port` is only a fallback.
+# so COM renumbering does not matter. If `usb_serial` is set but not found, connecting fails
+# (it never falls back to `port`, which could be a different device); `port` = last known COM.
 
 [devices.hitmv]
 type = "hitmv"
@@ -8,21 +9,27 @@ port = "COM4"
 baudrate = 38400
 rtscts = true
 mode = "HIT"
+# Insert = origin return (H:). Before each H: our driver sends B: with the controller's own
+# homing S/R/M and F = homing_max_speed (user requirement). 0 = do not send B:.
+homing_max_speed = 1000000      # units/s = 2 mm/s real
+speed = [100000, 1000000, 200]  # D: start, max (units/s), accel (ms) — sent before retract, as SGSample
+insert_timeout_s = 120
+move_timeout_s = 90
 
 # Both feedthroughs are in the VUV diagnostic chamber (see ref/NIMA_vuv_light_source.pdf, Fig. 4).
 # Normal operation: BOTH retracted. Values are raw controller units:
 # 30000000 units = 60 mm real travel (1 unit = 2 nm; the manual's nominal 0.01 um is NOT valid here).
-
 # INSERTED is reached by origin return (H:, "ORG" in SGSample) = 0, not by an absolute move.
+# Confirmed by capture 2026-11-16 (docs/protocols.md).
 
 [devices.hitmv.axes.0]
 name = "vuv_photodiode"    # SXUV300C VUV photodiode (+122 nm filter), pulse-energy measurement
-positions = { RETRACTED = 30000000, INSERTED = 0 }   # to be confirmed by capture
+positions = { RETRACTED = 30000000, INSERTED = 0 }
 default = "RETRACTED"
 
 [devices.hitmv.axes.1]
 name = "vuv_mirror"        # 45 deg VUV mirror that sends the beam to the VUV beam profiler
-positions = { RETRACTED = 30000000, INSERTED = 0 }   # to be confirmed by capture
+positions = { RETRACTED = 30000000, INSERTED = 0 }
 default = "RETRACTED"
 
 [devices.ell14]
@@ -31,6 +38,9 @@ usb_serial = "DP06TVEFA"
 port = "COM3"
 baudrate = 9600
 address = "0"
-# named angles (deg) to be defined in Phase 1
+terminator = "\u0007"   # what ELLO sends after every command; "" (none, as in the manual) also works
 
-# [devices.mff101_1] / [devices.mff101_2] — added when installed
+[devices.ell14.positions]   # named angles in degrees — to be defined with the user
+
+# [devices.mff101_1] / [devices.mff101_2] — added when installed (Phase 0 step 0.5)
+# [devices.dg645]                         — added when installed (Phase 0 step 0.5)

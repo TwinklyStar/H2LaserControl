@@ -2,7 +2,10 @@
 
 ## Current status
 - **Phase 0 — done** (MFF101 parts deferred until installed). 0.1 ✅, 0.2 ✅, 0.3 ✅, 0.4 ✅
-  (HIT-MV both axes, ELL14 all ELLO functions). No driver code yet. Next: Phase 1.
+  (HIT-MV both axes, ELL14 all ELLO functions).
+- **Phase 1 — in progress.** 1.1 ✅, 1.2 ✅, 1.3 ✅ (2 devices; MFF101/DG645 not installed).
+  1.4 ELL14 and 1.6 HIT-MV: code + unit tests ✅, read-only hardware check ✅,
+  **motion validation on hardware ⏳ (needs user permission per move)**. 1.5 / 1.6b wait for 0.5.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -91,10 +94,36 @@
   `sv` 50–70 % or the unit may overheat**; home offset is factory-set (ours 3.214°, must be > 0.7°);
   persistence of `so`/`sj` without `us` unknown. Details in protocols.md.
 - **Step 0.4 done** (HIT-MV both axes + ELL14). **Phase 0 done** except MFF101 (not installed).
+- DG645 added to the inventory (not installed); memo step 0.5 = revisit Phase 0 for MFF101 + DG645.
+
+- **Phase 1 started** (user: proceed until actual movement is needed).
+  - 1.1 Transport: `Transport` ABC (own RX buffer, `read_until`/`read_exact`, raw-byte debug
+    log), `SerialTransport`, `FakeTransport` + `ScriptedResponder`. TCP can be added for the DG645
+    by implementing 5 small methods. Tests ✅ (no loopback hardware available, skipped).
+  - 1.2 Op-log: JSON Lines per day, fsync per line, survives a crash mid-line (tested). Fields
+    changed from the plan: `event` (start/done/failed) and `exchanges` [[tx, rx], …] instead of
+    single raw_tx/raw_rx; polling during waits is not logged.
+  - 1.3 Driver base (`execute`, `@action(moves=…)`, `request_stop`) + `config.py`
+    (port by USB serial; **no fallback to the COM number** if the serial is missing).
+  - 1.4 ELL14 driver (all ELLO functions) and 1.6 HIT-MV driver (insert = `B:` fast homing +
+    `H:`, retract = `D:` + relative `M:` as SGSample, only from position 0; `move_abs`, `stop`,
+    `emergency_stop`, status). Simulators `HitMvSim`/`Ell14Sim`. Tests compare TX bytes with
+    the captures. **49 tests pass**, ruff clean.
+  - `scripts/status.py` (read-only) and `scripts/ctl.py` (one action; motion refused without
+    `--allow-motion`).
+  - **Read-only hardware run ✅ 20:55** (vendor software closed, nothing moved): both devices
+    connect via USB serial lookup. **`?:B0` = `?:B1` = `50000,500000,200,250000`** → insert will send
+    `B:n,50000,1000000,200,250000`. ELL14 position **−355.31°** (counter not wrapped; left there
+    by the capture's Clean→Stop), velocity `gv` = 100 %. Recorded in protocols.md.
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
+  *Current code:* relative `M:` as SGSample, refused unless the axis is at 0 (`move_abs` exists
+  for other cases). Change if the user prefers `A:`.
 - ELL14: send the `0x07` terminator like ELLO, or none as the manual specifies? Both work.
+  *Current code:* `0x07` (config `terminator`), works on hardware.
+- ELL14 position counter can be outside 0–360° (now −355.31°). Show it modulo 360 in the GUI?
+  `ma` to 0–360° from there turns the long way (harmless; homing resets the counter).
 - ELL14 `st` reply: manual says `GS`; capture showed one `GS00` for `st`+`gs`. Check in Phase 1.
 - ELL14 GUI: allow continuous jog (jog step 0)? If yes, must set `sv` 50–70 % first (overheating).
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
@@ -102,4 +131,8 @@
 ## Next step
 - ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
-- Phase 1: 1.1 transport layer → 1.2 operation log → 1.3 driver base/config.
+- Phase 1 hardware validation, **each move only after user permission**:
+  - ELL14 (1.4): home ccw → move_abs 3 angles → jog fw/bw → move_rel ±0.1° → (clean + stop to
+    see whether `st` replies).
+  - HIT-MV (1.6): mirror (axis 1) insert with fast homing (expect ≈ 30 s, ends at 0) → retract →
+    stop mid-move test; then photodiode (axis 0).

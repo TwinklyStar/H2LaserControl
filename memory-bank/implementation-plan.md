@@ -59,8 +59,9 @@ Working rules:
 - ✅ Validation: unit tests with FakeTransport; loopback/echo test on a real port if available.
 
 **1.2 Operation log**
-- `oplog.py`: append JSON Lines `{time, user, device, action, args, raw_tx, raw_rx, result, error}`
-  to `logs/oplog-YYYY-MM-DD.jsonl`.
+- `oplog.py`: append JSON Lines `{time, user, device, action, event, args, result, error,
+  exchanges: [[tx, rx], ...], duration_s}` to `logs/oplog-YYYY-MM-DD.jsonl`
+  (`event` = start | done | failed; raw TX/RX pairs collected per action).
 - ✅ Validation: unit test writes and re-reads entries; file survives a crash mid-run.
 
 **1.3 Driver base + config**
@@ -70,12 +71,15 @@ Working rules:
 - ✅ Validation: config with all three devices loads; port resolution by serial number works.
 
 **1.4 ELL14 driver**
-- Operations: `identify` (`in`), `status` (`gs`), `home`, `move_abs(deg)` (`ma`),
-  `position()` (`gp`), named angles from config. Degrees↔pulses from the `in` reply.
-- ✅ Validation: unit tests (encoding/decoding); on hardware: home, move to 3 angles, read back
-  within tolerance; oplog shows all commands.
+- Operations: all ELLO panel functions (design F4): `identify` (`in`), `status` (`gs`),
+  `get_position` (`gp`), `home(direction)` (`ho0/ho1`), `move_abs/move_rel(deg)` (`ma/mr`),
+  `jog_forward/backward` (`fw/bw`), `get/set_home_offset` (`go/so`), `get/set_jog_step`
+  (`gj/sj`), `clean` (`cm`), `clean_and_optimize` (`om`), `stop` (`st`), `get_velocity` (`gv`),
+  named angles from config. Degrees↔pulses from the `in` reply.
+- ✅ Validation: unit tests (encoding/decoding, exact captured bytes); on hardware: home, move to
+  3 angles, read back within tolerance; jog, move_rel; `st` reply observed; oplog shows all commands.
 
-**1.5 MFF101 driver**
+**1.5 MFF101 driver** (after 0.5 for MFF101 — not installed yet)
 - APT framing (header encode/decode). Operations: `identify` (HW_REQ_INFO),
   `position()` (status bits), `flip(1|2)` (MOT_MOVE_JOG direction) → named `DUMP`/`PASS`.
 - ✅ Validation: unit tests on byte frames vs. manual examples; on hardware: flip both ways,
@@ -99,6 +103,8 @@ Working rules:
 **1.7 Phase 1 demo script**
 - `scripts/demo_phase1.py`: connect all, report status, perform the real-world sequence
   (flip DUMP → insert PD → retract PD → flip PASS, rotate ELL14), disconnect.
+- Until MFF101/DG645 are installed: `scripts/status.py` (read-only) + `scripts/ctl.py` (one action
+  per call, motion only with `--allow-motion`) cover HIT-MV and ELL14.
 - ✅ Validation: runs end-to-end on hardware; oplog shows the full history. **Phase 1 done.**
 
 ---

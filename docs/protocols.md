@@ -174,7 +174,9 @@ did not survive text extraction):* homing travels at F and approaches the sensor
 only F should not change origin repeatability — to be confirmed on hardware.
 Memory-switch defaults (manual 3-x): homing S 50000, F 500000, R 200, **M 250000**; ORG offset 0
 (= 0.5 mm nominal = 50000 units). The `?:B` example `1000,500000,100,200000` in 4-1-17 is only an
-example. Current values on our unit: **not yet read** (`?:B0`, `?:B1` — read-only, do before changing).
+example. Current values on our unit ✅ (read-only, 2026-11-16 20:55, `scripts/status.py`):
+**`?:B0` = `?:B1` = `50000,500000,200,250000`** (s, f, r, m) = the memory-switch defaults. So our
+insert sends `B:n,50000,1000000,200,250000` (only F changed; s ≤ m ≤ f holds).
 Unknown: whether `B` is volatile (lost at power-off) or persists like a memory switch.
 
 ### Planned change: faster homing (user request, 2026-11-16) — ⏳ to implement in Phase 1
@@ -228,6 +230,12 @@ Sources: Thorlabs *ELLx OEM/Bare modules protocol manual* **Issue 12 (July 2026)
 | `0in` | `0IN0E1140112420251801016800023000` |
 | `0gs` | `0GS00` → status 0 = OK, no error |
 | `0gp` | `0PO00003040` → 0x3040 = 12352 pulses ≈ **31.02°** |
+
+Second read-only check ✅ (2026-11-16 20:55, our driver via `scripts/status.py`, `0x07` terminator):
+`0gs` → `GS00`, `0gp` → `0POFFFDD74B` = −141493 p = **−355.31°** (= 4.69° physically), `0go` →
+`HO00000500`, `0gj` → `GJ000007C7`, **`0gv` → `GV64` = 100 % velocity**.
+⇒ The position counter is **not wrapped to 0–360°**; it can be negative / beyond one turn (here
+after the capture's Clean → Stop). Homing resets it to 0. (Display/`ma` handling: see progress.md.)
 
 `IN` reply decoded: type `0E` (=14, ELL14) · serial `11401124` · year `2025` · firmware `18` ·
 hardware `01` · travel `0168` (=360°) · pulses per travel `00023000` (=143 360 → 398.2 pulses/°).
