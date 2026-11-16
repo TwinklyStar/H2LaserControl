@@ -10,7 +10,8 @@ rtscts = true
 mode = "HIT"
 
 # Both feedthroughs are in the VUV diagnostic chamber (see ref/NIMA_vuv_light_source.pdf, Fig. 4).
-# Normal operation: BOTH retracted. Units: 0.01 um (30000000 = 300 mm).
+# Normal operation: BOTH retracted. Values are raw controller units:
+# 30000000 units = 60 mm real travel (1 unit = 2 nm; the manual's nominal 0.01 um is NOT valid here).
 
 # INSERTED is reached by origin return (H:, "ORG" in SGSample) = 0, not by an absolute move.
 

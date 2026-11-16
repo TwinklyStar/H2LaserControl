@@ -29,17 +29,17 @@
 
 - **Read-only probe succeeded** (vendor software closed), details in `docs/protocols.md`:
   - HIT-MV: 38400 8N1 RTS/CTS, firmware V1.20-001, **HIT mode**, axes **0 and 1** connected,
-    both at 30000000 (=300.000 mm), ready, no alarms; 0.10 µm/pulse.
+    both at 30000000 (= 60 mm real; see scale note below), ready, no alarms.
   - ELL14: serial 11401124, OK status, position 0x3040 ≈ 31.02°, 143360 pulses/360°.
   - Created `config/devices.toml` (ports by USB serial). **Step 0.2 done.**
 
 - System paper added (`ref/NIMA_vuv_light_source.pdf`). Axis mapping confirmed by user:
   axis 0 = VUV photodiode, axis 1 = 45° VUV mirror (to profiler), both in VUV diagnostic chamber.
-  Retracted = 300 mm (normal), inserted = 0 mm. Recorded in config, design doc, protocols.
+  Retracted = 30000000 units (normal), inserted = 0. Recorded in config, design doc, protocols.
 - Decision: **do step 0.4** (capture vendor-software traffic) to make sure we reproduce the
   existing operation exactly. Capture method to be chosen.
 - Vendor software: Sigma Koki **SGSample** (HITSample.exe), Thorlabs **ELLO**.
-- **Insert = ORG (H:) in SGSample**; mechanical origin = 0 mm = inserted. Retract = move to 300 mm.
+- **Insert = ORG (H:) in SGSample**; mechanical origin = 0 = inserted. Retract = move to 30000000.
 - HITSample.exe strings confirm it uses HIT-mode commands from the manual.
 - Rule from user: **only the mirror (axis 1) may be moved during capture, and only after asking
   the user for explicit permission each time** (user checks the motion physically).
@@ -48,10 +48,13 @@
   `tools/parse_spm_table.py` summarizes it (handles stray line breaks in the redirect file).
   Captured SGSample **connect + idle** (no motion): settings 38400 8N1 RTS/CTS confirmed; connect
   sequence `?:N, ?:Z, per-axis ?:Dn/?:S/Q:/!:/Q:S, F:MU`; idle polling `Q:` ~2 Hz.
-  Axes 0/1 speed: S=1 mm/s, F=10 mm/s, R=200 ms. Details in `docs/protocols.md`.
+  Axes 0/1 speed: S=100000, F=1000000 units/s (real 0.2 / 2 mm/s), R=200 ms. Details in `docs/protocols.md`.
 - **Mirror insert/retract captured** (user-approved, checked physically), 18:51–18:53:
-  INSERT = `H:,1,,,,,,` (~62 s, homing overshoots −0.5 mm then settles at 0);
-  RETRACT = `D:1,100000,1000000,200` + `M:,+30000000,,,,,,` (relative +300 mm, ~30 s).
+  INSERT = `H:,1,,,,,,` (~62 s, homing overshoots ≈0.1 mm real then settles at 0);
+  RETRACT = `D:1,100000,1000000,200` + `M:,+30000000,,,,,,` (relative +60 mm real, ~30 s).
+- **Scale correction (user):** 30000000 units = **60 mm real** → 1 unit = 2 nm; the manual's
+  0.01 µm/unit (and `?:P` 0.10 µm/pulse) don't match the fitted stages. Real = nominal ÷ 5.
+  Docs corrected; always command in raw units, convert only for display.
   SGSample "timeout" popup = its own fixed ~30 s timeout during the 62 s homing; controller OK.
   Compact log committed in `docs/captures/`. Lesson: SPM redirect file caps at 512 MB — always
   apply the filter / untick Device Control.

@@ -26,7 +26,21 @@ To be confirmed which mode our unit / the vendor software uses.
 `<code>:<p0>,<p1>,...,<p7>` CR LF
 - `p0..p7` = parameter for slave (axis) number 0–7. Omit a parameter (keep the comma) for
   "no operation" on that axis; trailing parameters can be dropped.
-- Distances in **0.01 µm units** (integer only; decimals → `NG`). `+` sign optional.
+- Distances in **0.01 µm units** per the manual (integer only; decimals → `NG`). `+` sign optional.
+  ⚠ **On our feedthroughs this nominal unit is wrong by ×5** — see "Real scale" below. All values
+  in this file are raw controller units unless marked "real".
+
+### Real scale of our feedthroughs ✅ (user, 2026-11-16)
+**30,000,000 controller units = 60 mm real travel** → **1 unit = 2 nm** (= 0.002 µm), i.e. real
+distances/speeds are the nominal (0.01 µm-based) values **÷ 5**. The controller's `?:P` (0.10 µm/pulse)
+does not match the actual stage pitch. Always command in controller units; convert only for display.
+| Raw value | Nominal (manual) | **Real** |
+|---|---|---|
+| 30000000 (retracted) | 300 mm | **60 mm** |
+| speed F 1000000 | 10 mm/s | **2 mm/s** |
+| speed S 100000 | 1 mm/s | **0.2 mm/s** |
+| homing F 500000 | 5 mm/s | **≈1 mm/s** |
+| overshoot −49800 | −0.5 mm | **≈ −0.1 mm** |
 - Case-insensitive; **no leading/trailing spaces** (→ `NG`).
 - Drive commands (H, M, A, E, K, J) start immediately — no `G:` needed (G is invalid in HIT mode).
 - Reply: `OK` / `NG` for most commands; status data for `Q`, `!`, `?`, `I`.
@@ -56,7 +70,7 @@ To be confirmed which mode our unit / the vendor software uses.
 | `?:N` | `HIT-MV    ` | name, **right-padded with spaces** → strip replies |
 | `?:V` | `V1.20-001` | firmware |
 | `?:Z` | `1` | **HIT mode** active |
-| `Q:` | `30000000,30000000,,,,,,` | axes **0 and 1** connected, both at 300.000 mm; axes 2–7 not connected |
+| `Q:` | `30000000,30000000,,,,,,` | axes **0 and 1** connected, both at 30000000 (= 60 mm real, retracted); axes 2–7 not connected |
 | `Q:S` | `00,00,00,,,,,,` | last command OK; axes 0/1: no limit, no alarm |
 | `!:` | `0,0,,,,,,` | both ready |
 | `?:P` | `0.10,…` | 0.10 µm per pulse (all axes) |
@@ -67,7 +81,7 @@ Note: `?:P`/`?:S` list all 8 slots even for unconnected axes; `Q:` leaves them e
 
 ### Axis mapping (from user, 2026-11-16)
 - Axis 0 = VUV photodiode feedthrough, axis 1 = 45° VUV mirror feedthrough (VUV diagnostic chamber).
-- Retracted = 30000000 (300 mm), inserted = 0. Normal state: both retracted.
+- Retracted = 30000000 (60 mm real), inserted = 0. Normal state: both retracted.
 
 ### Insert = ORG (mechanical origin return)
 User confirmed: in SGSample the **ORG button is used to insert** devices (origin = 0 mm = inserted
@@ -90,9 +104,9 @@ Connect sequence:
 then for each axis n = 0..7:  ?:Dn, ?:S, Q:, !:, Q:S
 F:MU -> memory-switch dump (multi-chunk reply, terminated by 0x1A, not CR LF)
 ```
-Speed settings `?:Dn` (S start, F max in 0.01 µm/s, R accel ms):
-- axes 0, 1: `100000,1000000,200` → 1 mm/s start, **10 mm/s max**, 200 ms ramp
-  (300 mm stroke ≈ 30 s+ per move)
+Speed settings `?:Dn` (S start, F max in units/s, R accel ms):
+- axes 0, 1: `100000,1000000,200` → real 0.2 mm/s start, **2 mm/s max**, 200 ms ramp
+  (60 mm stroke ≈ 30 s per move)
 - axes 2–7: `10000,100000,200` (unused)
 
 Idle: SGSample polls `Q:` ≈ 2×/s (plus very frequent `IOCTL_SERIAL_GET_COMMSTATUS`, which bloats
@@ -105,11 +119,11 @@ User operation: ORG on mirror → wait → retract mirror. Mirror motion checked
 
 ```
 18:51:55  H:,1,,,,,,                 -> OK     INSERT (ORG, axis 1 only)
-          ... Q:/!: polling ~30 Hz, axis 1 busy, ~5 mm/s ...
-18:52:56  overshoot past origin to -49800 (-0.5 mm), reverse, settle
+          ... Q:/!: polling ~30 Hz, axis 1 busy, ~1 mm/s real ...
+18:52:56  overshoot past origin to -49800 (≈ -0.1 mm real), reverse, settle
 18:52:57  Q: 30000000,0    !: 0,0              insert done (62 s)
-18:53:07  D:1,100000,1000000,200     -> OK     set axis-1 speed (S 1 mm/s, F 10 mm/s, R 200 ms)
-18:53:07  M:,+30000000,,,,,,         -> OK     RETRACT = RELATIVE move +300 mm
+18:53:07  D:1,100000,1000000,200     -> OK     set axis-1 speed (real S 0.2 mm/s, F 2 mm/s, R 200 ms)
+18:53:07  M:,+30000000,,,,,,         -> OK     RETRACT = RELATIVE move +30000000 (60 mm real)
 18:53:37  Q: 30000000,30000000  !: 0,0         retract done (30 s)
 18:53:37  ?:D1                       -> 100000,1000000,200
 ```
@@ -117,16 +131,16 @@ User operation: ORG on mirror → wait → retract mirror. Mirror motion checked
 Confirmed operations (axis 1 = mirror; axis 0 = photodiode presumably the same with p0):
 | Operation | Command(s) | Duration | Done when |
 |---|---|---|---|
-| **INSERT** | `H:,1,,,,,,` | ≈ 62 s (homing ≈ 5 mm/s + overshoot/return) | `!:` axis = 0 and `Q:` axis = 0 |
-| **RETRACT** | `D:1,100000,1000000,200` then `M:,+30000000,,,,,,` | ≈ 30 s (10 mm/s) | `!:` axis = 0 and `Q:` axis = 30000000 |
+| **INSERT** | `H:,1,,,,,,` | ≈ 62 s (homing ≈ 1 mm/s real + overshoot/return) | `!:` axis = 0 and `Q:` axis = 0 |
+| **RETRACT** | `D:1,100000,1000000,200` then `M:,+30000000,,,,,,` | ≈ 30 s (2 mm/s real) | `!:` axis = 0 and `Q:` axis = 30000000 |
 
 Notes:
 - Command format: all 8 slots written (`H:,1,,,,,,` = 7 commas); empty slot = no operation.
-- **Retract is relative (`M:` +300 mm), not absolute.** It relies on the insert having homed to
-  exactly 0. If retract is issued from any other position the result is not 300 mm. (Our driver
+- **Retract is relative (`M:` +30000000 = +60 mm real), not absolute.** It relies on the insert
+  having homed to exactly 0. If retract is issued from any other position it won't end at 30000000. (Our driver
   should consider an absolute `A:,30000000` or check position first — decide in Phase 1.)
 - SGSample sets the speed (`D:`) before the relative move, with the same values already stored.
-- Homing speed (≈ 5 mm/s) matches `50000,500000` values in the `F:MU` dump (origin-return S/F).
+- Homing speed (≈ 1 mm/s real) matches `50000,500000` values in the `F:MU` dump (origin-return S/F).
 - During motion: tight `Q:` + `!:` polling (~30 Hz); idle: `Q:` ~2 Hz. No `NG`, no unanswered
   commands, `Q:S` status stayed `00` (no limit/alarm).
 

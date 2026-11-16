@@ -7,7 +7,7 @@ their **own vendor software**:
 
 | Device | Vendor | Role in the setup | Vendor software |
 |---|---|---|---|
-| HIT-MV stage controller (2 linear feedthroughs) | Sigma Koki (OptoSigma) | In the VUV diagnostic chamber: axis 0 inserts the **VUV photodiode** (pulse energy), axis 1 inserts the **45° VUV mirror** that sends the 122 nm beam to the VUV beam profiler. Both normally **retracted (300 mm)**; inserted = 0 mm | Sigma Koki software |
+| HIT-MV stage controller (2 linear feedthroughs) | Sigma Koki (OptoSigma) | In the VUV diagnostic chamber: axis 0 inserts the **VUV photodiode** (pulse energy), axis 1 inserts the **45° VUV mirror** that sends the 122 nm beam to the VUV beam profiler. Both normally **retracted (30000000 units = 60 mm real)**; inserted = 0 (mechanical origin) | Sigma Koki software |
 | ELL14 rotation mount | Thorlabs (Elliptec) | Rotate an optic | Elliptec software (ELLO) |
 | MFF101/M motorized flip mount | Thorlabs | Flip an optic in/out (e.g. dump a laser beam) | Thorlabs Kinesis |
 
