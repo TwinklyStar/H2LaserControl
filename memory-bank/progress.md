@@ -1,8 +1,8 @@
 # Progress
 
 ## Current status
-- **Phase 0 — nearly done.** 0.1 ✅, 0.2 ✅, 0.3 ✅ for HIT-MV/ELL14 (MFF101 later), 0.4 optional.
-  No driver code yet.
+- **Phase 0 — nearly done.** 0.1 ✅, 0.2 ✅, 0.3 ✅ (HIT-MV/ELL14; MFF101 later),
+  0.4 ✅ for HIT-MV (mirror insert/retract captured), ELL14 capture pending. No driver code yet.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -19,7 +19,6 @@
 - Conda env `H2LaserControl` was empty (no Python); installed **Python 3.12.16** + pip,
   pyserial 3.5, pytest, ruff, pypdf.
 - Installed Git for Windows 2.56; `git init -b main` done, `.gitignore` written.
-  First commit pending: git user.name/email not configured yet.
 - HIT-MV manual (`ref/HIT-MV_jp.pdf`, Japanese) read: port settings (38400 default, 8N1,
   RTS/CTS, CR+LF) and HIT-mode command set summarized in `docs/protocols.md`.
 
@@ -58,14 +57,13 @@
   apply the filter / untick Device Control.
 - **HIT-MV part of step 0.4 done.** Photodiode (axis 0) assumed identical with p0 — not captured.
 
+- Capture tool: Eltima / Electronic Team **Serial Port Monitor 9.5.602** (user-installed,
+  signatures valid, sniffer driver `SPSniff`). HHD installer discarded (unverified signer).
+
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
 - ELL14 capture with ELLO (step 0.4 for ELL14) — which operations does the user actually use?
 
-## Open questions
-- (resolved) Capture tool: user installed **Eltima / Electronic Team Serial Port Monitor 9.5.602**
-  (signatures valid, sniffer driver `SPSniff` running). HHD installer discarded.
-
 ## Next step
-- 0.4 (short): capture what the Sigma Koki software sends for insert/retract (optional).
+- 0.4 for ELL14: capture ELLO operations (needs user's go-ahead for any rotation).
 - Then Phase 1: 1.1 transport layer → 1.2 operation log → 1.3 driver base/config.
