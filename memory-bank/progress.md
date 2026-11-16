@@ -80,6 +80,10 @@
   home = `ho1` (anticlockwise); Home Direction is ELLO-local; motion reply `PO` comes at the end
   of motion; `cm` → `GS09` (busy) then `st`. Details in protocols.md, compact log in docs/captures/.
   (`parse_spm_table.py` pairs by CR LF, so it doesn't split ELL14 TX — fix in Phase 1 tooling.)
+- **Cross-check vs. manuals done, no contradictions.** HIT-MV captures vs `ref/HIT-MV_jp.pdf`
+  (H/M/D/B rules, limits, busy→NG). ELL14 vs Thorlabs' ELLO driver source (installed with ELLO;
+  the ELLx manual PDF could not be downloaded automatically). Fixed stale lines in protocols.md;
+  noted the homing-speed "F fast, M/S near sensor" idea is an assumption; i1/i2 decoded.
 - **Step 0.4 done** (HIT-MV both axes + ELL14). **Phase 0 done** except MFF101 (not installed).
 
 ## Open questions

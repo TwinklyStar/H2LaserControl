@@ -20,7 +20,7 @@ Source: `ref/HIT-MV_jp.pdf` (HIT-MV / HIT-S / HIT-SH 取扱説明書, 2021-09), 
 ### Command modes 📖
 Two command formats: **HIT mode** (up to 8 axes, used here) and SHOT mode (legacy).
 Switch with `Z` command; query current mode with `?:Z` → `0` = SHOT, `1` = HIT.
-To be confirmed which mode our unit / the vendor software uses.
+Our unit and SGSample use **HIT mode** (`?:Z` → `1`, probe + capture).
 
 ### HIT-mode format 📖
 `<code>:<p0>,<p1>,...,<p7>` CR LF
@@ -86,7 +86,8 @@ Note: `?:P`/`?:S` list all 8 slots even for unconnected axes; `Q:` leaves them e
 ### Insert = ORG (mechanical origin return)
 User confirmed: in SGSample the **ORG button is used to insert** devices (origin = 0 mm = inserted
 end). Homing every time removes drift over repeats, because the physical origin never changes.
-⇒ INSERT = `H:` on that axis (not `A:0`); RETRACT = absolute move to 30000000 (to be confirmed).
+⇒ INSERT = `H:` on that axis (not `A:0`); RETRACT = `D:` + **relative** `M:` +30000000 (confirmed
+by capture, see below).
 ⚠ Any `H:` on an axis inserts that device into the beam.
 
 ### Vendor software
@@ -168,9 +169,12 @@ Compact log: `docs/captures/2026-11-16_hitmv_photodiode_insert_retract.txt`
 `B:axis,s,f,r,m` — set origin-return speed of ONE axis: s start, f max, m intermediate (units/s),
 r accel (ms); requires **s ≤ m ≤ f**; `NG` if the axis is busy. Read back with `?:B<axis>` →
 `s,f,r,m` (manual example `1000,500000,100,200000`). Max output 800000 pulse/s (F 1000000 units/s
-≈ 100000 pulse/s here → OK). Homing travels at F and approaches the sensor at M/S, so raising
-only F should not change origin repeatability.
-Current values on our unit: **not yet read** (`?:B0`, `?:B1` — read-only, do before changing).
+≈ 100000 pulse/s here → OK). *Assumption (not stated in the manual text; its homing diagrams
+did not survive text extraction):* homing travels at F and approaches the sensor at M/S, so raising
+only F should not change origin repeatability — to be confirmed on hardware.
+Memory-switch defaults (manual 3-x): homing S 50000, F 500000, R 200, **M 250000**; ORG offset 0
+(= 0.5 mm nominal = 50000 units). The `?:B` example `1000,500000,100,200000` in 4-1-17 is only an
+example. Current values on our unit: **not yet read** (`?:B0`, `?:B1` — read-only, do before changing).
 Unknown: whether `B` is volatile (lost at power-off) or persists like a memory switch.
 
 ### Planned change: faster homing (user request, 2026-11-16) — ⏳ to implement in Phase 1
@@ -186,22 +190,37 @@ Unknown: whether `B` is volatile (lost at power-off) or persists like a memory s
 controller never failed to reply and the move completed. Not a device problem. Our driver must use
 per-operation timeouts (e.g. insert ≥ 90 s, retract ≥ 45 s).
 
-### Still to verify (capture of vendor software)
-- Exact commands for insert/retract (absolute `A:` vs relative `M:`; speed `D:` set beforehand?).
-- Whether the vendor software sends anything at connect (mode switch, init) and how it polls.
-- Which commands the vendor software sends for "insert"/"retract".
-- Whether the vendor software changes speed (`D:`) before moves.
+### Cross-check: captures vs. manual (2026-11-16) — no contradictions
+| Captured | Manual rule | Result |
+|---|---|---|
+| `H:,1,,,,,,` / `H:1,,,,,,,` | 4-1-2: param 1 = home that axis; omitted = NOP; coordinate cleared to 0 | ✔ ends at exactly 0 |
+| `M:+30000000,…` | 4-1-3: relative, `+` optional; limit ±134217727 **pulses** | ✔ 30000000 units ÷ 10 units/pulse (`?:P` 0.10 µm) = 3 000 000 pulses |
+| `D:n,100000,1000000,200` | 4-1-11: one axis, s ≤ f, r 1–1000 ms, NG if busy; >800000 pulse/s clipped | ✔ F = 100 000 pulse/s; SGSample sends it only when the axis is ready |
+| replies `OK`, `Q:`/`!:` data | 4-1-1, 4-1-14/16: OK/NG; Q values left-justified, variable length | ✔ (padding spaces = left-justified) |
+| `Q:S` → `00,00,00` | 4-1-15: stm 00 = last cmd accepted, sts bits | ✔ |
+| planned `B:n,s,f,r,m` | 4-1-21: one axis, **s ≤ m ≤ f**, NG if busy **or not connected** | ✔ plan respects it; send only when ready |
+
+Notes from the check (not contradictions, but worth knowing):
+- **Scale:** the manual's 0.01 µm/unit and `?:P` = 0.10 µm/pulse give 300 mm for 30000000; the
+  real stroke is 60 mm (user). So the controller's stage parameters don't describe the real
+  stage (factor 5). Harmless as long as we command raw units, but all manual "mm" values ÷ 5.
+- **Homing overshoot hypothesis:** axis 1 turned at −49800 ≈ −50000 = the default ORG offset
+  (0.5 mm nominal). Possibly the ORG-offset move of the homing method — unverified; homing method
+  (`ORG SEL`) and offsets per axis are in the `F:MU` dump, not decoded yet.
+- Manual 4-1-1: any command except `Q ? L ! I O` to a **busy** axis → NG and the *whole* line is
+  rejected → our driver must check `!:` before `D:`/`B:`/`H:`/`M:`.
 
 ---
 
 ## Thorlabs ELL14 (COM3) — Elliptec rotation mount
 
-Source: Thorlabs *ELLx modules protocol manual* (Issue 10). 📖 (to verify)
-- 9600 baud, 8N1, no flow control; ASCII; multidrop address `0`–`F` (default `0`).
+Sources: Thorlabs *ELLx modules protocol manual* (Issue 10) — **PDF not obtained yet** (thorlabs.com
+blocks automated download); instead cross-checked against **Thorlabs' own ELLO driver source**
+installed at `C:\Program Files\Thorlabs\Elliptec\Source Code\ELLO_DLL\` (📖 = from that source).
+- 9600 baud, 8N1, **no handshake**; ASCII; multidrop address `0`–`F` (default `0`). 📖✅
 - Packet: `<addr><cmd>[data]`, data as uppercase ASCII hex; replies end with CR LF.
-- Planned subset: `in` (info, incl. pulses/rev), `gs` (status/error), `ho0` (home),
-  `ma<8 hex>` (move absolute), `gp` (get position). Replies: `IN…`, `GS…`, `PO…`.
-- Commands are sent **without** terminator; replies end with CR LF. ✅
+- Subset we use: see the ELLO table below (all panel functions). Home for our use = `ho1`.
+- Commands work **without** terminator (our probe ✅) and with `0x07` (ELLO: `NewLine = "\a"` 📖🔍).
 
 ### Read-only probe of our unit ✅ (2026-11-16)
 | Query | Reply |
@@ -264,7 +283,36 @@ Compact log: `docs/captures/2026-11-16_ell14_ello_all_functions.txt`. Clean & Op
 - Motion commands: the `PO` reply comes **when the motion is finished**; ELLO does not poll
   during motion. Repeatability: within ±3 pulses (≈ ±0.008°).
 - `cm` (clean) answers `GS09` at once and runs in the background; after `st`, `gs` → `GS00`.
-- `i1`/`i2` replies recorded raw (motor 1/2 info: frequencies etc.), not decoded yet.
+- `i1`/`i2` replies recorded raw (motor 1/2 info: frequencies etc.), decoded below.
+
+### Cross-check: capture vs. ELLO driver source (2026-11-16) — no contradictions
+| Item | ELLO_DLL source | Capture | Result |
+|---|---|---|---|
+| Terminator | `NewLine = "\a"`, `WriteLine` → every TX ends `0x07` | `… 07` on every TX | ✔ |
+| Reply framing | reads until `\n`, trims CR/LF/space | replies end CR LF, sometimes split | ✔ |
+| Home direction | `Clockwise = '0'`, `AntiClockwise = '1'`; UI default Anticlockwise; held only in the UI | `0ho1`, no traffic on change | ✔ |
+| Deg ↔ pulses | type 14 = OpticsRotator: factor = pulses/360 = 398.222; `Math.Round(…, AwayFromZero)` | 31.025°→`3043`, 0.1°→`28`, 3.214°→`500`, 5.0°→`7C7` | ✔ all four |
+| Signed data | `ToInt(true)` on 8 hex = signed 32-bit | `FFFFFFFB` = −5 | ✔ |
+| Move/home reply | waits for `PO` (or `GS` on error); `PO` length must be 11 | `PO` at end of motion | ✔ |
+| Set offset/jog | `so`/`sj` then wait for `GS` | `GS00` | ✔ |
+| Clean | `cm`, then wait `GS`; on `GS09` sleep 10 s and send `gs` again (≤ 60 rounds) | `GS09` | ✔ |
+| Stop | `st` (no reply awaited), shorten the clean wait to 2 s, `gs` | `st`, `gs`, then 2nd `gs` 3 s later | ✔ explains the 2nd `gs`; whether `st` itself replies is still open |
+| Connect | scans addresses `0`–`F` with `in`; 2-motor devices → `i1`, `i2` | same | ✔ |
+
+ELLO timeouts (for reference): read 2 s, move 4 s, home 6 s, status 1 s, clean 10 s per poll.
+On an error status ELLO waits 500 ms and resends the command (`GS09` busy is not an error).
+Status codes (`DeviceStatus.cs`): 0 OK, 1 communication error, 2 mechanical timeout, 3 command
+error, 4 value out of range, 5 module isolated, 6 out of isolation, 7 initialization error,
+8 thermal error, 9 busy, 10 sensor error, 11 motor error, 12 out of range, 13 over current,
+14 general error.
+
+`i1`/`i2` decoded (`MotorInfo.cs`: loop, motor, current/1866 A, ramp up, ramp down,
+fwd period, rev period; freq = 14740 / period kHz):
+| Motor | Loop | Motor | Current | Ramp up/down | Fwd freq | Rev freq |
+|---|---|---|---|---|---|---|
+| 1 (`0I1100005FFFFFFFF00B60093`) | on | off | 0005 | FFFF/FFFF | 81.0 kHz | 100.3 kHz |
+| 2 (`0I2100005FFFFFFFF00BC0095`) | on | off | 0005 | FFFF/FFFF | 78.4 kHz | 98.9 kHz |
+(Baseline for after a future "Clean and Optimize", which re-tunes these frequencies.)
 
 ---
 
