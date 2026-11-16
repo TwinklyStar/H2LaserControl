@@ -75,7 +75,8 @@ is where every command passes through.
 ### Functional
 - F1. Connect / disconnect each device; detect and report connection loss.
 - F2. HIT-MV: move each of the 2 linear feedthroughs to named positions ("IN" / "OUT"),
-  query position / busy state, stop, home (origin return).
+  query position / busy state, stop, home (origin return). IN = origin return (as in SGSample),
+  with **homing max speed raised to 1000000 units/s (2 mm/s real)** to halve the insert time.
 - F3. MFF101: flip to position 1 / 2 (named, e.g. "DUMP" / "PASS"), query current position.
 - F4. ELL14: home, move to absolute angle, query angle.
 - F5. Operation log: every user action and every device command/response with timestamp,

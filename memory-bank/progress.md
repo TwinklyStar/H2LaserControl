@@ -63,6 +63,9 @@
 - Capture tool: Eltima / Electronic Team **Serial Port Monitor 9.5.602** (user-installed,
   signatures valid, sniffer driver `SPSniff`). HHD installer discarded (unverified signer).
 
+- **User requirement recorded:** homing F = 1000000 units/s (via `B:` before `H:`, S/R/M kept).
+  In implementation-plan 1.6, design-document F2, protocols.md. Read `?:B0/?:B1` first.
+
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
 - ELL14 capture with ELLO (step 0.4 for ELL14) — which operations does the user actually use?

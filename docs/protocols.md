@@ -144,6 +144,23 @@ Notes:
 - During motion: tight `Q:` + `!:` polling (~30 Hz); idle: `Q:` ~2 Hz. No `NG`, no unanswered
   commands, `Q:S` status stayed `00` (no limit/alarm).
 
+### Homing speed command `B` 📖 (manual 4-1-21)
+`B:axis,s,f,r,m` — set origin-return speed of ONE axis: s start, f max, m intermediate (units/s),
+r accel (ms); requires **s ≤ m ≤ f**; `NG` if the axis is busy. Read back with `?:B<axis>` →
+`s,f,r,m` (manual example `1000,500000,100,200000`). Max output 800000 pulse/s (F 1000000 units/s
+≈ 100000 pulse/s here → OK). Homing travels at F and approaches the sensor at M/S, so raising
+only F should not change origin repeatability.
+Current values on our unit: **not yet read** (`?:B0`, `?:B1` — read-only, do before changing).
+Unknown: whether `B` is volatile (lost at power-off) or persists like a memory switch.
+
+### Planned change: faster homing (user request, 2026-11-16) — ⏳ to implement in Phase 1
+- Our software sets homing **F = 1000000** units/s (2 mm/s real, same as the retract speed) for
+  the feedthrough axes; keep S, R, M unchanged → insert ≈ 30 s instead of ≈ 62 s.
+- Send `B:` right before each `H:` (like SGSample sends `D:` before `M:`), so it does not depend
+  on whether `B` persists, and SGSample behaviour is unaffected if it is used again.
+- Verify on hardware (with user permission): insert time, final position exactly 0, overshoot
+  past the origin still acceptable (was ≈ 0.1 mm real at the slower speed).
+
 **SGSample "timeout" popup explained:** polling pauses for 2 s at 18:52:25 — exactly **30 s after
 `H:`** — while the homing takes 62 s. SGSample evidently uses a fixed ~30 s motion timeout; the
 controller never failed to reply and the move completed. Not a device problem. Our driver must use

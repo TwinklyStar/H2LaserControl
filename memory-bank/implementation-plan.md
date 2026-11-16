@@ -77,6 +77,11 @@ Working rules:
 - Operations (exact syntax from 0.3/0.4): `identify`, `position(axis)`, `is_busy()`,
   `move_abs(axis, pulses)`, `home(axis)`, `stop(axis)`; named `IN`/`OUT` per feedthrough.
 - Wait-until-done with timeout; stop on timeout.
+- **INSERT = `H:` (origin return); RETRACT = `D:` + `M:` +30000000** (as captured from SGSample,
+  see `docs/protocols.md`). Per-operation timeouts (insert/retract ≈ 30–62 s).
+- **User requirement: homing max speed F = 1000000 units/s** (same as retract) via
+  `B:axis,s,f,r,m` sent before each `H:`, keeping S/R/M unchanged. First read current `?:B0/?:B1`.
+  Validate on hardware with permission: insert ≈ 30 s, ends exactly at 0, overshoot acceptable.
 - ✅ Validation: on hardware, each feedthrough IN→OUT→IN, positions confirmed; stop works mid-move.
 
 **1.7 Phase 1 demo script**
