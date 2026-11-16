@@ -3,6 +3,13 @@
 Each step is small and has a **validation** check. Do not start the next step until the
 current one is validated and `progress.md` is updated.
 
+Working rules:
+- **Record before code.** Investigation steps (manuals, probes, captures) only *record* findings in
+  `docs/protocols.md` (marked 📖 manual / 🔍 capture / ✅ hardware). Driver code and config are
+  written afterwards, in Phase 1, from the recorded findings.
+- **No motion without explicit permission.** Any command that moves hardware is sent only after
+  the user approves that specific move and can check it physically.
+
 ---
 
 ## Phase 0 — Setup & protocol capture
