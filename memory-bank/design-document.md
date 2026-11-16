@@ -7,7 +7,7 @@ their **own vendor software**:
 
 | Device | Vendor | Role in the setup | Vendor software |
 |---|---|---|---|
-| HIT-MV stage controller (2 linear feedthroughs) | Sigma Koki (OptoSigma) | Insert / retract things (e.g. a photodiode) into the beam path | Sigma Koki software (e.g. SGCommander) |
+| HIT-MV stage controller (2 linear feedthroughs) | Sigma Koki (OptoSigma) | In the VUV diagnostic chamber: axis 0 inserts the **VUV photodiode** (pulse energy), axis 1 inserts the **45° VUV mirror** that sends the 122 nm beam to the VUV beam profiler. Both normally **retracted (300 mm)**; inserted = 0 mm | Sigma Koki software |
 | ELL14 rotation mount | Thorlabs (Elliptec) | Rotate an optic | Elliptec software (ELLO) |
 | MFF101/M motorized flip mount | Thorlabs | Flip an optic in/out (e.g. dump a laser beam) | Thorlabs Kinesis |
 
@@ -22,6 +22,13 @@ Problems with this situation:
    laser, otherwise the photodiode can be damaged. Today this relies on the operator's memory.
 3. **No unified record.** There is no single history of *who did what, when*. When
    something goes wrong it is hard to reconstruct the sequence of operations.
+
+### System context
+Setup described in `ref/NIMA_vuv_light_source.pdf` (muonium laser ionization system, J-PARC MLF H2
+area): 122 nm (VUV) and 355 nm pulses are transported under vacuum through the laser steering
+chamber and the **VUV diagnostic chamber** to the muonium-production target. Either feedthrough
+inserted ⇒ the 122 nm beam does **not** reach the target, so "both retracted" is the safe/normal
+state during muon operation.
 
 ## 2. Goal
 

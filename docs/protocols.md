@@ -65,8 +65,18 @@ To be confirmed which mode our unit / the vendor software uses.
 Works at **38400 baud, 8N1, RTS/CTS**, CR+LF both ways (factory defaults).
 Note: `?:P`/`?:S` list all 8 slots even for unconnected axes; `Q:` leaves them empty.
 
-### Still to verify
-- Which axis (0/1) is which feedthrough, and the IN/OUT target positions.
+### Axis mapping (from user, 2026-11-16)
+- Axis 0 = VUV photodiode feedthrough, axis 1 = 45° VUV mirror feedthrough (VUV diagnostic chamber).
+- Retracted = 30000000 (300 mm), inserted = 0. Normal state: both retracted.
+
+### ⚠ Homing caution
+`H:` drives to the **mechanical origin**. If the origin sensor is at the 0 mm (inserted) end, homing
+**inserts the device into the beam**. Do not use `H:` from our code until we know where the origin
+is and how the vendor software uses it.
+
+### Still to verify (capture of vendor software)
+- Exact commands for insert/retract (absolute `A:` vs relative `M:`; speed `D:` set beforehand?).
+- Whether the vendor software sends anything at connect (mode switch, init) and how it polls.
 - Which commands the vendor software sends for "insert"/"retract".
 - Whether the vendor software changes speed (`D:`) before moves.
 

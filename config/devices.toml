@@ -9,12 +9,18 @@ baudrate = 38400
 rtscts = true
 mode = "HIT"
 
+# Both feedthroughs are in the VUV diagnostic chamber (see ref/NIMA_vuv_light_source.pdf, Fig. 4).
+# Normal operation: BOTH retracted. Units: 0.01 um (30000000 = 300 mm).
+
 [devices.hitmv.axes.0]
-name = "feedthrough_A"     # TODO: which physical feedthrough?
-# positions (0.01 um units) to be defined in Phase 1, e.g. IN = ..., OUT = ...
+name = "vuv_photodiode"    # SXUV300C VUV photodiode (+122 nm filter), pulse-energy measurement
+positions = { RETRACTED = 30000000, INSERTED = 0 }   # to be confirmed by capture
+default = "RETRACTED"
 
 [devices.hitmv.axes.1]
-name = "feedthrough_B"     # TODO: which physical feedthrough?
+name = "vuv_mirror"        # 45 deg VUV mirror that sends the beam to the VUV beam profiler
+positions = { RETRACTED = 30000000, INSERTED = 0 }   # to be confirmed by capture
+default = "RETRACTED"
 
 [devices.ell14]
 type = "ell14"

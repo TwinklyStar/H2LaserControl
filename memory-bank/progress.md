@@ -34,8 +34,15 @@
   - ELL14: serial 11401124, OK status, position 0x3040 ≈ 31.02°, 143360 pulses/360°.
   - Created `config/devices.toml` (ports by USB serial). **Step 0.2 done.**
 
+- System paper added (`ref/NIMA_vuv_light_source.pdf`). Axis mapping confirmed by user:
+  axis 0 = VUV photodiode, axis 1 = 45° VUV mirror (to profiler), both in VUV diagnostic chamber.
+  Retracted = 300 mm (normal), inserted = 0 mm. Recorded in config, design doc, protocols.
+- Decision: **do step 0.4** (capture vendor-software traffic) to make sure we reproduce the
+  existing operation exactly. Capture method to be chosen.
+
 ## Open questions
-- HIT-MV: which physical feedthrough is axis 0 / axis 1; is 300 mm currently IN or OUT?
+- Where is the HIT-MV mechanical origin (0 mm = inserted end?) → `H:` may insert into beam.
+- Capture tool for step 0.4; name of the Sigma Koki / Elliptec vendor software used.
 
 ## Next step
 - 0.4 (short): capture what the Sigma Koki software sends for insert/retract (optional).
