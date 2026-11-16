@@ -12,6 +12,8 @@ mode = "HIT"
 # Both feedthroughs are in the VUV diagnostic chamber (see ref/NIMA_vuv_light_source.pdf, Fig. 4).
 # Normal operation: BOTH retracted. Units: 0.01 um (30000000 = 300 mm).
 
+# INSERTED is reached by origin return (H:, "ORG" in SGSample) = 0, not by an absolute move.
+
 [devices.hitmv.axes.0]
 name = "vuv_photodiode"    # SXUV300C VUV photodiode (+122 nm filter), pulse-energy measurement
 positions = { RETRACTED = 30000000, INSERTED = 0 }   # to be confirmed by capture

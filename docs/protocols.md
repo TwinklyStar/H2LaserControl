@@ -69,10 +69,16 @@ Note: `?:P`/`?:S` list all 8 slots even for unconnected axes; `Q:` leaves them e
 - Axis 0 = VUV photodiode feedthrough, axis 1 = 45° VUV mirror feedthrough (VUV diagnostic chamber).
 - Retracted = 30000000 (300 mm), inserted = 0. Normal state: both retracted.
 
-### ⚠ Homing caution
-`H:` drives to the **mechanical origin**. If the origin sensor is at the 0 mm (inserted) end, homing
-**inserts the device into the beam**. Do not use `H:` from our code until we know where the origin
-is and how the vendor software uses it.
+### Insert = ORG (mechanical origin return)
+User confirmed: in SGSample the **ORG button is used to insert** devices (origin = 0 mm = inserted
+end). Homing every time removes drift over repeats, because the physical origin never changes.
+⇒ INSERT = `H:` on that axis (not `A:0`); RETRACT = absolute move to 30000000 (to be confirmed).
+⚠ Any `H:` on an axis inserts that device into the beam.
+
+### Vendor software
+SGSample (`C:\Program Files (x86)\SIGMA-KOKI\SGSample\`), HIT program = `HITSample.exe` (.NET).
+Strings embedded in it match the manual's HIT-mode commands: `?:N ?:V ?:Z ?:P ?:S ?:D H: M: A: R:
+L: L:E Q: Q:S !: D: Z:0 Z:1` and handshake options `RTS/CTS`, `RTS/Xonoff`.
 
 ### Still to verify (capture of vendor software)
 - Exact commands for insert/retract (absolute `A:` vs relative `M:`; speed `D:` set beforehand?).

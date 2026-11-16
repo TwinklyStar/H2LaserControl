@@ -39,10 +39,15 @@
   Retracted = 300 mm (normal), inserted = 0 mm. Recorded in config, design doc, protocols.
 - Decision: **do step 0.4** (capture vendor-software traffic) to make sure we reproduce the
   existing operation exactly. Capture method to be chosen.
+- Vendor software: Sigma Koki **SGSample** (HITSample.exe), Thorlabs **ELLO**.
+- **Insert = ORG (H:) in SGSample**; mechanical origin = 0 mm = inserted. Retract = move to 300 mm.
+- HITSample.exe strings confirm it uses HIT-mode commands from the manual.
+- Rule from user: **only the mirror (axis 1) may be moved during capture, and only after asking
+  the user for explicit permission each time** (user checks the motion physically).
 
 ## Open questions
-- Where is the HIT-MV mechanical origin (0 mm = inserted end?) → `H:` may insert into beam.
-- Capture tool for step 0.4; name of the Sigma Koki / Elliptec vendor software used.
+- Capture tool for step 0.4 (HHD installer downloaded but signed by "MIKOM INC" — unverified link
+  to HHD; not run).
 
 ## Next step
 - 0.4 (short): capture what the Sigma Koki software sends for insert/retract (optional).
