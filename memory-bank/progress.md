@@ -45,9 +45,16 @@
 - Rule from user: **only the mirror (axis 1) may be moved during capture, and only after asking
   the user for explicit permission each time** (user checks the motion physically).
 
+- Step 0.4 started: Eltima monitor Table view redirected to `captures/hitmv_table.txt`;
+  `tools/parse_spm_table.py` summarizes it (handles stray line breaks in the redirect file).
+  Captured SGSample **connect + idle** (no motion): settings 38400 8N1 RTS/CTS confirmed; connect
+  sequence `?:N, ?:Z, per-axis ?:Dn/?:S/Q:/!:/Q:S, F:MU`; idle polling `Q:` ~2 Hz.
+  Axes 0/1 speed: S=1 mm/s, F=10 mm/s, R=200 ms. Details in `docs/protocols.md`.
+- Next: capture mirror (axis 1) ORG insert + retract — **only with user's explicit go-ahead**.
+
 ## Open questions
-- Capture tool for step 0.4 (HHD installer downloaded but signed by "MIKOM INC" — unverified link
-  to HHD; not run).
+- (resolved) Capture tool: user installed **Eltima / Electronic Team Serial Port Monitor 9.5.602**
+  (signatures valid, sniffer driver `SPSniff` running). HHD installer discarded.
 
 ## Next step
 - 0.4 (short): capture what the Sigma Koki software sends for insert/retract (optional).

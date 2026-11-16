@@ -80,6 +80,24 @@ SGSample (`C:\Program Files (x86)\SIGMA-KOKI\SGSample\`), HIT program = `HITSamp
 Strings embedded in it match the manual's HIT-mode commands: `?:N ?:V ?:Z ?:P ?:S ?:D H: M: A: R:
 L: L:E Q: Q:S !: D: Z:0 Z:1` and handshake options `RTS/CTS`, `RTS/Xonoff`.
 
+### SGSample capture — connect & idle 🔍 (2026-11-16, `captures/hitmv_table.txt`, `tools/parse_spm_table.py`)
+Port setup on open: 38400 baud (`00 96 00 00`), 8N1 (`00 00 08`), handshake = CTS handshake +
+RTS handshake (RTS/CTS), DTR on, EOF char 0x1A. Matches our probe settings.
+
+Connect sequence:
+```
+?:N  -> HIT-MV            ?:Z -> 1 (HIT mode)
+then for each axis n = 0..7:  ?:Dn, ?:S, Q:, !:, Q:S
+F:MU -> memory-switch dump (multi-chunk reply, terminated by 0x1A, not CR LF)
+```
+Speed settings `?:Dn` (S start, F max in 0.01 µm/s, R accel ms):
+- axes 0, 1: `100000,1000000,200` → 1 mm/s start, **10 mm/s max**, 200 ms ramp
+  (300 mm stroke ≈ 30 s+ per move)
+- axes 2–7: `10000,100000,200` (unused)
+
+Idle: SGSample polls `Q:` ≈ 2×/s (plus very frequent `IOCTL_SERIAL_GET_COMMSTATUS`, which bloats
+the monitor log; disable "Device Control" capture for long recordings).
+
 ### Still to verify (capture of vendor software)
 - Exact commands for insert/retract (absolute `A:` vs relative `M:`; speed `D:` set beforehand?).
 - Whether the vendor software sends anything at connect (mode switch, init) and how it polls.
