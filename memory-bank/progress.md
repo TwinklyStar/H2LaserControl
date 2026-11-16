@@ -50,7 +50,17 @@
   Captured SGSample **connect + idle** (no motion): settings 38400 8N1 RTS/CTS confirmed; connect
   sequence `?:N, ?:Z, per-axis ?:Dn/?:S/Q:/!:/Q:S, F:MU`; idle polling `Q:` ~2 Hz.
   Axes 0/1 speed: S=1 mm/s, F=10 mm/s, R=200 ms. Details in `docs/protocols.md`.
-- Next: capture mirror (axis 1) ORG insert + retract — **only with user's explicit go-ahead**.
+- **Mirror insert/retract captured** (user-approved, checked physically), 18:51–18:53:
+  INSERT = `H:,1,,,,,,` (~62 s, homing overshoots −0.5 mm then settles at 0);
+  RETRACT = `D:1,100000,1000000,200` + `M:,+30000000,,,,,,` (relative +300 mm, ~30 s).
+  SGSample "timeout" popup = its own fixed ~30 s timeout during the 62 s homing; controller OK.
+  Compact log committed in `docs/captures/`. Lesson: SPM redirect file caps at 512 MB — always
+  apply the filter / untick Device Control.
+- **HIT-MV part of step 0.4 done.** Photodiode (axis 0) assumed identical with p0 — not captured.
+
+## Open questions
+- Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
+- ELL14 capture with ELLO (step 0.4 for ELL14) — which operations does the user actually use?
 
 ## Open questions
 - (resolved) Capture tool: user installed **Eltima / Electronic Team Serial Port Monitor 9.5.602**

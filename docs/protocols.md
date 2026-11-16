@@ -98,6 +98,43 @@ Speed settings `?:Dn` (S start, F max in 0.01 µm/s, R accel ms):
 Idle: SGSample polls `Q:` ≈ 2×/s (plus very frequent `IOCTL_SERIAL_GET_COMMSTATUS`, which bloats
 the monitor log; disable "Device Control" capture for long recordings).
 
+### SGSample capture — mirror insert + retract 🔍 (2026-11-16 18:51, user-approved motion)
+Compact log: `docs/captures/2026-11-16_hitmv_mirror_insert_retract.txt`
+(raw: `captures/2026-11-16_hitmv_mirror_insert_retract_table.txt`, not in git).
+User operation: ORG on mirror → wait → retract mirror. Mirror motion checked physically by user.
+
+```
+18:51:55  H:,1,,,,,,                 -> OK     INSERT (ORG, axis 1 only)
+          ... Q:/!: polling ~30 Hz, axis 1 busy, ~5 mm/s ...
+18:52:56  overshoot past origin to -49800 (-0.5 mm), reverse, settle
+18:52:57  Q: 30000000,0    !: 0,0              insert done (62 s)
+18:53:07  D:1,100000,1000000,200     -> OK     set axis-1 speed (S 1 mm/s, F 10 mm/s, R 200 ms)
+18:53:07  M:,+30000000,,,,,,         -> OK     RETRACT = RELATIVE move +300 mm
+18:53:37  Q: 30000000,30000000  !: 0,0         retract done (30 s)
+18:53:37  ?:D1                       -> 100000,1000000,200
+```
+
+Confirmed operations (axis 1 = mirror; axis 0 = photodiode presumably the same with p0):
+| Operation | Command(s) | Duration | Done when |
+|---|---|---|---|
+| **INSERT** | `H:,1,,,,,,` | ≈ 62 s (homing ≈ 5 mm/s + overshoot/return) | `!:` axis = 0 and `Q:` axis = 0 |
+| **RETRACT** | `D:1,100000,1000000,200` then `M:,+30000000,,,,,,` | ≈ 30 s (10 mm/s) | `!:` axis = 0 and `Q:` axis = 30000000 |
+
+Notes:
+- Command format: all 8 slots written (`H:,1,,,,,,` = 7 commas); empty slot = no operation.
+- **Retract is relative (`M:` +300 mm), not absolute.** It relies on the insert having homed to
+  exactly 0. If retract is issued from any other position the result is not 300 mm. (Our driver
+  should consider an absolute `A:,30000000` or check position first — decide in Phase 1.)
+- SGSample sets the speed (`D:`) before the relative move, with the same values already stored.
+- Homing speed (≈ 5 mm/s) matches `50000,500000` values in the `F:MU` dump (origin-return S/F).
+- During motion: tight `Q:` + `!:` polling (~30 Hz); idle: `Q:` ~2 Hz. No `NG`, no unanswered
+  commands, `Q:S` status stayed `00` (no limit/alarm).
+
+**SGSample "timeout" popup explained:** polling pauses for 2 s at 18:52:25 — exactly **30 s after
+`H:`** — while the homing takes 62 s. SGSample evidently uses a fixed ~30 s motion timeout; the
+controller never failed to reply and the move completed. Not a device problem. Our driver must use
+per-operation timeouts (e.g. insert ≥ 90 s, retract ≥ 45 s).
+
 ### Still to verify (capture of vendor software)
 - Exact commands for insert/retract (absolute `A:` vs relative `M:`; speed `D:` set beforehand?).
 - Whether the vendor software sends anything at connect (mode switch, init) and how it polls.

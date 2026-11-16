@@ -56,11 +56,48 @@ def events(path):
                 yield t, "RX", bytes.fromhex(data_hex)
 
 
+POLL_CMDS = {"Q:", "!:", "Q:S"}
+
+
+def print_compact(out):
+    """Print non-polling events verbatim; summarize each run of polling transactions."""
+    run = []
+
+    def flush():
+        if not run:
+            return
+        by_cmd = collections.defaultdict(list)
+        for _, (cmd, reply) in run:
+            by_cmd[cmd].append(reply)
+        parts = []
+        for cmd, replies in by_cmd.items():
+            first, last = replies[0], replies[-1]
+            span = f"{first!r}" if first == last else f"{first!r} -> {last!r}"
+            parts.append(f"{cmd} x{len(replies)} {span}")
+        print(f"{run[0][0]} .. {run[-1][0].split()[-1]}  POLL  " + " | ".join(parts))
+        run.clear()
+
+    for t, kind, item in out:
+        if kind == "XCHG" and item[0] in POLL_CMDS:
+            run.append((t, item))
+            continue
+        flush()
+        if kind == "XCHG":
+            print(f"{t}  TX {item[0]!r:24} RX {item[1]!r}")
+        elif kind == "PORT":
+            print(f"{t}  {kind:4} {item}")
+    flush()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("path")
     ap.add_argument("--all", action="store_true", help="print every transaction, incl. polling")
     ap.add_argument("--since", help="only events at/after this time (HH:MM:SS)")
+    ap.add_argument(
+        "--compact", action="store_true",
+        help="collapse runs of polling (Q:, !:, Q:S) into one summary line; hide CFG",
+    )
     args = ap.parse_args()
 
     tx_buf, rx_buf = b"", b""
@@ -94,15 +131,18 @@ def main():
     if pending:
         out.append((pending[0], "XCHG", (pending[1], None)))
 
-    last = None
-    for t, kind, item in out:
-        if kind == "XCHG":
-            if args.all or item != last:
-                print(f"{t}  TX {item[0]!r:24} RX {item[1]!r}")
-            last = item
-        else:
-            print(f"{t}  {kind:4} {item}")
-            last = None
+    if args.compact:
+        print_compact(out)
+    else:
+        last = None
+        for t, kind, item in out:
+            if kind == "XCHG":
+                if args.all or item != last:
+                    print(f"{t}  TX {item[0]!r:24} RX {item[1]!r}")
+                last = item
+            else:
+                print(f"{t}  {kind:4} {item}")
+                last = None
     print("\n--- command counts ---")
     for cmd, n in counts.most_common():
         print(f"{n:7}  {cmd!r}")
