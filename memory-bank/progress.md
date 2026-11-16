@@ -58,7 +58,11 @@
   SGSample "timeout" popup = its own fixed ~30 s timeout during the 62 s homing; controller OK.
   Compact log committed in `docs/captures/`. Lesson: SPM redirect file caps at 512 MB — always
   apply the filter / untick Device Control.
-- **HIT-MV part of step 0.4 done.** Photodiode (axis 0) assumed identical with p0 — not captured.
+- **Photodiode (axis 0) insert/retract captured** by user (19:03–19:04): `H:1,,,,,,,` (62 s),
+  `D:0,100000,1000000,200` + `M:+30000000,,,,,,,` (30 s). Identical to axis 1 with slot p0.
+  Homing turn-around differs per axis (axis 0 +83920, axis 1 −49800) → counter drifts ~0.1–0.2 mm
+  real from the physical origin between homings; homing removes it. Recorded in protocols.md.
+- **HIT-MV part of step 0.4 done** (both axes).
 
 - Capture tool: Eltima / Electronic Team **Serial Port Monitor 9.5.602** (user-installed,
   signatures valid, sniffer driver `SPSniff`). HHD installer discarded (unverified signer).

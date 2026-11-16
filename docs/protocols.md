@@ -128,7 +128,7 @@ User operation: ORG on mirror → wait → retract mirror. Mirror motion checked
 18:53:37  ?:D1                       -> 100000,1000000,200
 ```
 
-Confirmed operations (axis 1 = mirror; axis 0 = photodiode presumably the same with p0):
+Confirmed operations (axis 1 = mirror; axis 0 = photodiode identical with p0 — captured 19:03, see below):
 | Operation | Command(s) | Duration | Done when |
 |---|---|---|---|
 | **INSERT** | `H:,1,,,,,,` | ≈ 62 s (homing ≈ 1 mm/s real + overshoot/return) | `!:` axis = 0 and `Q:` axis = 0 |
@@ -143,6 +143,26 @@ Notes:
 - Homing speed (≈ 1 mm/s real) matches `50000,500000` values in the `F:MU` dump (origin-return S/F).
 - During motion: tight `Q:` + `!:` polling (~30 Hz); idle: `Q:` ~2 Hz. No `NG`, no unanswered
   commands, `Q:S` status stayed `00` (no limit/alarm).
+
+### SGSample capture — photodiode insert + retract 🔍 (2026-11-16 19:03, user-approved motion)
+Compact log: `docs/captures/2026-11-16_hitmv_photodiode_insert_retract.txt`
+(raw: `captures/2026-11-16_hitmv_photodiode_insert_retract_table.txt`, not in git).
+```
+19:03:07  H:1,,,,,,,                 -> OK     INSERT axis 0 (p0 = 1, then 7 commas)
+19:04:09  !: 0,0   Q: 0,30000000               insert done (62 s)
+19:04:20  D:0,100000,1000000,200     -> OK
+19:04:20  M:+30000000,,,,,,,         -> OK     RETRACT axis 0, relative +30000000
+19:04:50  !: 0,0   Q: 30000000,30000000        retract done (30 s)
+19:04:50  ?:D0                       -> 100000,1000000,200
+```
+- **Axis 0 behaves exactly like axis 1** with the parameter in slot p0. Same durations, no `NG`,
+  no unanswered commands, `Q:S` stayed `00`.
+- Polling pause 19:03:38–19:03:45 (≈ 31 s after `H:`) = SGSample's timeout popup again.
+- Homing turn-around differs between axes (observation only): axis 0 reversed at **+83920**
+  (sensor reached *before* counter 0), axis 1 at **−49800** (after counter 0); both then approach
+  slowly and settle at exactly 0. So before each homing the counter is off from the physical origin
+  by roughly 0.1–0.2 mm real — consistent with the user's reason for homing on every insert
+  (removes drift). Not yet understood in detail.
 
 ### Homing speed command `B` 📖 (manual 4-1-21)
 `B:axis,s,f,r,m` — set origin-return speed of ONE axis: s start, f max, m intermediate (units/s),
