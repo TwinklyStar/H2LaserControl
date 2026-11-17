@@ -214,6 +214,13 @@
     86 tests pass, ruff clean. **On hardware (user-approved, off the bench):** connect, retract
     0.44 s, retract again = no-op, insert 0.44 s, transit 500 ms, LED command; ends at insert.
 
+  - **Transfer to another PC (user request):** `README.md` (devices, moving to a new PC, setup,
+    running, checks, safety, config, troubleshooting, catch-up reading order) and `CLAUDE.md`
+    (standing agent rules, which until now lived only in this PC's agent memory). Launchers now
+    find conda in several usual install folders (tested: activation + import OK).
+    Notes: `logs/` and `captures/` are git-ignored, so copy the folder, not only git; re-run
+    `pip install -e ".[dev]"` on the new PC; flip mounts need `ftd2xx.dll` (FTDI CDM or Kinesis).
+
 ## Open questions
 - MFF101 second unit: serial and position ↔ name (tomorrow). What does each flip mount do in
   the beam path (for Phase 3 interlock rules with the feedthroughs)?
