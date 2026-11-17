@@ -4,10 +4,12 @@ another device of a known type needs only a config entry (it gets its own tab au
 from .base import DevicePanel
 from .ell14_panel import Ell14Panel
 from .hitmv_panel import HitMvPanel
+from .mff_panel import MffPanel
 
 PANELS: dict[str, type[DevicePanel]] = {
     "hitmv": HitMvPanel,
     "ell14": Ell14Panel,
+    "mff": MffPanel,
 }
 
 __all__ = ["PANELS", "DevicePanel"]

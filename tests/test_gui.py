@@ -8,7 +8,7 @@ from h2lasercontrol.config import DEFAULT_CONFIG, load_config
 from h2lasercontrol.gui.main_window import MainWindow
 from h2lasercontrol.oplog import OpLog, read_oplog
 from h2lasercontrol.services import device_service
-from h2lasercontrol.sim import Ell14Sim, HitMvSim
+from h2lasercontrol.sim import Ell14Sim, HitMvSim, MffSim
 from h2lasercontrol.transport import FakeTransport
 
 pytest.importorskip("pytestqt")
@@ -19,6 +19,9 @@ def window(qtbot, tmp_path, monkeypatch, request):
     def fast_sim(cfg):
         if cfg.type == "hitmv":
             return FakeTransport(HitMvSim(busy_polls=5))
+        if cfg.type == "mff":
+            return {k: FakeTransport(MffSim(serial=int(u["usb_serial"])))
+                    for k, u in cfg.settings["units"].items()}
         return FakeTransport(Ell14Sim(clean_polls=1))
 
     monkeypatch.setattr(device_service, "make_sim_transport", fast_sim)
@@ -43,7 +46,25 @@ def panel(w, key):
 
 def test_one_tab_per_device(window):
     labels = [window.tabs.tabText(i) for i in range(window.tabs.count())]
-    assert labels == ["VUV feedthroughs", "Rotation mount"]
+    assert labels == ["VUV feedthroughs", "Rotation mount", "Flip mounts"]
+
+
+def test_flip_mount_retract_and_insert(window, qtbot):
+    flip = panel(window, "flipmounts")
+    card = flip.cards["flip1"]
+    assert card.state_label.text() == "INSERTED"  # real unit's state on 2026-11-17
+    assert card.retract_btn.isEnabled() and not card.insert_btn.isEnabled()
+    assert flip.stop_btn.isHidden()  # a 0.5 s flip cannot be stopped
+    card.retract_btn.click()
+    qtbot.waitUntil(lambda: card.state_label.text() == "RETRACTED" and not flip.busy,
+                    timeout=5000)
+    assert card.insert_btn.isEnabled() and not card.retract_btn.isEnabled()
+    card.insert_btn.click()
+    qtbot.waitUntil(lambda: card.state_label.text() == "INSERTED" and not flip.busy,
+                    timeout=5000)
+    done = [(e["action"], e["args"]) for e in read_oplog(window.oplog.today_path())
+            if e["event"] == "done" and e["device"] == "flipmounts"]
+    assert ("retract", {"unit": "flip1"}) in done and ("insert", {"unit": "flip1"}) in done
 
 
 def test_insert_and_retract_mirror(window, qtbot):

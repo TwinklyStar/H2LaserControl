@@ -132,6 +132,14 @@ class Driver:
     def is_connected(self) -> bool:
         return self.transport.is_open
 
+    def connection_text(self) -> str:
+        """Where the device is connected (shown in the GUI header), e.g. "COM4"."""
+        return str(getattr(self.transport, "port", None) or "simulated")
+
+    def drop_connection(self) -> None:
+        """Close without talking to the device (after the connection was lost)."""
+        self.transport.close()
+
     @action()
     def identify(self) -> Any:
         raise NotImplementedError

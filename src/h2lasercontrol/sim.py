@@ -4,6 +4,8 @@ without hardware. They are simplified: motion completes after a few status polls
 
 from __future__ import annotations
 
+import struct
+
 N = 8
 
 
@@ -195,3 +197,50 @@ class Ell14Sim:
                 self.cleaning = 0
                 return "GS00" if self.st_replies else None
         return "GS03"
+
+
+class MffSim:
+    """MFF101 flip mount (APT binary). Replies as unit 37011815 did on 2026-11-17."""
+
+    def __init__(self, serial: int = 37011815, position: int = 2, flip_polls: int = 3,
+                 model: bytes = b"MFF002") -> None:
+        self.serial = serial
+        self.model = model
+        self.pos: int | None = position
+        self.target = position
+        self.moving = 0  # status polls left until the flip ends
+        self.flip_polls = flip_polls
+        self.received: list[bytes] = []
+
+    @staticmethod
+    def _msg(mid: int, data: bytes) -> bytes:
+        return struct.pack("<HHBB", mid, len(data), 0x81, 0x50) + data
+
+    def __call__(self, tx: bytes) -> bytes | None:
+        self.received.append(tx)
+        mid, _chan, p2 = struct.unpack_from("<HBB", tx)
+        if mid == 0x0005:  # HW_REQ_INFO
+            data = (struct.pack("<I", self.serial) + self.model.ljust(8, b"\0")
+                    + struct.pack("<H", 16) + bytes([3, 0, 1, 0])
+                    + b"APT Filter Flipper".ljust(48, b"\0") + bytes(12)
+                    + struct.pack("<HHH", 2, 0, 1))
+            return self._msg(0x0006, data)
+        if mid == 0x0429:  # MOT_REQ_STATUSBITS
+            if self.moving:
+                self.moving -= 1
+                bits = 0x10
+                if self.moving == 0:
+                    self.pos = self.target
+            else:
+                bits = {1: 0x01, 2: 0x02}.get(self.pos or 0, 0)
+            return self._msg(0x042A, struct.pack("<HI", 1, 0x90000000 | bits))
+        if mid == 0x046A:  # MOT_MOVE_JOG: go to position p2
+            if p2 in (1, 2) and not (p2 == self.pos and not self.moving):
+                self.target = p2
+                self.pos = None
+                self.moving = self.flip_polls
+            return None
+        if mid == 0x0511:  # MOT_REQ_MFF_OPERPARAMS (values of our unit)
+            data = struct.pack("<HiiHHiHHi", 1, 500, 508, 1, 1, 200, 3, 0x10, 200) + bytes(6)
+            return self._msg(0x0512, data)
+        return None  # MOD_IDENTIFY and anything else: no reply

@@ -30,9 +30,11 @@ Rules:
 ```
 src/h2lasercontrol/
   transport/      base.py (Transport ABC: buffering, read_until/read_exact, raw debug log),
-                  serial_transport.py, fake.py (FakeTransport + ScriptedResponder)
+                  serial_transport.py, d2xx_transport.py (FTDI D2XX via ctypes ftd2xx.dll, opened
+                  by USB serial — Thorlabs APT devices without COM port), fake.py
   drivers/        base.py (Driver, @action(moves=...), DeviceError/DeviceTimeout/Aborted),
-                  ell14.py, hitmv.py, __init__.py (create_driver(cfg) factory)
+                  ell14.py, hitmv.py, mff.py (flip mounts: one driver, several units, one D2XX
+                  transport per unit), __init__.py (create_driver(cfg) factory)
   oplog.py        operation history (JSON Lines, fsync per line)
   config.py       load config/devices.toml, resolve_port() by USB serial
   sim.py          HitMvSim, Ell14Sim — simulated devices for tests / GUI work without hardware
@@ -72,6 +74,13 @@ logs/             operation logs (git-ignored)
   only within [0, 30000000],
   stops the axis on timeout; refuses to run if `?:Z` ≠ HIT mode. ELL14 refuses jog step 0
   (continuous jog), home offset ≤ 0.7°, absolute angles outside [0, 360).
+
+- **Multi-unit device (flip mounts)**: config `type = "mff"` with `[devices.X.units.Y]`
+  (usb_serial, label, insert_position 1|2). `Mff` overrides connect/disconnect/is_connected:
+  connect succeeds if ≥ 1 unit answers; a missing unit is shown offline and retried by
+  `snapshot()` every 5 s; a USB error of one unit (`_guard`) takes only that unit offline.
+  `Driver.connection_text()` / `drop_connection()` hooks let the service stay device-agnostic.
+  No STOP for flips (0.5 s; MFF has no stop message) → the tab hides STOP.
 
 ## GUI (Phase 2)
 - **Browser-style tabs, one per device** (user requirement). `PANELS[type]` picks the tab class;

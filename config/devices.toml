@@ -50,5 +50,18 @@ terminator = "\u0007"   # what ELLO sends after every command; "" (none, as in t
 
 [devices.ell14.positions]   # named angles in degrees — to be defined with the user
 
-# [devices.mff101_1] / [devices.mff101_2] — added when installed (Phase 0 step 0.5)
-# [devices.dg645]                         — added when installed (Phase 0 step 0.5)
+[devices.flipmounts]
+type = "mff"               # Thorlabs MFF101 motorized flip mounts (APT protocol, FTDI D2XX)
+label = "Flip mounts"      # tab title; one card per unit (user, 2026-11-17)
+move_timeout_s = 3         # a flip takes ~0.4 s (transit time 500 ms)
+# Each unit: USB serial number (no COM port; Kinesis must be closed). insert_position = which of
+# the flipper's two positions (1 or 2) is "insert"; the other one is "retract".
+
+[devices.flipmounts.units.flip1]
+label = "Flip mount 1"
+usb_serial = "37011815"
+insert_position = 2        # user 2026-11-17: position 2 = insert, position 1 = retract
+
+# second flip mount: add [devices.flipmounts.units.flip2] when it is connected (expected 2026-11-18)
+
+# [devices.dg645]          — added when installed (Phase 0 step 0.5)

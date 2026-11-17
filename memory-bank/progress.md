@@ -207,6 +207,13 @@
     flip mounts on one tab, cards like the HIT-MV tab**; second unit connected ~tomorrow;
     DIG IO not wired. Plan in implementation-plan 1.5 (D2XX via ctypes).
 
+  - **MFF101 step 1.5 + GUI done (user: "write the GUI"):** `D2xxTransport`, `drivers/mff.py`
+    (identify, status, insert/retract, flash_led, get_transit_time), `MffSim`, config
+    `[devices.flipmounts]` (unit flip1 = 37011815, insert_position 2), "Flip mounts" tab with one
+    card per unit (Insert/Retract, Flash LED, offline card for an unplugged unit, no STOP).
+    86 tests pass, ruff clean. **On hardware (user-approved, off the bench):** connect, retract
+    0.44 s, retract again = no-op, insert 0.44 s, transit 500 ms, LED command; ends at insert.
+
 ## Open questions
 - MFF101 second unit: serial and position ↔ name (tomorrow). What does each flip mount do in
   the beam path (for Phase 3 interlock rules with the feedthroughs)?
@@ -228,7 +235,9 @@
 ## Next step
 - DG645: answer the open questions → write driver + simulator + GUI tab (1.6b, can be done
   before installation against `Dg645Sim`) → hardware checks in `docs/protocols.md` once installed.
-- Next Phase 0.5: **MFF101 ×2** (APT manual).
+- MFF101 second unit (expected 2026-11-18): read serial (Windows device list), short flip test,
+  add `[devices.flipmounts.units.flip2]` (label, usb_serial, insert_position). User to try the
+  Flip mounts tab on the real unit; names/labels of the two flip mounts.
 - Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation.
 - Phase 2 finish: retract from a partial position on hardware (Insert → STOP → Retract);
   save the real max-energy angle and try the energy buttons on hardware; a non-developer lab

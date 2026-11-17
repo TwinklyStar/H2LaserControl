@@ -18,16 +18,20 @@ from ..config import DeviceConfig
 from ..drivers import Driver, create_driver
 from ..drivers.base import DeviceTimeout
 from ..oplog import OpLog
-from ..sim import Ell14Sim, HitMvSim
+from ..sim import Ell14Sim, HitMvSim, MffSim
 from ..transport import FakeTransport, TransportError
 
 log = logging.getLogger(__name__)
 
-POLL_MS = {"hitmv": 1000, "ell14": 2000}
+POLL_MS = {"hitmv": 1000, "ell14": 2000, "mff": 1000}
 LOST_AFTER = 2  # consecutive failed polls before the connection is reported lost
 
 
-def make_sim_transport(cfg: DeviceConfig) -> FakeTransport:
+def make_sim_transport(cfg: DeviceConfig) -> FakeTransport | dict[str, FakeTransport]:
+    if cfg.type == "mff":  # one simulated flip mount per configured unit
+        return {k: FakeTransport(MffSim(serial=int(u["usb_serial"]), flip_polls=4),
+                                 name=f"{cfg.key}.{k}-sim")
+                for k, u in cfg.settings.get("units", {}).items()}
     if cfg.type == "hitmv":
         # 60 polls x 0.2 s = 12 s per simulated move (real: ~30 s)
         return FakeTransport(HitMvSim(busy_polls=60), name=f"{cfg.key}-sim")
@@ -132,8 +136,7 @@ class DeviceService(QObject):
                 self._set_connected(False, str(e))
         else:
             if action == "connect":
-                port = getattr(self.driver.transport, "port", "simulated")
-                self._set_connected(True, port)
+                self._set_connected(True, self.driver.connection_text())
             elif action == "disconnect":
                 self._set_connected(False, "disconnected")
             self.action_done.emit(action, result)
@@ -150,7 +153,7 @@ class DeviceService(QObject):
         except (TransportError, DeviceTimeout) as e:
             self._failed_polls += 1
             if self._failed_polls >= LOST_AFTER:
-                self.driver.transport.close()
+                self.driver.drop_connection()
                 self._set_connected(False, f"connection lost: {e}")
             return
         except Exception as e:  # noqa: BLE001 - unexpected reply: show, keep going

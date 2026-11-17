@@ -8,10 +8,11 @@ from pathlib import Path
 from ..config import DEFAULT_CONFIG, DeviceConfig, resolve_port
 from ..energy import AngleStore
 from ..oplog import OpLog
-from ..transport import SerialTransport, Transport
+from ..transport import D2xxTransport, SerialTransport, Transport
 from .base import Aborted, DeviceError, DeviceTimeout, Driver, action
 from .ell14 import Ell14
 from .hitmv import Axis, HitMv
+from .mff import FlipUnit, Mff
 
 __all__ = [
     "Aborted",
@@ -20,19 +21,33 @@ __all__ = [
     "DeviceTimeout",
     "Driver",
     "Ell14",
+    "FlipUnit",
     "HitMv",
+    "Mff",
     "action",
     "create_driver",
 ]
 
 
 def create_driver(cfg: DeviceConfig, oplog: OpLog | None = None,
-                  transport: Transport | None = None,
+                  transport: Transport | dict[str, Transport] | None = None,
                   state_dir: str | os.PathLike[str] | None = None) -> Driver:
     """Build the driver for one configured device. Without `transport`, a SerialTransport on
     the port found by USB serial number is used (not opened yet: call `connect`).
+    Flip mounts (`mff`): one D2XX transport per unit, or `transport` = {unit key: Transport}.
     `state_dir`: where program-written state lives (saved_angles.json); default config/."""
     s = cfg.settings
+    if cfg.type == "mff":
+        units = []
+        for ukey, u in s.get("units", {}).items():
+            t = (transport[ukey] if isinstance(transport, dict)
+                 else D2xxTransport(str(u["usb_serial"]), cfg.baudrate, rtscts=cfg.rtscts,
+                                    name=f"{cfg.key}.{ukey}"))
+            units.append(FlipUnit(ukey, u.get("label", ukey), str(u["usb_serial"]), t,
+                                  insert_position=int(u.get("insert_position", 2))))
+        return Mff(cfg.key, units, oplog, move_timeout=float(s.get("move_timeout_s", 3)))
+    if isinstance(transport, dict):
+        raise TypeError(f"{cfg.key}: one transport expected")
     if transport is None:
         transport = SerialTransport(resolve_port(cfg), cfg.baudrate, rtscts=cfg.rtscts,
                                     name=cfg.key)

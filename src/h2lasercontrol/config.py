@@ -35,19 +35,25 @@ def load_config(path: str | os.PathLike[str] = DEFAULT_CONFIG) -> dict[str, Devi
         data = tomllib.load(f)
     devices = {}
     for key, table in data.get("devices", {}).items():
+        # a device with `units` (flip mounts) has one USB connection per unit, set per unit
+        multi = "units" in table
         try:
             devices[key] = DeviceConfig(
                 key=key,
                 type=table["type"],
                 usb_serial=table.get("usb_serial"),
                 port=table.get("port"),
-                baudrate=int(table["baudrate"]),
-                rtscts=bool(table.get("rtscts", False)),
+                baudrate=int(table.get("baudrate", 115200) if multi else table["baudrate"]),
+                rtscts=bool(table.get("rtscts", multi)),
                 settings=table,
             )
         except KeyError as e:
             raise ConfigError(f"[devices.{key}] is missing {e}") from e
-        if not (devices[key].usb_serial or devices[key].port):
+        if multi:
+            for ukey, unit in table["units"].items():
+                if not unit.get("usb_serial"):
+                    raise ConfigError(f"[devices.{key}.units.{ukey}] needs usb_serial")
+        elif not (devices[key].usb_serial or devices[key].port):
             raise ConfigError(f"[devices.{key}] needs usb_serial or port")
     return devices
 

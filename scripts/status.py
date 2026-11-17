@@ -9,7 +9,7 @@ import logging
 import sys
 
 from h2lasercontrol.config import load_config
-from h2lasercontrol.drivers import Ell14, HitMv, create_driver
+from h2lasercontrol.drivers import Ell14, HitMv, Mff, create_driver
 from h2lasercontrol.oplog import OpLog
 
 ELL14_QUERIES = ["status", "get_position", "get_home_offset", "get_jog_step", "get_velocity"]
@@ -39,6 +39,12 @@ def main() -> int:
                 elif isinstance(drv, Ell14):
                     for name in ELL14_QUERIES:
                         print(f"  {name}: {drv.execute(name)}")
+                elif isinstance(drv, Mff):
+                    print(f"  status: {drv.execute('status')}")
+                    for unit, u in drv.units.items():
+                        if u.transport.is_open:
+                            ms = drv.execute("get_transit_time", unit=unit)
+                            print(f"  {unit} transit time: {ms} ms")
             finally:
                 drv.execute("disconnect")
         except Exception as e:  # noqa: BLE001 - report and continue with the next device
