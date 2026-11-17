@@ -144,6 +144,9 @@
   - Driver fix after H3 (simulator-tested only, not yet on hardware): after `L:` the driver waits
     until `Q:` stops changing (`_wait_settled`); before any move it reads `Q:` twice and refuses if
     the axis is still moving. `HitMvSim` now coasts after `L:` like the real unit. 50 tests pass.
+  - H6 ✅ 11:17:41 photodiode (axis 0) `insert` (new double-`Q:` ready check passed):
+    `B:0,50000,1000000,200,250000` → `OK`, `H:1,,,,,,,` → `OK`; done after **31.9 s**; `Q:`
+    `0,30000000`, `Q:S` 00. **Photodiode left INSERTED** (retract H7 awaits permission).
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
