@@ -15,10 +15,10 @@ small; we implement our own thin drivers and use existing libraries as reference
 |---|---|---|
 | Serial I/O | **pyserial** | De-facto standard; works for all FTDI virtual COM ports |
 | FTDI direct (fallback for MFF101) | **ftd2xx** (D2XX wrapper) | Only if the MFF101 is not exposed as a COM port (Thorlabs APT devices use the FTDI D2XX driver; VCP can be enabled in Device Manager → "Load VCP") |
-| GUI (Phase 2) | **PySide6** (Qt 6, LGPL) | Mature, native-looking, Qt Designer, signals/slots fit device threads |
+| GUI (Phase 2) | **PySide6** 6.12 (Qt 6, LGPL) | Mature, native-looking, Qt Designer, signals/slots fit device threads |
 | Config | **TOML** via stdlib `tomllib` (read) | Human-editable; named positions, ports, rules |
 | Operation log | **JSON Lines** files (one per day) + stdlib `logging` for debug | Append-only, crash-safe, trivially parsed; can migrate to SQLite if querying becomes important |
-| Testing | **pytest** + fake/simulated serial devices | Test drivers and rules without hardware |
+| Testing | **pytest** + fake/simulated serial devices; **pytest-qt** for the GUI | Test drivers, GUI and rules without hardware (GUI tests: `QT_QPA_PLATFORM=offscreen`) |
 | Lint/format | **ruff** | Single fast tool |
 | VCS | **git** | |
 

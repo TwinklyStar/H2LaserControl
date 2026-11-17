@@ -165,6 +165,14 @@ class Ell14(Driver):
     def get_position(self) -> float:
         return self._deg(decode(self._request("gp", expect="PO")))
 
+    def snapshot(self) -> dict[str, Any]:
+        """Position and settings (no `gs`: reading the status clears a stored error)."""
+        return {
+            "position": self.get_position(),
+            "jog_step": self.get_jog_step(),
+            "home_offset": self.get_home_offset(),
+        }
+
     @action()
     def get_velocity(self) -> int:
         """Velocity in % of maximum (read-only; `sv` is not used)."""
@@ -272,6 +280,7 @@ class Ell14(Driver):
                 self._stop()
                 raise DeviceTimeout(f"{self.name}: {cmd} not finished in {self.clean_timeout} s")
             code = int(self._request("gs", expect="GS"), 16)
+            self._report(elapsed=time.monotonic() - t0)
         if code != 0:
             raise Ell14Error(code, cmd)
         return {"duration_s": round(time.monotonic() - t0, 1)}

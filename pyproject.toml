@@ -7,10 +7,13 @@ name = "h2lasercontrol"
 version = "0.0.1"
 description = "Unified control of H2 laser room devices (Sigma Koki HIT-MV, Thorlabs ELL14, MFF101)"
 requires-python = ">=3.12"
-dependencies = ["pyserial>=3.5"]
+dependencies = ["pyserial>=3.5", "PySide6>=6.6"]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "pytest-qt", "ruff"]
+
+[project.gui-scripts]
+h2lasercontrol = "h2lasercontrol.gui.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

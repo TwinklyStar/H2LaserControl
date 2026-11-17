@@ -153,6 +153,9 @@ class HitMv(Driver):
             }
         return out
 
+    def snapshot(self) -> dict[str, Any]:
+        return {"axes": self.status()}
+
     @action()
     def get_speed(self, axis: int) -> dict[str, int]:
         s, f, r = (int(v) for v in self._query(f"?:D{axis}").split(","))
@@ -204,6 +207,9 @@ class HitMv(Driver):
                 raise Aborted(f"{self.name}: axis {axis} stopped on request")
             if not self._busy(record=False)[axis]:
                 break
+            if self.progress is not None:
+                self._report(axis=axis, position=self._positions(record=False)[axis],
+                             elapsed=time.monotonic() - t0)
             if time.monotonic() - t0 > timeout:
                 self._stop_axes([axis])
                 raise DeviceTimeout(f"{self.name}: axis {axis} still busy after {timeout} s; stopped")

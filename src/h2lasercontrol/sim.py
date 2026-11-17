@@ -13,6 +13,7 @@ class HitMvSim:
                  speed: tuple[int, int, int] = (100000, 1000000, 200)) -> None:
         self.pos: list[int | None] = list(positions) + [None] * (N - len(positions))
         self.target = list(self.pos)
+        self.start: list[int | None] = list(self.pos)
         self.remaining = [0] * N
         self.coast: list[list[int]] = [[] for _ in range(N)]  # positions shown after L: (decel)
         self.busy_polls = busy_polls
@@ -51,6 +52,9 @@ class HitMvSim:
             for a in range(N):
                 if self.coast[a]:
                     self.pos[a] = self.coast[a].pop(0)
+                elif self.remaining[a]:  # moving: show a position between start and target
+                    done = 1 - self.remaining[a] / self.busy_polls
+                    self.pos[a] = int(self.start[a] + (self.target[a] - self.start[a]) * done)
             return self._fmt(self.pos)
         if code == "!":
             flags = []
@@ -102,6 +106,7 @@ class HitMvSim:
                 return "NG"
             for a in axes:
                 v = parts[a]
+                self.start[a] = self.pos[a]
                 if code == "H":
                     self.target[a] = 0
                 elif code == "M":

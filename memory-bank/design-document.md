@@ -89,6 +89,13 @@ is where every command passes through.
 - F6. (Phase 3) Ordering rules defined in config, checked before every action.
 - F7. (Phase 4) User macros: named sequences of actions, runnable with one button.
 
+### GUI structure (user, 2026-11-17)
+- **One tab per device**, like browser (Chrome) tabs; the user switches between tabs. Devices are
+  **not** put together on one screen.
+- Adding a device later = adding a tab (a new device *type* needs one new panel class; another
+  device of a known type needs only a config entry).
+- Keep it **clean and easy to use**.
+
 ### Non-functional
 - N1. Runs on the single lab PC (Windows 11) in the `H2LaserControl` conda environment.
 - N2. Simple UI for non-expert users; named positions instead of raw numbers.

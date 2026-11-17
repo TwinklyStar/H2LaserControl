@@ -113,8 +113,10 @@ Working rules:
 
 **2.1 Device services**: one `QThread` worker per device; command queue; state signals;
 periodic status polling; connection-loss detection.
-**2.2 Main window**: one panel per device (connect indicator, current named position,
-big buttons for named positions, busy indicator); errors shown plainly.
+**2.2 Main window**: **browser-style tabs, one tab per device** (user, 2026-11-17); tab shows a
+status dot. Each device panel: connect indicator, current named position, big buttons for named
+positions, busy indicator, Stop; errors shown plainly. Panel class chosen by device type, so a new
+device = a new tab. Simulation mode (`--sim`) for work without hardware, clearly marked.
 **2.3 Operation log view**: live table of today's oplog; filter by device.
 **2.4 Startup/shutdown**: auto-connect from config; safe shutdown; single-instance guard.
 **2.5 Launcher**: desktop shortcut / `.bat` activating the conda env.

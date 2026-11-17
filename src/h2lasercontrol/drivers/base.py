@@ -62,6 +62,9 @@ class Driver:
         self.oplog = oplog
         self._stop_event = threading.Event()
         self._exchanges: list[tuple[bytes, bytes | None]] | None = None
+        # optional callback for long operations, called from the driver's thread with a dict
+        # (e.g. {"axis": 1, "position": 12345, "elapsed": 3.2}); used by the GUI for live display
+        self.progress: Callable[[dict[str, Any]], None] | None = None
 
     # --- operation entry point -----------------------------------------------------------
     @classmethod
@@ -77,7 +80,8 @@ class Driver:
         if info is None:
             raise ValueError(f"{self.name}: unknown action {action_name!r}")
         fn = getattr(self, action_name)
-        self._stop_event.clear()
+        # The stop flag is NOT cleared here: a stop pressed between "busy" being shown and this
+        # point must not be lost. It is cleared after each action and by clear_stop().
         if info.moves:
             self._log(action_name, "start", args)
         self._exchanges = []
@@ -90,12 +94,17 @@ class Driver:
             raise
         finally:
             exchanges, self._exchanges = self._exchanges, None
+            self._stop_event.clear()
         self._log(action_name, "done", args, result=result, t0=t0, exchanges=exchanges)
         return result
 
     def request_stop(self) -> None:
         """Thread-safe: ask the running operation to stop the device and raise `Aborted`."""
         self._stop_event.set()
+
+    def clear_stop(self) -> None:
+        """Forget an old stop request. Call before announcing that a new action starts."""
+        self._stop_event.clear()
 
     @property
     def stop_requested(self) -> bool:
@@ -130,6 +139,18 @@ class Driver:
     @action()
     def status(self) -> Any:
         raise NotImplementedError
+
+    def snapshot(self) -> dict[str, Any]:
+        """Current state for display. Read-only; called directly (not via execute), so periodic
+        polling does not fill the operation log."""
+        raise NotImplementedError
+
+    def _report(self, **info: Any) -> None:
+        if self.progress is not None:
+            try:
+                self.progress(info)
+            except Exception:  # a display problem must never break a device operation
+                log.exception("progress callback failed")
 
     # --- helpers for subclasses ------------------------------------------------------------
     def _record(self, tx: bytes, rx: bytes | None) -> None:

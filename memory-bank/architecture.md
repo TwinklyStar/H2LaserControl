@@ -36,7 +36,11 @@ src/h2lasercontrol/
   oplog.py        operation history (JSON Lines, fsync per line)
   config.py       load config/devices.toml, resolve_port() by USB serial
   sim.py          HitMvSim, Ell14Sim — simulated devices for tests / GUI work without hardware
-  services/ rules/ macros/ gui/   (Phase 2–4, not yet)
+  services/       device_service.py — DeviceService: one QThread per device, owns the driver
+  gui/            app.py (entry, --sim, single-instance lock), main_window.py (tabs + history),
+                  log_panel.py, style.py, panels/ (base.py DevicePanel, hitmv_panel.py,
+                  ell14_panel.py, PANELS registry by device type)
+  rules/ macros/  (Phase 3–4, not yet)
 config/devices.toml
 scripts/          status.py (read-only status of all devices), ctl.py (one action from CLI;
                   motion only with --allow-motion)
@@ -61,6 +65,26 @@ logs/             operation logs (git-ignored)
   unconfigured axes, retract only from position 0, `move_abs` only within [0, 30000000],
   stops the axis on timeout; refuses to run if `?:Z` ≠ HIT mode. ELL14 refuses jog step 0
   (continuous jog), home offset ≤ 0.7°, absolute angles outside [0, 360).
+
+## GUI (Phase 2)
+- **Browser-style tabs, one per device** (user requirement). `PANELS[type]` picks the tab class;
+  a new device type = one new `DevicePanel` subclass; another device of a known type = config
+  entry only. Tab title from config `label`; tab icon = status dot (green ok, blue busy, grey
+  off, red error). Operation history (today, live, filter by device) below the tabs.
+- `DevicePanel` base: header (connection, busy text, STOP, Connect/Disconnect), plain error line,
+  `build_body()` / `update_view()` / `on_progress()` hooks. Buttons are enabled only when the
+  action makes sense (e.g. Retract only from INSERTED), with tooltips saying why not.
+- `DeviceService` (QObject moved to its own QThread): `submit(action, **kw)` queued to the worker;
+  signals connection_changed / busy_changed / state_changed / progress / action_done / failed;
+  idle polling via `driver.snapshot()` (not logged), 2 failed polls ⇒ "connection lost".
+- ⚠ **STOP must call `service.request_stop()` directly from the GUI thread**, never via a signal
+  connection to the service: the service lives in the worker thread, so Qt queues the call behind
+  the running action (found in testing: stop arrived only after the move finished).
+- ⚠ The stop flag is cleared by the service *before* "busy" is announced and by `execute()` after
+  each action — not at the start of `execute()` (a STOP pressed in between would be lost).
+- Operator name field (top right) → `oplog.user` (remembered in QSettings). `--sim` mode: yellow
+  banner, logs to `logs/sim/`. Single-instance lock (two programs can't share ports).
+- Launchers: `H2LaserControl.bat`, `H2LaserControl-simulation.bat`.
 
 ## Insights / decisions log
 - Thorlabs MFF101 normally uses the FTDI D2XX driver (Kinesis), not a COM port → its traffic

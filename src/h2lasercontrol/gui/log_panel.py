@@ -1,0 +1,134 @@
+"""Operation history: today's op-log entries, newest at the top, live."""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..oplog import OpLog, read_oplog
+from .style import GREY, RED
+
+MAX_ROWS = 2000
+HIDDEN_ACTIONS = {"status", "identify"}  # routine queries: kept in the file, not shown
+
+
+class _Bridge(QObject):
+    """OpLog listeners run in device threads; this re-emits entries into the GUI thread."""
+
+    entry = Signal(dict)
+
+
+class LogPanel(QWidget):
+    COLUMNS = ("Time", "Operator", "Device", "Action", "Details", "Result")
+
+    def __init__(self, oplog: OpLog, device_labels: dict[str, str], parent: QWidget | None = None):
+        super().__init__(parent)
+        self.device_labels = device_labels
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 4, 16, 8)
+
+        top = QHBoxLayout()
+        title = QLabel("<b>Operation history</b> (today)")
+        self.filter = QComboBox()
+        self.filter.addItem("All devices", None)
+        for key, label in device_labels.items():
+            self.filter.addItem(label, key)
+        self.filter.currentIndexChanged.connect(self._apply_filter)
+        top.addWidget(title)
+        top.addStretch(1)
+        top.addWidget(QLabel("Show:"))
+        top.addWidget(self.filter)
+        lay.addLayout(top)
+
+        self.table = QTableWidget(0, len(self.COLUMNS))
+        self.table.setHorizontalHeaderLabels(list(self.COLUMNS))
+        self.table.verticalHeader().hide()
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        h = self.table.horizontalHeader()
+        for i in range(len(self.COLUMNS) - 1):
+            h.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
+        h.setSectionResizeMode(len(self.COLUMNS) - 1, QHeaderView.ResizeMode.Stretch)
+        lay.addWidget(self.table)
+
+        path = oplog.today_path()
+        if os.path.exists(path):
+            for e in read_oplog(path)[-MAX_ROWS:]:
+                self.add_entry(e)
+        self._bridge = _Bridge()
+        self._bridge.entry.connect(self.add_entry)
+        oplog.listeners.append(self._bridge.entry.emit)
+
+    def add_entry(self, e: dict[str, Any]) -> None:
+        if e.get("action") in HIDDEN_ACTIONS:
+            return
+        event = e.get("event")
+        if event == "failed":
+            result, color = f"FAILED: {e.get('error')}", QColor(RED)
+        elif event == "start":
+            result, color = "started", QColor(GREY)
+        else:
+            result, color = _summary(e.get("action"), e.get("result")), None
+        args = ", ".join(f"{k}={v}" for k, v in (e.get("args") or {}).items())
+        values = [
+            str(e.get("time", ""))[11:19],
+            str(e.get("user", "")),
+            self.device_labels.get(e.get("device"), str(e.get("device"))),
+            str(e.get("action", "")).replace("_", " "),
+            args,
+            result,
+        ]
+        self.table.insertRow(0)
+        for col, v in enumerate(values):
+            item = QTableWidgetItem(v)
+            item.setToolTip(v)
+            if color is not None:
+                item.setForeground(color)
+            item.setData(Qt.ItemDataRole.UserRole, e.get("device"))
+            self.table.setItem(0, col, item)
+        if self.table.rowCount() > MAX_ROWS:
+            self.table.removeRow(self.table.rowCount() - 1)
+        self._apply_filter_row(0)
+
+    def _apply_filter(self) -> None:
+        for row in range(self.table.rowCount()):
+            self._apply_filter_row(row)
+
+    def _apply_filter_row(self, row: int) -> None:
+        want = self.filter.currentData()
+        dev = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        self.table.setRowHidden(row, want is not None and dev != want)
+
+
+def _summary(action: str | None, result: Any) -> str:
+    """Short human-readable result (the full value stays in the log file)."""
+    if action == "connect":
+        return "connected"
+    if result is None:
+        return "OK"
+    if isinstance(result, float):
+        return f"{result:.2f}°"  # ELL14 angles
+    if isinstance(result, dict):
+        if "position" in result and len(result) <= 2:
+            return f"position {result['position']}"
+        return _short(", ".join(f"{k} {v}" for k, v in result.items()))
+    return _short(result)
+
+
+def _short(value: Any, limit: int = 120) -> str:
+    text = str(value)
+    return text if len(text) <= limit else text[: limit - 1] + "…"

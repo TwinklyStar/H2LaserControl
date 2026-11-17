@@ -4,7 +4,10 @@
 - **Phase 0 — done** (MFF101 parts deferred until installed). 0.1 ✅, 0.2 ✅, 0.3 ✅, 0.4 ✅
   (HIT-MV both axes, ELL14 all ELLO functions).
 - **Phase 1 — in progress.** 1.1 ✅, 1.2 ✅, 1.3 ✅ (2 devices; MFF101/DG645 not installed).
-  **1.4 ELL14 ✅ and 1.6 HIT-MV ✅ validated on hardware** (2026-11-17, incl. post-stop settle fix). 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
+  **1.4 ELL14 ✅ and 1.6 HIT-MV ✅ validated on hardware** (2026-11-17, incl. post-stop settle fix).
+- **Phase 2 — in progress** (started 2026-11-17). 2.1 services ✅, 2.2 tabbed main window ✅,
+  2.3 history panel ✅, 2.4 startup/shutdown ✅, 2.5 launchers ✅ — all tested in **simulation**
+  only. ⏳ Next: try with the real devices (user), then usability feedback. 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -153,6 +156,20 @@
     requested 5.0 s after start → `Aborted` returned **0.64 s later** (poll wait + `L:` + settle);
     position right after = 25219040 (≈ 9.6 mm real in) and **unchanged over the next 2 s** → fix
     works on hardware. Then insert 27.5 s → 0, retract 30.7 s → 30000000. Both axes retracted.
+- **Phase 2 started.** User: **one tab per device, like Chrome tabs; new device = new tab; clean
+  and easy** (recorded in design-document). Installed PySide6 6.12.0 + pytest-qt 4.5.0.
+  - Built: `DeviceService` (worker thread per device), tabbed `MainWindow`, `HitMvPanel` (card per
+    feedthrough: big state RETRACTED/INSERTED/PARTLY INSERTED/Inserting…, insertion bar, mm real,
+    Insert (with confirm) / Retract), `Ell14Panel` (angle, go-to, rotate-by, step, home + direction,
+    collapsed Maintenance: step size, home offset (confirm), clean, clean & optimize (confirm)),
+    live operation history, operator field, `--sim` mode, launchers. Drivers got `snapshot()`
+    (unlogged polling) and a `progress` callback (live position during 30 s moves).
+  - Bugs found by GUI tests and fixed: (1) STOP wired to the worker-thread service was queued
+    until the move ended → now called directly; (2) stop flag cleared at the start of `execute()`
+    could swallow an early STOP → cleared before "busy" instead.
+  - 55 tests pass (5 GUI tests on simulators), ruff clean. Screenshots checked offscreen.
+  - Display choices (changeable): ELL14 angle shown modulo 360° (raw counter in tooltip);
+    HIT-MV position in real mm (0 = inserted, 60 = retracted).
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
@@ -168,5 +185,6 @@
 ## Next step
 - ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
-- Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation → can start **Phase 2
-  (GUI)** with HIT-MV + ELL14 now (simulators allow GUI work without hardware).
+- Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation.
+- Phase 2: user tries the GUI (simulation first, then real devices — any click that moves a
+  HIT-MV feedthrough is the user's own action); collect feedback; then validate 2.x on hardware.

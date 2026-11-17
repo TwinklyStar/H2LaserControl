@@ -4,6 +4,8 @@
 
 [devices.hitmv]
 type = "hitmv"
+label = "VUV feedthroughs"        # tab title in the GUI
+units_per_mm = 500000             # display only: 30000000 units = 60 mm real
 usb_serial = "DU0DFFMCA"   # RS-232 -> USB adapter
 port = "COM4"
 baudrate = 38400
@@ -24,16 +26,19 @@ move_timeout_s = 90
 
 [devices.hitmv.axes.0]
 name = "vuv_photodiode"    # SXUV300C VUV photodiode (+122 nm filter), pulse-energy measurement
+label = "VUV photodiode"
 positions = { RETRACTED = 30000000, INSERTED = 0 }
 default = "RETRACTED"
 
 [devices.hitmv.axes.1]
 name = "vuv_mirror"        # 45 deg VUV mirror that sends the beam to the VUV beam profiler
+label = "VUV mirror (to profiler)"
 positions = { RETRACTED = 30000000, INSERTED = 0 }
 default = "RETRACTED"
 
 [devices.ell14]
 type = "ell14"
+label = "Rotation mount"   # tab title in the GUI
 usb_serial = "DP06TVEFA"
 port = "COM3"
 baudrate = 9600

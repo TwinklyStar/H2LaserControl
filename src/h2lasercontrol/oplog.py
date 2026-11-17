@@ -31,6 +31,11 @@ class OpLog:
         self.user = user or getpass.getuser()
         self._clock = clock
         self._lock = threading.Lock()
+        # called with each new entry after it is on disk (from the writing thread)
+        self.listeners: list[Callable[[dict[str, Any]], None]] = []
+
+    def today_path(self) -> Path:
+        return self.path_for(self._clock())
 
     def path_for(self, when: datetime) -> Path:
         return self.directory / f"oplog-{when:%Y-%m-%d}.jsonl"
@@ -74,6 +79,11 @@ class OpLog:
                 f.write(line.encode("utf-8"))
                 f.flush()
                 os.fsync(f.fileno())
+        for listener in list(self.listeners):
+            try:
+                listener(entry)
+            except Exception:  # a display problem must not break logging
+                log.exception("oplog listener failed")
         return entry
 
 
