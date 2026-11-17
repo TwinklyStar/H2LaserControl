@@ -14,6 +14,7 @@ class HitMvSim:
         self.pos: list[int | None] = list(positions) + [None] * (N - len(positions))
         self.target = list(self.pos)
         self.remaining = [0] * N
+        self.coast: list[list[int]] = [[] for _ in range(N)]  # positions shown after L: (decel)
         self.busy_polls = busy_polls
         self.homing = {a: list(homing) for a in range(len(positions))}
         self.speed = {a: list(speed) for a in range(len(positions))}
@@ -47,6 +48,9 @@ class HitMvSim:
         if code == "Q":
             if p == "S":
                 return "00," + self._fmt(["00" if x is not None else None for x in self.pos])
+            for a in range(N):
+                if self.coast[a]:
+                    self.pos[a] = self.coast[a].pop(0)
             return self._fmt(self.pos)
         if code == "!":
             flags = []
@@ -65,8 +69,15 @@ class HitMvSim:
                 self.remaining = [0] * N
             else:
                 for a, v in enumerate(p.split(",")):
-                    if v == "1":
-                        self.remaining[a] = 0  # stays where it is (simplified)
+                    if v == "1" and self.remaining[a]:
+                        # like the real unit (2026-11-17): `!:` says ready at once, but the stage
+                        # still decelerates for a short distance (Q: changes a few more times)
+                        self.remaining[a] = 0
+                        cur, tgt = self.pos[a], self.target[a]
+                        mid = cur + (tgt - cur) // 2
+                        step = 1 if tgt >= cur else -1
+                        self.pos[a] = mid
+                        self.coast[a] = [mid + step * 40000, mid + step * 79860]
             return "OK"
         if code in ("D", "B"):
             vals = [int(v) for v in p.split(",")]

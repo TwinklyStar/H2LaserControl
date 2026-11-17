@@ -16,6 +16,7 @@ AXES = {0: Axis(0, "vuv_photodiode"), 1: Axis(1, "vuv_mirror")}
 def make(sim=None, oplog=None, **kw):
     sim = sim or HitMvSim()
     kw.setdefault("poll_interval", 0.001)
+    kw.setdefault("settle_interval", 0.001)
     drv = HitMv("hitmv", FakeTransport(sim, chunk_size=5), oplog, axes=AXES, **kw)
     drv.connect()
     return drv, sim
@@ -111,6 +112,18 @@ def test_stop_request_from_other_thread():
     with pytest.raises(Aborted):
         drv.insert(0)
     assert motion_commands(sim)[-1] == "L:1,,,,,,,"
+    # returns only after the stage stopped coasting (hardware: 0.16 mm after `!:` said ready)
+    assert sim.coast[0] == []
+    assert drv.status()["vuv_photodiode"]["position"] == 15000000 - 79860
+
+
+def test_refuses_to_start_while_still_coasting():
+    sim = HitMvSim(positions=(30000000, 20000000))
+    drv, _ = make(sim)
+    sim.coast[1] = [20040000, 20079860]  # decelerating, but `!:` already says ready
+    with pytest.raises(DeviceError, match="still moving"):
+        drv.insert(1)
+    assert motion_commands(sim) == []
 
 
 def test_move_abs_range_checked():

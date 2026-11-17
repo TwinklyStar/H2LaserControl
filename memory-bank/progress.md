@@ -136,6 +136,14 @@
   - H2 ✅ 11:10:00 mirror `retract`: ready at 0 → `D:1,100000,1000000,200` → `OK` →
     `M:,+30000000,,,,,,` → `OK`; done after **30.3 s**; `Q:` `30000000,30000000`, `Q:S` 00.
     Identical to SGSample. Both axes back to the normal (retracted) state.
+  - H3 ✅ 11:12:33 stop during mirror insert: `L:,1,,,,,,` after 5.06 s → `Aborted`, stopped ≈ 9.9 mm
+    real in. **Finding: `!:` said ready at once, but the stage drifted another 79860 units (0.16 mm
+    real) while decelerating** → driver must wait for `Q:` to settle after a stop (fixed, see below).
+  - H4 ✅ insert from 25037160: 27.1 s → exactly 0. H5 ✅ retract: 30.4 s → 30000000.
+  - Mirror (axis 1) fully validated. Photodiode (axis 0, H6/H7) not yet — needs permission.
+  - Driver fix after H3 (simulator-tested only, not yet on hardware): after `L:` the driver waits
+    until `Q:` stops changing (`_wait_settled`); before any move it reads `Q:` twice and refuses if
+    the axis is still moving. `HitMvSim` now coasts after `L:` like the real unit. 50 tests pass.
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?

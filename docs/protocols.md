@@ -190,6 +190,15 @@ Unknown: whether `B` is volatile (lost at power-off) or persists like a memory s
   `OK`, `H:,1,,,,,,` → `OK`, finished in **32.0 s** (was 62 s), ended at exactly **0**, `Q:S` 00.
   Overshoot not measured (driver polls only `!:` while waiting).
 
+### Stop during a move ✅ (hardware 2026-11-17 11:12, mirror axis 1, fast homing, user-approved)
+`L:,1,,,,,,` → `OK` sent 5.06 s after `H:`. The axis stopped ≈ 9.9 mm real into the travel.
+⚠ **`!:` reported the axis ready (`0`) immediately after `L:`** (position 25117020), but 1 s later
+`Q:` read **25037160** — it kept moving **79860 units (0.16 mm real)** while decelerating
+(≈ ½ · 1000000 units/s · 200 ms ramp = 100000). ⇒ After a stop, `!:` = ready does **not** mean the
+stage is standing still; wait until `Q:` stops changing before reporting "stopped" or sending the next
+command. Homing from that position (H4) then took 27.1 s and ended at exactly 0; retract (H5) 30.4 s
+→ 30000000. No alarms.
+
 **SGSample "timeout" popup explained:** polling pauses for 2 s at 18:52:25 — exactly **30 s after
 `H:`** — while the homing takes 62 s. SGSample evidently uses a fixed ~30 s motion timeout; the
 controller never failed to reply and the move completed. Not a device problem. Our driver must use

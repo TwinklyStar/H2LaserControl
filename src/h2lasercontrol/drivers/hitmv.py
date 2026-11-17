@@ -74,6 +74,8 @@ class HitMv(Driver):
         move_timeout: float = 90.0,
         reply_timeout: float = 2.0,
         poll_interval: float = 0.2,
+        settle_interval: float = 0.15,
+        settle_timeout: float = 5.0,
     ) -> None:
         super().__init__(name, transport, oplog)
         self.axes = dict(axes)
@@ -83,6 +85,8 @@ class HitMv(Driver):
         self.move_timeout = move_timeout
         self.reply_timeout = reply_timeout
         self.poll_interval = poll_interval
+        self.settle_interval = settle_interval
+        self.settle_timeout = settle_timeout
 
     # --- low level --------------------------------------------------------------------------
     def _query(self, cmd: str, *, record: bool = True) -> str:
@@ -161,15 +165,35 @@ class HitMv(Driver):
 
     # --- motion ------------------------------------------------------------------------------
     def _require_ready(self, axis: int) -> int:
-        """Axis must be connected and not busy (busy axis -> NG). Returns its position."""
+        """Axis must be connected, not busy (busy axis -> NG) and standing still. Returns its
+        position. (`!:` says ready while still decelerating after `L:` — hardware 2026-11-17 —
+        so the position is read twice.)"""
         busy = self._busy()[axis]
         if busy is None:
             raise DeviceError(f"{self.name}: axis {axis} is not connected")
         if busy:
             raise DeviceError(f"{self.name}: axis {axis} is busy")
         pos = self._positions()[axis]
+        time.sleep(self.settle_interval)
+        pos2 = self._positions()[axis]
+        if pos2 != pos:
+            raise DeviceError(f"{self.name}: axis {axis} is still moving ({pos} -> {pos2})")
         assert pos is not None
         return pos
+
+    def _wait_settled(self, axes: list[int]) -> None:
+        """After a stop: wait until the positions stop changing (deceleration takes ~0.2 s+)."""
+        last = self._positions(record=False)
+        deadline = time.monotonic() + self.settle_timeout
+        while time.monotonic() < deadline:
+            time.sleep(self.settle_interval)
+            now = self._positions(record=False)
+            busy = self._busy(record=False)
+            if all(now[a] == last[a] and not busy[a] for a in axes):
+                self._positions()  # record the final position in the op-log
+                return
+            last = now
+        raise DeviceTimeout(f"{self.name}: axes {axes} did not settle after stop")
 
     def _wait_done(self, axis: int, timeout: float) -> int:
         """Poll `!:` until the axis is ready. Stop the axis on timeout or stop request."""
@@ -261,7 +285,9 @@ class HitMv(Driver):
         self._command("L:E")
 
     def _stop_axes(self, axes: list[int]) -> None:
+        """Decelerate-stop and wait until the stages stand still."""
         parts = [""] * N_SLOTS
         for a in axes:
             parts[a] = "1"
         self._command("L:" + ",".join(parts))
+        self._wait_settled(axes)
