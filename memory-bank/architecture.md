@@ -67,7 +67,8 @@ logs/             operation logs (git-ignored)
   disabled with "🔒 Locked: retract the … first". Config `exclusive_axes = true`. Moves into the
   Phase 3 rule engine later.
 - **Safety checks in drivers**: HIT-MV checks `!:` before any command (busy → NG), refuses
-  unconfigured axes, retract only from position 0, `move_abs` only within [0, 30000000],
+  unconfigured axes, retract = `M:+(30000000 − current)` (also after a stop halfway), `move_abs`
+  only within [0, 30000000],
   stops the axis on timeout; refuses to run if `?:Z` ≠ HIT mode. ELL14 refuses jog step 0
   (continuous jog), home offset ≤ 0.7°, absolute angles outside [0, 360).
 

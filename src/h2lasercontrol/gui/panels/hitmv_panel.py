@@ -96,7 +96,7 @@ class AxisCard(QGroupBox):
                 self._set_state("INSERTED", ORANGE, "In the beam: the 122 nm beam does not reach the target.")
             else:
                 self._set_state("PARTLY INSERTED", ORANGE,
-                                "Stopped between the ends. Insert first, then Retract.")
+                                "Stopped between the ends: choose Insert or Retract.")
         alarms = (info or {}).get("alarms") or []
         self.alarm_label.setText("Alarm: " + ", ".join(alarms) if alarms else "")
         self.alarm_label.setVisible(bool(alarms))
@@ -104,16 +104,13 @@ class AxisCard(QGroupBox):
         connected_axis = pos is not None
         self.insert_btn.setEnabled(can_act and connected_axis and pos != self.inserted
                                    and not blocked_by)
-        self.retract_btn.setEnabled(can_act and connected_axis and pos == self.inserted)
+        self.retract_btn.setEnabled(can_act and connected_axis and pos != self.retracted)
         self.insert_btn.setToolTip(
             f"Locked: the {blocked_by} is not retracted. Retract it first." if blocked_by else
             "Already inserted" if pos == self.inserted else "Move into the beam (origin return)"
         )
-        self.retract_btn.setToolTip(
-            "Move out of the beam" if pos == self.inserted else
-            "Already retracted" if pos == self.retracted else
-            "Retract works from the inserted position only: insert first"
-        )
+        self.retract_btn.setToolTip("Already retracted" if pos == self.retracted else
+                                    "Move out of the beam")
 
     def _set_state(self, text: str, color: str, hint: str) -> None:
         self.state_label.setText(text)

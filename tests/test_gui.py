@@ -95,7 +95,8 @@ def test_stop_button_stops_move(window, qtbot, monkeypatch):
     qtbot.waitUntil(lambda: not hit.busy, timeout=10000)
     assert "stopped (STOP pressed)" in hit.error_label.text()
     assert hit.cards[0].state_label.text() == "PARTLY INSERTED"
-    assert not hit.cards[0].retract_btn.isEnabled()  # must insert first
+    # stopped halfway: both Insert and Retract can be chosen (user, 2026-11-17)
+    assert hit.cards[0].retract_btn.isEnabled()
     assert hit.cards[0].insert_btn.isEnabled()
     assert not hit.cards[1].insert_btn.isEnabled()  # interlock: photodiode partly in
 

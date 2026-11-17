@@ -77,10 +77,16 @@ def test_retract_like_sgsample():
     assert motion_commands(sim) == ["D:1,100000,1000000,200", "M:,+30000000,,,,,,"]
 
 
-def test_retract_refused_unless_inserted():
+def test_retract_from_partial_position_moves_remaining_distance():
+    # after a STOP halfway (user, 2026-11-17): retract moves out by what is left
     drv, sim = make(HitMvSim(positions=(30000000, 12345)))
-    with pytest.raises(DeviceError, match="not at the inserted position"):
-        drv.retract(1)
+    assert drv.retract(1) == {"position": 30000000}
+    assert motion_commands(sim) == ["D:1,100000,1000000,200", "M:,+29987655,,,,,,"]
+
+
+def test_retract_when_already_retracted_sends_nothing():
+    drv, sim = make()
+    assert drv.retract(1)["position"] == 30000000
     assert motion_commands(sim) == []
 
 

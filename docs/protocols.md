@@ -138,8 +138,9 @@ Confirmed operations (axis 1 = mirror; axis 0 = photodiode identical with p0 —
 Notes:
 - Command format: all 8 slots written (`H:,1,,,,,,` = 7 commas); empty slot = no operation.
 - **Retract is relative (`M:` +30000000 = +60 mm real), not absolute.** It relies on the insert
-  having homed to exactly 0. If retract is issued from any other position it won't end at 30000000. (Our driver
-  should consider an absolute `A:,30000000` or check position first — decide in Phase 1.)
+  having homed to exactly 0. If retract is issued from any other position it won't end at 30000000.
+  **Our driver (decided 2026-11-17):** `M:+(30000000 − current position)` — same command as SGSample
+  from 0; from a partial position (after STOP) it moves out by the remaining distance.
 - SGSample sets the speed (`D:`) before the relative move, with the same values already stored.
 - Homing speed (≈ 1 mm/s real) matches `50000,500000` values in the `F:MU` dump (origin-return S/F).
 - During motion: tight `Q:` + `!:` polling (~30 Hz); idle: `Q:` ~2 Hz. No `NG`, no unanswered

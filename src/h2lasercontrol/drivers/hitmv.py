@@ -261,18 +261,20 @@ class HitMv(Driver):
 
     @action(moves=True)
     def retract(self, axis: int) -> dict[str, Any]:
-        """Retract = speed `D:` + relative `M:` +travel, as SGSample. Only from the inserted
-        position (0), because the relative move only ends at the retracted position from there."""
+        """Retract = speed `D:` + relative `M:+(retracted - current)`. From the inserted position
+        this is exactly SGSample's `M:+30000000`; after a stop halfway it moves out by the
+        remaining distance (user, 2026-11-17). Never blocked by the interlock (out = safe)."""
         ax = self._axis(axis)
         pos = self._require_ready(axis)
-        if pos != ax.inserted:
-            raise DeviceError(
-                f"{self.name}: axis {axis} is at {pos}, not at the inserted position "
-                f"{ax.inserted}; retract refused (insert first, or use move_abs)"
-            )
+        lo, hi = sorted((ax.inserted, ax.retracted))
+        if pos == ax.retracted:
+            return {"position": pos, "note": "already retracted"}
+        if not lo <= pos <= hi:
+            raise DeviceError(f"{self.name}: axis {axis} is at {pos}, outside [{lo}, {hi}]; "
+                              "retract refused")
         s, f, r = self.speed
         self._command(f"D:{axis},{s},{f},{r}")
-        self._command(f"M:{slots(axis, f'{ax.retracted - ax.inserted:+d}')}")
+        self._command(f"M:{slots(axis, f'{ax.retracted - pos:+d}')}")
         pos = self._wait_done(axis, self.move_timeout)
         if pos != ax.retracted:
             raise DeviceError(f"{self.name}: axis {axis} ended at {pos}, expected {ax.retracted}")

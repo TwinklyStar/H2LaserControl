@@ -175,9 +175,10 @@
     HIT-MV position in real mm (0 = inserted, 60 = retracted).
 
 ## Open questions
-- Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
-  *Current code:* relative `M:` as SGSample, refused unless the axis is at 0 (`move_abs` exists
-  for other cases). Change if the user prefers `A:`.
+- ~~Retract: relative `M:` or absolute `A:`?~~ **Decided (user, 2026-11-17): retract must also
+  work after a stop halfway.** Retract = `D:` + relative `M:+(retracted − current)`: identical to
+  SGSample's `M:+30000000` from 0, and from a partial position it moves out by the remaining
+  distance. ⏳ Retract from a partial position not yet run on hardware (needs permission).
 - ELL14: send the `0x07` terminator like ELLO, or none as the manual specifies? Both work.
   *Current code:* `0x07` (config `terminator`), works on hardware.
 - ELL14 position counter can be outside 0–360° (now −355.31°). Show it modulo 360 in the GUI?
