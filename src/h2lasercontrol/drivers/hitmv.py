@@ -73,6 +73,7 @@ class HitMv(Driver):
         insert_timeout: float = 120.0,
         move_timeout: float = 90.0,
         reply_timeout: float = 2.0,
+        exclusive_axes: bool = True,
         poll_interval: float = 0.2,
         settle_interval: float = 0.15,
         settle_timeout: float = 5.0,
@@ -84,6 +85,7 @@ class HitMv(Driver):
         self.insert_timeout = insert_timeout
         self.move_timeout = move_timeout
         self.reply_timeout = reply_timeout
+        self.exclusive_axes = exclusive_axes
         self.poll_interval = poll_interval
         self.settle_interval = settle_interval
         self.settle_timeout = settle_timeout
@@ -184,6 +186,23 @@ class HitMv(Driver):
         assert pos is not None
         return pos
 
+    def _check_interlock(self, axis: int) -> None:
+        """Interlock (user requirement F2a): the feedthroughs must never be inserted together.
+        Before moving `axis` away from retracted, every other configured axis must be exactly
+        at its retracted position and not busy. Unknown state counts as not retracted."""
+        if not self.exclusive_axes:
+            return
+        pos = self._positions()
+        busy = self._busy()
+        for n, other in self.axes.items():
+            if n == axis:
+                continue
+            if pos[n] != other.retracted or busy[n] is not False:
+                raise DeviceError(
+                    f"{self.name}: interlock - {other.name} (axis {n}) is not retracted "
+                    f"(position {pos[n]}); retract it before moving {self.axes[axis].name}"
+                )
+
     def _wait_settled(self, axes: list[int]) -> None:
         """After a stop: wait until the positions stop changing (deceleration takes ~0.2 s+)."""
         last = self._positions(record=False)
@@ -225,6 +244,7 @@ class HitMv(Driver):
         """Insert = origin return (`H:`), ends at position 0. Takes ~62 s (~30 s with fast homing)."""
         ax = self._axis(axis)
         self._require_ready(axis)
+        self._check_interlock(axis)
         sent_b = None
         if self.homing_max_speed:
             hs = self.get_homing_speed(axis)
@@ -266,6 +286,8 @@ class HitMv(Driver):
         if not isinstance(units, int) or not lo <= units <= hi:
             raise ValueError(f"target must be an integer within [{lo}, {hi}], not {units!r}")
         self._require_ready(axis)
+        if units != ax.retracted:
+            self._check_interlock(axis)
         s, f, r = self.speed
         self._command(f"D:{axis},{s},{f},{r}")
         self._command(f"A:{slots(axis, f'{units:+d}')}")

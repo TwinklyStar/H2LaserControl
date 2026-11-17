@@ -61,6 +61,11 @@ logs/             operation logs (git-ignored)
   flood the log); the commands that change something are.
 - **Threading**: a driver is used from one thread. `request_stop()` is the only cross-thread call:
   wait loops (`_sleep_or_stop`) see it, stop the device (`L:` / `st`) and raise `Aborted`.
+- **HIT-MV interlock (F2a)**: never two feedthroughs inserted. Driver `_check_interlock` before
+  `insert` / `move_abs` away from retracted: every other axis must be exactly retracted and not
+  busy (unknown ⇒ blocked); retract is never blocked. GUI mirrors it: the other card's Insert is
+  disabled with "🔒 Locked: retract the … first". Config `exclusive_axes = true`. Moves into the
+  Phase 3 rule engine later.
 - **Safety checks in drivers**: HIT-MV checks `!:` before any command (busy → NG), refuses
   unconfigured axes, retract only from position 0, `move_abs` only within [0, 30000000],
   stops the axis on timeout; refuses to run if `?:Z` ≠ HIT mode. ELL14 refuses jog step 0

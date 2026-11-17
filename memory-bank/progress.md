@@ -168,6 +168,9 @@
     until the move ended → now called directly; (2) stop flag cleared at the start of `execute()`
     could swallow an early STOP → cleared before "busy" instead.
   - 55 tests pass (5 GUI tests on simulators), ruff clean. Screenshots checked offscreen.
+  - **New requirement (user): HIT-MV axes 0 and 1 must never be inserted at the same time** —
+    retract one before inserting the other; GUI disables the other axis's buttons while one is
+    not retracted. Recorded as design F2a; enforced in driver + GUI (config `exclusive_axes`).
   - Display choices (changeable): ELL14 angle shown modulo 360° (raw counter in tooltip);
     HIT-MV position in real mm (0 = inserted, 60 = retracted).
 

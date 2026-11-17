@@ -66,7 +66,9 @@ class AxisCard(QGroupBox):
             self.panel.axis_action("insert", self.axis)
 
     def display(self, info: dict[str, Any] | None, *, can_act: bool, moving: str | None,
-             elapsed: float | None) -> None:
+                elapsed: float | None, blocked_by: str | None = None) -> None:
+        """`blocked_by`: label of another feedthrough that is not retracted (interlock F2a:
+        never two inserted at once) -> Insert is disabled. Retract is never blocked."""
         pos = None if info is None else info.get("position")
         upmm = self.panel.units_per_mm
         if pos is None:
@@ -84,6 +86,10 @@ class AxisCard(QGroupBox):
                 t = f" ({elapsed:.0f} s so far)" if elapsed is not None else ""
                 self._set_state(f"{verb} …", BLUE, f"Moving{t}, about 30 s in total. "
                                 "Press STOP to stop.")
+            elif pos == self.retracted and blocked_by:
+                self._set_state("RETRACTED", GREEN,
+                                f"🔒 Locked: retract the {blocked_by} first "
+                                "(the two must never be inserted together).")
             elif pos == self.retracted:
                 self._set_state("RETRACTED", GREEN, "Out of the beam (normal state).")
             elif pos == self.inserted:
@@ -96,10 +102,13 @@ class AxisCard(QGroupBox):
         self.alarm_label.setVisible(bool(alarms))
 
         connected_axis = pos is not None
-        self.insert_btn.setEnabled(can_act and connected_axis and pos != self.inserted)
+        self.insert_btn.setEnabled(can_act and connected_axis and pos != self.inserted
+                                   and not blocked_by)
         self.retract_btn.setEnabled(can_act and connected_axis and pos == self.inserted)
-        self.insert_btn.setToolTip("Already inserted" if pos == self.inserted else
-                                   "Move into the beam (origin return)")
+        self.insert_btn.setToolTip(
+            f"Locked: the {blocked_by} is not retracted. Retract it first." if blocked_by else
+            "Already inserted" if pos == self.inserted else "Move into the beam (origin return)"
+        )
         self.retract_btn.setToolTip(
             "Move out of the beam" if pos == self.inserted else
             "Already retracted" if pos == self.retracted else
@@ -132,8 +141,8 @@ class HitMvPanel(DevicePanel):
             self.cards[n] = card
             row.addWidget(card)
         self.body.addLayout(row)
-        note = QLabel("Insert takes about 30 s, retract about 30 s. "
-                      "Both feedthroughs are normally retracted.")
+        note = QLabel("Insert takes about 30 s, retract about 30 s. Both feedthroughs are normally "
+                      "retracted, and only one may be inserted at a time.")
         set_role(note, "muted")
         self.body.addWidget(note)
 
@@ -157,7 +166,17 @@ class HitMvPanel(DevicePanel):
         axes = self.state.get("axes", {})
         if not self.busy:
             self.moving = None
+        exclusive = bool(self.cfg.settings.get("exclusive_axes", True))
+        # axes that are not exactly retracted (or are moving / unknown) lock the others
+        not_retracted = set()
         for n, card in self.cards.items():
+            info = axes.get(self.axis_names[n]) or {}
+            if info.get("position") != card.retracted or info.get("busy") or (
+                    self.moving and self.moving[0] == n):
+                not_retracted.add(n)
+        for n, card in self.cards.items():
+            others = [self.cards[o].label for o in sorted(not_retracted) if o != n]
+            blocked_by = " and ".join(others) if exclusive and self.connected and others else None
             info = dict(axes.get(self.axis_names[n]) or {}) if self.connected else None
             moving = elapsed = None
             if self.moving and self.moving[0] == n:
@@ -165,4 +184,5 @@ class HitMvPanel(DevicePanel):
                 if self.progress_info.get("axis") == n:
                     info = {**(info or {}), "position": self.progress_info["position"]}
                     elapsed = self.progress_info.get("elapsed")
-            card.display(info, can_act=self.can_act, moving=moving, elapsed=elapsed)
+            card.display(info, can_act=self.can_act, moving=moving, elapsed=elapsed,
+                         blocked_by=blocked_by)

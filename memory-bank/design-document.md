@@ -78,6 +78,11 @@ is where every command passes through.
 - F2. HIT-MV: move each of the 2 linear feedthroughs to named positions ("IN" / "OUT"),
   query position / busy state, stop, home (origin return). IN = origin return (as in SGSample),
   with **homing max speed raised to 1000000 units/s (2 mm/s real)** to halve the insert time.
+- F2a. **HIT-MV interlock (user, 2026-11-17): the two feedthroughs must never be inserted at the
+  same time.** Always retract one before inserting the other. "Inserted" here means *not fully
+  retracted* (inserted, partly inserted after a stop, or moving). GUI: while one axis is not
+  retracted, the other axis's operation buttons are disabled (with the reason). Also enforced in
+  the driver (scripts can't bypass it); unknown position ⇒ blocked.
 - F3. MFF101: flip to position 1 / 2 (named, e.g. "DUMP" / "PASS"), query current position.
 - F3b. DG645: functions to be defined when installed (Phase 0 revisit). Transport must allow
   RS-232 now and LAN (TCP) later without changing the driver.

@@ -62,6 +62,24 @@ def test_insert_and_retract_mirror(window, qtbot):
     assert all(e["user"] == "tester" for e in entries)
 
 
+def test_interlock_locks_other_axis(window, qtbot):
+    hit = panel(window, "hitmv")
+    pd, mirror = hit.cards[0], hit.cards[1]
+    assert pd.insert_btn.isEnabled() and mirror.insert_btn.isEnabled()
+    mirror.insert_btn.click()
+    # locked already while the mirror is moving, and while it is inserted
+    qtbot.waitUntil(lambda: hit.busy, timeout=5000)
+    assert not pd.insert_btn.isEnabled()
+    qtbot.waitUntil(lambda: mirror.state_label.text() == "INSERTED", timeout=10000)
+    assert not pd.insert_btn.isEnabled() and not pd.retract_btn.isEnabled()
+    assert "Locked" in pd.hint_label.text() and "VUV mirror" in pd.hint_label.text()
+    assert mirror.retract_btn.isEnabled()  # getting out is always allowed
+    mirror.retract_btn.click()
+    qtbot.waitUntil(lambda: mirror.state_label.text() == "RETRACTED" and not hit.busy,
+                    timeout=10000)
+    assert pd.insert_btn.isEnabled() and "Locked" not in pd.hint_label.text()
+
+
 def test_stop_button_stops_move(window, qtbot, monkeypatch):
     monkeypatch.setattr(device_service, "make_sim_transport",
                         lambda cfg: FakeTransport(HitMvSim(busy_polls=10**6)))
@@ -78,6 +96,8 @@ def test_stop_button_stops_move(window, qtbot, monkeypatch):
     assert "stopped (STOP pressed)" in hit.error_label.text()
     assert hit.cards[0].state_label.text() == "PARTLY INSERTED"
     assert not hit.cards[0].retract_btn.isEnabled()  # must insert first
+    assert hit.cards[0].insert_btn.isEnabled()
+    assert not hit.cards[1].insert_btn.isEnabled()  # interlock: photodiode partly in
 
 
 def test_rotation_mount_go_to_angle(window, qtbot):

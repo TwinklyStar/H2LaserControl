@@ -143,6 +143,33 @@ def test_named_positions():
         drv.move_to(1, "HALF")
 
 
+@pytest.mark.parametrize("other_pos", [0, 12345678])  # other axis inserted / partly inserted
+def test_interlock_never_two_inserted(other_pos):
+    drv, sim = make(HitMvSim(positions=(30000000, other_pos)))
+    with pytest.raises(DeviceError, match="interlock"):
+        drv.insert(0)
+    with pytest.raises(DeviceError, match="interlock"):
+        drv.move_abs(0, 15000000)
+    assert motion_commands(sim) == []  # nothing was sent
+
+
+def test_interlock_allows_getting_out():
+    # abnormal state (both inserted, e.g. via vendor software): retracting is always allowed
+    drv, sim = make(HitMvSim(positions=(0, 0)))
+    drv.retract(1)
+    assert sim.pos[:2] == [0, 30000000]
+    drv.move_abs(1, 30000000)  # moving to the retracted end is fine too
+    drv.retract(0)
+    drv.insert(1)  # now the photodiode is out -> mirror may go in
+    assert sim.pos[:2] == [30000000, 0]
+
+
+def test_interlock_can_be_disabled_in_config():
+    drv, sim = make(HitMvSim(positions=(30000000, 0)), exclusive_axes=False)
+    drv.insert(0)
+    assert sim.pos[:2] == [0, 0]
+
+
 def test_oplog_hides_polling(tmp_path):
     oplog = OpLog(tmp_path, user="t")
     drv, _ = make(oplog=oplog)
@@ -152,4 +179,5 @@ def test_oplog_hides_polling(tmp_path):
     assert (done["action"], done["event"], done["args"]) == ("insert", "done", {"axis": 1})
     sent = [tx.strip() for tx, _ in done["exchanges"]]
     assert "B:1,50000,1000000,200,250000" in sent and "H:,1,,,,,," in sent
-    assert sent.count("!:") <= 1  # polling during the wait is not logged
+    # only the ready check + interlock check are logged, not the polling during the wait
+    assert sent.count("!:") <= 2

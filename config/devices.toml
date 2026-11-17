@@ -15,6 +15,9 @@ mode = "HIT"
 # homing S/R/M and F = homing_max_speed (user requirement). 0 = do not send B:.
 homing_max_speed = 1000000      # units/s = 2 mm/s real
 speed = [100000, 1000000, 200]  # D: start, max (units/s), accel (ms) — sent before retract, as SGSample
+# Interlock (user, 2026-11-17): the two feedthroughs must NEVER be inserted at the same time.
+# Insert (or any move away from retracted) is refused unless every other axis is fully retracted.
+exclusive_axes = true
 insert_timeout_s = 120
 move_timeout_s = 90
 

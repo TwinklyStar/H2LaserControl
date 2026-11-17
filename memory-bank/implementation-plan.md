@@ -126,7 +126,9 @@ device = a new tab. Simulation mode (`--sim`) for work without hardware, clearly
 
 ## Phase 3 — Interlock / ordering rules
 
-**3.1 Rule model** (in config): preconditions per action, e.g.
+**3.1 Rule model** (in config): preconditions per action. First rule already enforced since Phase 2
+(user, 2026-11-17): HIT-MV axis 0 and axis 1 never inserted together (driver + GUI, config
+`exclusive_axes`) — move it into the rule engine here. Other example:
 `hitmv.pd_axis -> IN requires mff101.flip == DUMP`; mode per rule: *block with message* or
 *auto-perform prerequisite*.
 **3.2 Rule engine** in the sequencer; every action checked before execution; unknown
