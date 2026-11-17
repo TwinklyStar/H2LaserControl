@@ -183,7 +183,8 @@
     log), Go to max / Go to min (= max + 45°), Set energy % (T = cos²(2·(θ − θ_max))), live
     "Now ≈ x % of max". Home offset stays factory. Saved in `config/saved_angles.json` (program-
     written; simulation uses `logs/sim/`). `energy.py` + 4 driver actions. 72 tests pass.
-    ⏳ Not yet on hardware: the user saves the real max-energy angle and tries the buttons.
+    Real max-energy angle saved by the user on hardware: **30.9877°** (2026-11-17 12:26,
+    `config/saved_angles.json`, committed as lab state).
   - Display choices (changeable): ELL14 angle shown modulo 360° (raw counter in tooltip);
     HIT-MV position in real mm (0 = inserted, 60 = retracted).
 
