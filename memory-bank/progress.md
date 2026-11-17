@@ -6,8 +6,9 @@
 - **Phase 1 — in progress.** 1.1 ✅, 1.2 ✅, 1.3 ✅ (2 devices; MFF101/DG645 not installed).
   **1.4 ELL14 ✅ and 1.6 HIT-MV ✅ validated on hardware** (2026-11-17, incl. post-stop settle fix).
 - **Phase 2 — in progress** (started 2026-11-17). 2.1 services ✅, 2.2 tabbed main window ✅,
-  2.3 history panel ✅, 2.4 startup/shutdown ✅, 2.5 launchers ✅ — all tested in **simulation**
-  only. ⏳ Next: try with the real devices (user), then usability feedback. 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
+  2.3 history panel ✅, 2.4 startup/shutdown ✅, 2.5 launchers ✅ — tested in simulation and
+  **on the real devices by the user ✅** (2026-11-17). ⏳ Left: retract-from-partial on hardware,
+  usability check by a non-developer lab member. 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -171,6 +172,12 @@
   - **New requirement (user): HIT-MV axes 0 and 1 must never be inserted at the same time** —
     retract one before inserting the other; GUI disables the other axis's buttons while one is
     not retracted. Recorded as design F2a; enforced in driver + GUI (config `exclusive_axes`).
+  - **GUI tested on real devices by the user ✅ (12:08–12:14, op-log `logs/oplog-2026-11-17.jsonl`):**
+    mirror insert 32 s → retract STOPped after 6 s → insert from there 7 s → retract 31 s;
+    photodiode insert 32 s → retract 31 s (all ended at exactly 0 / 30000000); ELL14 3× go-to 31°
+    + home, jog ×7, ended 30.99°. User: "they work well". Not yet on hardware: **retract from a
+    partial position** (user chose Insert after the STOP). Operator field was left at the Windows
+    account name (`h2_laserroom_03`).
   - Display choices (changeable): ELL14 angle shown modulo 360° (raw counter in tooltip);
     HIT-MV position in real mm (0 = inserted, 60 = retracted).
 
@@ -190,5 +197,7 @@
 - ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
 - Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation.
-- Phase 2: user tries the GUI (simulation first, then real devices — any click that moves a
-  HIT-MV feedthrough is the user's own action); collect feedback; then validate 2.x on hardware.
+- Phase 2 finish: retract from a partial position on hardware (Insert → STOP → Retract);
+  a non-developer lab member operates the GUI without help; optional: saved ELL14 angles,
+  require an operator name at start-up?
+- Phase 3: write down the full interlock rule list with the user (most rules need the MFF101).
