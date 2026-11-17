@@ -178,6 +178,12 @@
     + home, jog ×7, ended 30.99°. User: "they work well". Not yet on hardware: **retract from a
     partial position** (user chose Insert after the STOP). Operator field was left at the Windows
     account name (`h2_laserroom_03`).
+  - **ELL14 = half-wave plate for 355 nm before a PBS** (user) → energy control, option 2 chosen:
+    "Laser energy (355 nm)" section: Save current angle as max energy (confirm; old → new in the
+    log), Go to max / Go to min (= max + 45°), Set energy % (T = cos²(2·(θ − θ_max))), live
+    "Now ≈ x % of max". Home offset stays factory. Saved in `config/saved_angles.json` (program-
+    written; simulation uses `logs/sim/`). `energy.py` + 4 driver actions. 72 tests pass.
+    ⏳ Not yet on hardware: the user saves the real max-energy angle and tries the buttons.
   - Display choices (changeable): ELL14 angle shown modulo 360° (raw counter in tooltip);
     HIT-MV position in real mm (0 = inserted, 60 = retracted).
 
@@ -198,6 +204,6 @@
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
 - Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation.
 - Phase 2 finish: retract from a partial position on hardware (Insert → STOP → Retract);
-  a non-developer lab member operates the GUI without help; optional: saved ELL14 angles,
-  require an operator name at start-up?
+  save the real max-energy angle and try the energy buttons on hardware; a non-developer lab
+  member operates the GUI without help; open: require an operator name at start-up?
 - Phase 3: write down the full interlock rule list with the user (most rules need the MFF101).

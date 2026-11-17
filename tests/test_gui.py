@@ -26,7 +26,8 @@ def window(qtbot, tmp_path, monkeypatch, request):
     monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.StandardButton.Yes)
     oplog = OpLog(tmp_path / "logs", user="tester")
     settings = QSettings(str(tmp_path / "gui.ini"), QSettings.Format.IniFormat)
-    w = MainWindow(load_config(DEFAULT_CONFIG), oplog, sim=True, settings=settings)
+    w = MainWindow(load_config(DEFAULT_CONFIG), oplog, sim=True, settings=settings,
+                   state_dir=str(tmp_path))
     qtbot.addWidget(w)
     # shut the device threads down even if the test fails (otherwise the run hangs at exit)
     request.addfinalizer(lambda: [s.shutdown() for s in w.services])
@@ -108,6 +109,22 @@ def test_rotation_mount_go_to_angle(window, qtbot):
     qtbot.waitUntil(lambda: ell.angle_label.text().startswith("45.0"), timeout=5000)
     rows = [window.log_panel.table.item(r, 3).text() for r in range(window.log_panel.table.rowCount())]
     assert "move abs" in rows
+
+
+def test_energy_section(window, qtbot, tmp_path):
+    ell = panel(window, "ell14")
+    assert "not saved" in ell.energy_label.text()
+    assert not any(w.isEnabled() for w in ell.energy_controls)  # nothing saved yet
+    ell._save_max()  # confirm dialog answered "Yes" by the fixture
+    qtbot.waitUntil(lambda: "of max" in ell.energy_label.text(), timeout=5000)
+    assert "100 %" in ell.energy_label.text()
+    assert all(w.isEnabled() for w in ell.energy_controls)
+    assert (tmp_path / "saved_angles.json").exists()  # test folder, not config/
+    ell.pct_spin.setValue(50)
+    ell.run("set_energy", percent=50.0)
+    qtbot.waitUntil(lambda: "50 %" in ell.energy_label.text(), timeout=5000)
+    ell.run("go_to_min_energy")
+    qtbot.waitUntil(lambda: ell.energy_label.text().startswith("Now ≈ 0 %"), timeout=5000)
 
 
 def test_rotation_mount_refuses_bad_offset(window, qtbot):

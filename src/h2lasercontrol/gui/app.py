@@ -39,7 +39,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     oplog = OpLog(LOG_DIR / "sim" if args.sim else LOG_DIR)
-    window = MainWindow(load_config(args.config), oplog, sim=args.sim)
+    # simulation must never overwrite the real saved angles (config/saved_angles.json)
+    state_dir = str(LOG_DIR / "sim") if args.sim else None
+    window = MainWindow(load_config(args.config), oplog, sim=args.sim, state_dir=state_dir)
     window.show()
     window.start(auto_connect=not args.no_connect)
     return app.exec()

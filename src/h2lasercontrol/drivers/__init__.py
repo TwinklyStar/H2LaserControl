@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from ..config import DeviceConfig, resolve_port
+import os
+from pathlib import Path
+
+from ..config import DEFAULT_CONFIG, DeviceConfig, resolve_port
+from ..energy import AngleStore
 from ..oplog import OpLog
 from ..transport import SerialTransport, Transport
 from .base import Aborted, DeviceError, DeviceTimeout, Driver, action
@@ -23,9 +27,11 @@ __all__ = [
 
 
 def create_driver(cfg: DeviceConfig, oplog: OpLog | None = None,
-                  transport: Transport | None = None) -> Driver:
+                  transport: Transport | None = None,
+                  state_dir: str | os.PathLike[str] | None = None) -> Driver:
     """Build the driver for one configured device. Without `transport`, a SerialTransport on
-    the port found by USB serial number is used (not opened yet: call `connect`)."""
+    the port found by USB serial number is used (not opened yet: call `connect`).
+    `state_dir`: where program-written state lives (saved_angles.json); default config/."""
     s = cfg.settings
     if transport is None:
         transport = SerialTransport(resolve_port(cfg), cfg.baudrate, rtscts=cfg.rtscts,
@@ -36,6 +42,7 @@ def create_driver(cfg: DeviceConfig, oplog: OpLog | None = None,
             address=s.get("address", "0"),
             terminator=s.get("terminator", "\x07").encode("ascii"),
             positions={k: float(v) for k, v in s.get("positions", {}).items()},
+            angle_store=AngleStore(Path(state_dir or DEFAULT_CONFIG.parent) / "saved_angles.json"),
         )
     if cfg.type == "hitmv":
         axes = {}

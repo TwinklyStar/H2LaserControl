@@ -46,9 +46,11 @@ class DeviceService(QObject):
     _submit = Signal(str, dict)
     _shutdown = Signal()
 
-    def __init__(self, cfg: DeviceConfig, oplog: OpLog, *, sim: bool = False) -> None:
+    def __init__(self, cfg: DeviceConfig, oplog: OpLog, *, sim: bool = False,
+                 state_dir: str | None = None) -> None:
         super().__init__()
         self.cfg = cfg
+        self.state_dir = state_dir  # where saved angles are written (sim: separate folder)
         self.key = cfg.key
         self.oplog = oplog
         self.sim = sim
@@ -104,7 +106,7 @@ class DeviceService(QObject):
 
     def _new_driver(self) -> Driver:
         transport = make_sim_transport(self.cfg) if self.sim else None
-        drv = create_driver(self.cfg, self.oplog, transport)
+        drv = create_driver(self.cfg, self.oplog, transport, state_dir=self.state_dir)
         drv.progress = self.progress.emit
         return drv
 

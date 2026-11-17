@@ -8,7 +8,7 @@ their **own vendor software**:
 | Device | Vendor | Role in the setup | Vendor software |
 |---|---|---|---|
 | HIT-MV stage controller (2 linear feedthroughs) | Sigma Koki (OptoSigma) | In the VUV diagnostic chamber: axis 0 inserts the **VUV photodiode** (pulse energy), axis 1 inserts the **45° VUV mirror** that sends the 122 nm beam to the VUV beam profiler. Both normally **retracted (30000000 units = 60 mm real)**; inserted = 0 (mechanical origin) | Sigma Koki software |
-| ELL14 rotation mount | Thorlabs (Elliptec) | Rotate an optic | Elliptec software (ELLO) |
+| ELL14 rotation mount | Thorlabs (Elliptec) | Rotates the **half-wave plate for the 355 nm laser** in front of a **PBS** → sets the transmitted 355 nm **pulse energy** (user, 2026-11-17). Users save the angle that **maximizes the output energy** | Elliptec software (ELLO) |
 | MFF101/M motorized flip mount | Thorlabs | Flip an optic in/out (e.g. dump a laser beam) | Thorlabs Kinesis |
 | DG645 digital delay generator (not installed yet) | Stanford Research Systems | Timing/delays; controlled via **RS-232** now, maybe **LAN** later | — (manual `ref/DG645m.pdf`, remote programming from printed p. 41) |
 
@@ -89,6 +89,10 @@ is where every command passes through.
 - F4. ELL14: all functions of the ELLO panel — home (with direction), get/set home offset,
   get/set jog step, jog forward/backward, move absolute, move relative, query angle,
   clean device, clean & optimize, stop.
+- F4a. **355 nm energy control (user, 2026-11-17, option 2):** "Save current angle as max energy",
+  "Go to max energy", "Go to min energy" (= max + 45°) and "Set energy %" using
+  T = cos²(2·(θ − θ_max)). Home offset stays factory-set (Home = fixed reference); the max-energy
+  angle is stored by the program (`config/saved_angles.json`), every change logged (old → new).
 - F5. Operation log: every user action and every device command/response with timestamp,
   stored persistently on disk and viewable.
 - F6. (Phase 3) Ordering rules defined in config, checked before every action.

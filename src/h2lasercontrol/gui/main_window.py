@@ -26,7 +26,7 @@ from .style import TAB_STATES, dot_icon, set_role
 
 class MainWindow(QMainWindow):
     def __init__(self, config: dict[str, DeviceConfig], oplog: OpLog, *, sim: bool = False,
-                 settings: QSettings | None = None):
+                 settings: QSettings | None = None, state_dir: str | None = None):
         super().__init__()
         self.oplog = oplog
         self.sim = sim
@@ -39,7 +39,8 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
         if sim:
-            banner = QLabel("SIMULATION — no real device is controlled. Logs go to logs/sim/.")
+            banner = QLabel("SIMULATION — no real device is controlled. Logs and saved angles "
+                            "go to logs/sim/.")
             banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
             set_role(banner, "sim")
             root.addWidget(banner)
@@ -68,7 +69,7 @@ class MainWindow(QMainWindow):
                 continue  # device type without a GUI panel yet
             label = cfg.settings.get("label", key)
             labels[key] = label
-            service = DeviceService(cfg, oplog, sim=sim)
+            service = DeviceService(cfg, oplog, sim=sim, state_dir=state_dir)
             panel = panel_cls(service, cfg)
             index = self.tabs.addTab(panel, label)
             panel.tab_state_changed.connect(

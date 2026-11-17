@@ -33,6 +33,10 @@ BUSY_TEXT = {
     "clean_and_optimize": "Cleaning and optimizing (several minutes; STOP cancels)",
     "set_jog_step": "Saving step",
     "set_home_offset": "Saving home offset",
+    "go_to_max_energy": "Going to max energy",
+    "go_to_min_energy": "Going to min energy",
+    "set_energy": "Setting energy",
+    "save_max_energy": "Saving max-energy angle",
 }
 
 
@@ -61,6 +65,44 @@ class Ell14Panel(DevicePanel):
         top.addWidget(self.angle_label)
         top.addWidget(self.info_label)
         self.body.addLayout(top)
+
+        # 355 nm energy: half-wave plate + PBS (design F4a)
+        ebox = QGroupBox("Laser energy (355 nm)")
+        e = QGridLayout(ebox)
+        e.setHorizontalSpacing(10)
+        e.setVerticalSpacing(10)
+        self.energy_label = QLabel("—")
+        self.energy_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        self.max_label = QLabel()
+        self.max_label.setWordWrap(True)
+        set_role(self.max_label, "muted")
+        e.addWidget(self.energy_label, 0, 0, 1, 4)
+        e.addWidget(self.max_label, 1, 0, 1, 4)
+        self.energy_controls: list[QWidget] = []
+        go_max = self._button("Go to max energy", lambda: self.run("go_to_max_energy"), primary=True)
+        go_min = self._button("Go to min energy", lambda: self.run("go_to_min_energy"))
+        e.addWidget(go_max, 2, 0, 1, 2)
+        e.addWidget(go_min, 2, 2)
+        e.addWidget(QLabel("Set energy"), 3, 0)
+        self.pct_spin = QDoubleSpinBox()
+        self.pct_spin.setRange(0, 100)
+        self.pct_spin.setDecimals(1)
+        self.pct_spin.setSingleStep(5)
+        self.pct_spin.setSuffix(" %")
+        self.pct_spin.setValue(100)
+        self.pct_spin.setMinimumWidth(110)
+        self.controls.append(self.pct_spin)
+        e.addWidget(self.pct_spin, 3, 1)
+        set_pct = self._button("Set", lambda: self.run("set_energy", percent=self.pct_spin.value()))
+        e.addWidget(set_pct, 3, 2)
+        self.energy_controls += [go_max, go_min, set_pct, self.pct_spin]
+        e.addWidget(self._button("Save current angle as max energy …", self._save_max), 4, 0, 1, 3)
+        note = QLabel("Energy % is estimated from the angle: cos²(2·(angle − max angle)); "
+                      "min = max + 45°.")
+        set_role(note, "muted")
+        e.addWidget(note, 5, 0, 1, 4)
+        e.setColumnStretch(3, 1)
+        self.body.addWidget(ebox)
 
         # everyday controls
         box = QGroupBox("Rotate")
@@ -160,6 +202,16 @@ class Ell14Panel(DevicePanel):
         self.maint.setVisible(on)
         self.maint_toggle.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
 
+    def _save_max(self) -> None:
+        pos = self.state.get("position")
+        if pos is None:
+            return
+        old = (self.state.get("max_energy") or {}).get("max_energy_deg")
+        prev = f"\n\nPrevious max-energy angle: {old:.2f}°" if old is not None else ""
+        if self.confirm("Save max energy",
+                        f"Save the current angle {pos % 360:.2f}° as the max-energy angle?{prev}"):
+            self.run("save_max_energy")
+
     def _set_offset(self) -> None:
         v = self.offset_spin.value()
         if self.confirm("Home offset", f"Change the home offset to {v:.2f}°?\n\n"
@@ -209,5 +261,23 @@ class Ell14Panel(DevicePanel):
                 self.abs_spin.setValue(round(shown, 2) % 360)
                 self.jog_spin.setValue(jog)
                 self.offset_spin.setValue(off)
+        saved = self.state.get("max_energy") if self.connected else None
+        frac = self.state.get("energy_fraction")
+        if not self.connected:
+            self.energy_label.setText("—")
+            self.max_label.setText("")
+        elif saved:
+            self.energy_label.setText(f"Now ≈ {100 * frac:.0f} % of max" if frac is not None else "—")
+            by = f" by {saved['saved_by']}" if saved.get("saved_by") else ""
+            when = str(saved.get("saved_at", ""))[:16].replace("T", " ")
+            self.max_label.setText(f"Max-energy angle {saved['max_energy_deg']:.2f}° "
+                                   f"(saved {when}{by})")
+        else:
+            self.energy_label.setText("Max-energy angle not saved yet")
+            self.max_label.setText("Tune the angle for maximum energy, then press "
+                                   "“Save current angle as max energy”.")
         for w in self.controls:
             w.setEnabled(self.can_act)
+        for w in self.energy_controls:
+            w.setEnabled(self.can_act and bool(saved))
+            w.setToolTip("" if saved else "Save the max-energy angle first")

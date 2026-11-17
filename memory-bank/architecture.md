@@ -36,6 +36,7 @@ src/h2lasercontrol/
   oplog.py        operation history (JSON Lines, fsync per line)
   config.py       load config/devices.toml, resolve_port() by USB serial
   sim.py          HitMvSim, Ell14Sim — simulated devices for tests / GUI work without hardware
+  energy.py       HWP+PBS energy math (cos²) + AngleStore (config/saved_angles.json, atomic write)
   services/       device_service.py — DeviceService: one QThread per device, owns the driver
   gui/            app.py (entry, --sim, single-instance lock), main_window.py (tabs + history),
                   log_panel.py, style.py, panels/ (base.py DevicePanel, hitmv_panel.py,

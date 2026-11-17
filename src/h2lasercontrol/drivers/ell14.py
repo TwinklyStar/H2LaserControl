@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from ..energy import AngleStore, angle_for_fraction, fraction_at
 from ..oplog import OpLog
 from ..transport import Transport, TransportTimeout
 from .base import Aborted, DeviceError, DeviceTimeout, Driver, action
@@ -77,6 +78,7 @@ class Ell14(Driver):
         clean_timeout: float = 900.0,
         clean_poll: float = 2.0,
         stop_reply_timeout: float = 3.0,
+        angle_store: AngleStore | None = None,
     ) -> None:
         super().__init__(name, transport, oplog)
         if len(address) != 1 or address not in "0123456789ABCDEF":
@@ -89,6 +91,7 @@ class Ell14(Driver):
         self.clean_timeout = clean_timeout
         self.clean_poll = clean_poll
         self.stop_reply_timeout = stop_reply_timeout
+        self.angle_store = angle_store
         self.pulses_per_deg = DEFAULT_PULSES_PER_DEG
         self.info: dict[str, Any] = {}
 
@@ -167,11 +170,54 @@ class Ell14(Driver):
 
     def snapshot(self) -> dict[str, Any]:
         """Position and settings (no `gs`: reading the status clears a stored error)."""
+        pos = self.get_position()
+        saved = self._saved()
+        max_deg = saved.get("max_energy_deg")
         return {
-            "position": self.get_position(),
+            "position": pos,
             "jog_step": self.get_jog_step(),
             "home_offset": self.get_home_offset(),
+            "max_energy": saved or None,
+            "energy_fraction": None if max_deg is None else fraction_at(pos, max_deg),
         }
+
+    # --- 355 nm energy (half-wave plate + PBS, see energy.py) ---------------------------------
+    def _saved(self) -> dict[str, Any]:
+        return self.angle_store.get(self.name) if self.angle_store else {}
+
+    def _max_energy_deg(self) -> float:
+        deg = self._saved().get("max_energy_deg")
+        if deg is None:
+            raise DeviceError(f"{self.name}: no max-energy angle saved yet")
+        return float(deg)
+
+    @action()
+    def save_max_energy(self) -> dict[str, Any]:
+        """Store the current angle (0..360) as the max-energy angle. Logged as old -> new."""
+        if self.angle_store is None:
+            raise DeviceError(f"{self.name}: no angle store configured")
+        old = self._saved().get("max_energy_deg")
+        new = round(self.get_position() % 360, 4)
+        user = self.oplog.user if self.oplog else None
+        self.angle_store.update(self.name, max_energy_deg=new, saved_by=user)
+        return {"old": old, "new": new}
+
+    @action(moves=True)
+    def go_to_max_energy(self) -> float:
+        return self.move_abs(self._max_energy_deg())
+
+    @action(moves=True)
+    def go_to_min_energy(self) -> float:
+        return self.move_abs((self._max_energy_deg() + 45) % 360)
+
+    @action(moves=True)
+    def set_energy(self, percent: float) -> dict[str, Any]:
+        """Turn to the angle giving `percent` of the max energy (T = cos²(2·(θ − θ_max)))."""
+        if not 0 <= percent <= 100:
+            raise ValueError(f"energy must be 0..100 %, not {percent}")
+        target = angle_for_fraction(percent / 100, self._max_energy_deg())
+        pos = self.move_abs(target)
+        return {"angle": pos, "estimated_percent": round(100 * fraction_at(pos, self._max_energy_deg()), 1)}
 
     @action()
     def get_velocity(self) -> int:
