@@ -96,9 +96,34 @@ Working rules:
   Validate on hardware with permission: insert ≈ 30 s, ends exactly at 0, overshoot acceptable.
 - ✅ Validation: on hardware, each feedthrough IN→OUT→IN, positions confirmed; stop works mid-move.
 
-**1.6b DG645 driver** (after 0.5 for DG645)
-- Text (SCPI-like) commands over RS-232; transport chosen so a LAN/TCP transport can replace it.
-- ✅ Validation: defined after the Phase 0 revisit.
+**1.6b DG645 driver** (manual read 2026-11-17, `docs/protocols.md` § DG645; unit not installed)
+Scope (user): **adjust the delay of one channel only.** No trigger/burst/level/output changes;
+never `*RST`, `*RCL`, `REMT`, `IFCF`.
+- Config `[devices.dg645]`: `type = "dg645"`, port by USB-serial adapter serial, 9600 baud,
+  `rtscts = true`; `channel = "A"` (the one channel we adjust), `reference = "T0"` (kept as is
+  unless the user says otherwise), `min_s` / `max_s` (allowed range, refused outside),
+  `steps_s` (step sizes for ± buttons), `unit = "ns"|"us"` for display. Later LAN:
+  `host`, `tcp_port = 5025` → `TcpTransport` (only `_open/_close/_write/_read_some/
+  _discard_input`; driver unchanged).
+- `drivers/dg645.py` (`Driver` subclass; command = text + `\n`, reply = `read_until(b"\r\n")`):
+  - `identify` → `*IDN?`, refuse if it is not a DG645.
+  - `get_delay()` → `DLAY?c` → `{channel, reference, delay_s}`.
+  - `set_delay(delay_s)` (`moves=False`, logged): check range → `*CLS` → `DLAY c,d,t`
+    (t formatted with 12 decimals = 1 ps) → `LERR?` until `0` (any error → `DeviceError` with
+    the code's text) → read back `DLAY?c` and require |read − requested| ≤ 5 ps and the same
+    reference. Old → new value in the oplog result.
+  - `step_delay(delta_s)` = `set_delay(current + delta)` (one oplog entry).
+  - `snapshot()` for polling: `DLAY?c` (+ `INSR?` bit 6/7 PLL/Rb unlock as a warning — optional).
+- `sim.py`: `Dg645Sim` (parses `*IDN?`, `*CLS`, `DLAY`, `DLAY?`, `LERR?`, `*ESR?`; error queue;
+  range/link errors) for tests and `--sim`.
+- GUI tab "Delay generator": big display "A = T0 + 12.345 678 µs", entry box (with unit) + **Set**,
+  step buttons (−/+ with step-size choice), last change (who/when). No other controls.
+- Power-off note: remote changes are not saved by the DG645 (p. 17). Either do nothing (the
+  front-panel value returns after power cycle) or save with `*SAV n` — ⏳ user decision.
+- ✅ Validation: unit tests vs. simulator and the manual's example strings; on hardware (no
+  laser risk, but ask first): `*IDN?`, read delay, set a new value and read it back, check the
+  front-panel display shows it, restore the original value; error path (out-of-range value
+  → refused by our range check; a raw out-of-range `DLAY` → error 12 seen via `LERR?`).
 
 **1.7 Phase 1 demo script**
 - `scripts/demo_phase1.py`: connect all, report status, perform the real-world sequence

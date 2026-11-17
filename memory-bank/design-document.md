@@ -84,8 +84,9 @@ is where every command passes through.
   retracted, the other axis's operation buttons are disabled (with the reason). Also enforced in
   the driver (scripts can't bypass it); unknown position ⇒ blocked.
 - F3. MFF101: flip to position 1 / 2 (named, e.g. "DUMP" / "PASS"), query current position.
-- F3b. DG645: functions to be defined when installed (Phase 0 revisit). Transport must allow
-  RS-232 now and LAN (TCP) later without changing the driver.
+- F3b. DG645: **only adjust the delay of one channel** (user, 2026-11-17): show it, set a new
+  value, step it up/down; no other DG645 operations. Transport must allow RS-232 now and LAN
+  (TCP) later without changing the driver.
 - F4. ELL14: all functions of the ELLO panel — home (with direction), get/set home offset,
   get/set jog step, jog forward/backward, move absolute, move relative, query angle,
   clean device, clean & optimize, stop.

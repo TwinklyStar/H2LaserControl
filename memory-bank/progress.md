@@ -188,7 +188,18 @@
   - Display choices (changeable): ELL14 angle shown modulo 360° (raw counter in tooltip);
     HIT-MV position in real mm (0 = inserted, 60 = retracted).
 
+  - **DG645 Phase 0.5 (paper only, unit not installed):** read the manual's remote chapter;
+    full command set, syntax, channel numbering, error codes recorded in `docs/protocols.md`
+    § DG645. Key facts: RS-232 9600 8N1 RTS/CTS (LAN: raw TCP 5025), `DLAY c,d,t` sets channel c
+    = channel d + t seconds, `DLAY?c` → `"d,+t"`, set commands give no reply (errors via
+    `LERR?`), 5 ps resolution, **remote changes are not saved at power-off**. Plan written
+    (implementation-plan 1.6b). No code yet (record before code).
+
 ## Open questions
+- DG645 (before coding): which channel (A–H), and its reference (T0 or another channel)? Typical
+  value, allowed min/max, display unit and step sizes? Keep the value over power-off (`*SAV`)
+  or not? Is cutting one pulse cycle short when the delay changes acceptable? RS-232 cable /
+  USB adapter to be used?
 - ~~Retract: relative `M:` or absolute `A:`?~~ **Decided (user, 2026-11-17): retract must also
   work after a stop halfway.** Retract = `D:` + relative `M:+(retracted − current)`: identical to
   SGSample's `M:+30000000` from 0, and from a partial position it moves out by the remaining
@@ -201,8 +212,9 @@
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
-- ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
-  installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
+- DG645: answer the open questions → write driver + simulator + GUI tab (1.6b, can be done
+  before installation against `Dg645Sim`) → hardware checks in `docs/protocols.md` once installed.
+- Next Phase 0.5: **MFF101 ×2** (APT manual).
 - Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation.
 - Phase 2 finish: retract from a partial position on hardware (Insert → STOP → Retract);
   save the real max-energy angle and try the energy buttons on hardware; a non-developer lab

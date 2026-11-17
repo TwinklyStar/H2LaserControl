@@ -395,6 +395,90 @@ fwd period, rev period; freq = 14740 / period kHz):
 
 ---
 
+## SRS DG645 (not installed yet) — digital delay generator
+
+Source: `ref/DG645m.pdf`, chapter *Remote Programming* (printed pp. 41–70 = PDF pp. 55–84;
+printed page = PDF page − 14), plus *Operation* pp. 17, 27, 36–38. Everything here is 📖
+(manual only) until the unit is installed. **Our need (user, 2026-11-17): adjust the delay of
+one channel. No other operations.**
+
+### Interfaces 📖 (pp. 41–44)
+| Interface | Settings | Notes |
+|---|---|---|
+| RS-232 (rear, DB-9 female, DCE) | **9600 baud default** (4800–115200), **8N1, RTS/CTS** fixed | baud set on front panel SHIFT‑RS232 or `IFCF 1,<baud>`; changes apply after interface reset / power cycle |
+| LAN 10/100 | **raw socket TCP 5025**, telnet 5024, VXI‑11 | DHCP → Auto‑IP (169.254.x.x) → static, in that priority. **No security** (put behind a firewall). Current IP: SHIFT, STATUS, MODIFY ▲, STATUS ×3 |
+| GPIB | address 15 | not used |
+
+All interfaces are enabled by default. Front-panel LEDs: REM (remote lock-out), ACT (traffic),
+ERR (a remote command failed; error list under SHIFT‑STATUS → "Error Status").
+
+### Command syntax 📖 (pp. 44–45)
+- ASCII, **4-character mnemonics**, case-insensitive (`*XXX` = IEEE-488.2, `XXXX` = DG645).
+  Query form = mnemonic + `?`. Parameters separated by commas; **send no spaces/brackets** (the
+  manual's own examples do put one space after the mnemonic, e.g. `DLAY 2,0,10e-6` — ⏳ verify).
+- Terminator: `;`, CR or LF. Replies end with **CR LF** (default; `XTRM` changes it).
+- **Set commands return nothing.** Errors are only visible via `*ESR?` (bit 4 EXE, bit 5 CME) and
+  the error queue `LERR?` (pops one code; `0` = empty; 20 entries max, `254` = overflow).
+- Input buffer 255 bytes, ≤ 3 parameters of ≤ 25 bytes each.
+- Parameters: `i` integer, `f` frequency Hz, `t` time **seconds** (float, e.g. `10e-6`),
+  `v` volts.
+
+### Channel numbering 📖 (p. 56, Table 31)
+Delay channel `c`/`d`: **0 T0, 1 T1, 2 A, 3 B, 4 C, 5 D, 6 E, 7 F, 8 G, 9 H**.
+Output BNC `b`: 0 T0, 1 AB, 2 CD, 3 EF, 4 GH. Output AB: rises at delay A, falls at delay B
+(likewise CD, EF, GH). T0 ≡ 0; T1 = end of T0 (not settable). Delay range 0 – 2000 s,
+**resolution 5 ps** (pp. 17, 27). Factory default: A = 0, B = A + 10 ns, C = 0, D = C + 10 ns, …
+
+### The command we need 📖 (p. 56)
+`DLAY(?)c{,d,t}` — set (query) delay of channel `c` to `t` seconds **relative to channel `d`**.
+```
+DLAY 2,0,10e-6      set A = T0 + 10 µs
+DLAY 3,2,1e-3       set B = A + 1 ms
+DLAY?3              → "2,+0.001000000000"   (reference channel, signed seconds, 12 decimals)
+```
+- The reference is part of every set: setting `DLAY c,d,t` also sets the link of `c` to `d`
+  (`LINK(?)c{,d}`: c ≠ T0, neither may be T1; circular links refused, error 13).
+- Linked channels move together: if B = A + 1 ms and A changes, the B edge moves too
+  (pulse width AB stays constant). Changing a link does not change the absolute time (p. 28).
+- Errors: 12 Illegal Delay (out of range), 13 Illegal Link, 10 Illegal Value, 15 Not Allowed
+  (another interface holds the lock).
+- INSR bit 5 ABORT_DELAY: "a delay cycle was aborted prematurely in order to change instrument
+  delay settings" → a change may cut one pulse cycle short (harmless for us? ⏳ ask).
+
+### Full command set 📖 (pp. 46–59) — for reference; only ★ are planned
+| Group | Commands |
+|---|---|
+| IEEE-488.2 | ★`*IDN?` id string (`Stanford Research Systems,DG645,s/n004025,ver1.00.00E`), ★`*CLS` clear ESR/INSR/error queue, ★`*ESR?` event status (clears on read; bits 0 OPC, 2 QYE, 3 DDE, 4 EXE, 5 CME, 7 PON), `*ESE(?)`, ★`*OPC?` returns `1` when all prior commands done, `*PSC(?)`, `*RCL i` recall settings 0–9 (0 = factory), `*RST` = factory defaults (**never send**), `*SAV i` save to 1–9, `*SRE(?)`, `*STB?` (bit 1 BUSY delay cycle running, 2 BURST, 4 MAV), `*TRG` single shot, `*TST?` self test, `*CAL?` auto-cal, `*WAI` |
+| Status/display | `DISP(?){i,c}` front-panel display (e.g. `DISP 11,2` = show delay A), `INSE(?)`, `INSR?` (0 TRIG, 1 RATE, 2 END_OF_DELAY, 3 END_OF_BURST, 4 INHIBIT, 5 ABORT_DELAY, 6 PLL_UNLOCK, 7 RB_UNLOCK), ★`LERR?`, `SHDP(?)` display on/off, `TIMB?` timebase 0 int/1 OCXO/2 Rb/3 ext |
+| Trigger | `TSRC(?)` source 0 int, 1/2 ext rise/fall, 3/4 single-shot ext, 5 single shot, 6 line; `TRAT(?)` int rate; `TLVL(?)` level; `HOLD(?)` holdoff; `INHB(?)`; `ADVT(?)`; `PRES(?)`, `PHAS(?)` prescalers; step commands `SPHD SPPH SPPS SPTL SPTR`, step sizes `SSHD SSPH SSPS SSTL SSTR` |
+| Burst | `BURM(?)` on/off, `BURC(?)` count, `BURD(?)` delay, `BURP(?)` period, `BURT(?)` T0 config; `SPBC SPBD SPBP`, `SSBC SSBD SSBP` |
+| Delay/output | ★`DLAY(?)c{,d,t}`, `LINK(?)c{,d}`, `LAMP(?)b{,v}` amplitude, `LOFF(?)b{,v}` offset, `LPOL(?)b{,i}` polarity, `SPDL c,i` step delay up/down by step size, `SSDL(?)c{,t}` delay step size, `SPLA SPLO SSLA SSLO` |
+| Interface | `EMAC?`, `EPHY(?)`, `IFCF(?)i{,j}` (0 RS-232 on, 1 baud, 4 TCP/IP, 5 DHCP, 6 Auto-IP, 7 static, 8 raw socket, 9 telnet, 10 VXI-11, 11 IP, 12 mask, 13 gateway), `IFRS i` reset interface, `LCAL` go local, `REMT` go remote (front panel locked), `LOCK?`/`UNLK?` exclusive lock, `XTRM i{,j,k}` reply terminator |
+
+Error codes (pp. 62–67): 0 none · 10–17 execution (10 illegal value, 11 illegal mode,
+12 illegal delay, 13 illegal link, 14 recall failed, 15 not allowed/locked, 16 self test,
+17 auto cal) · 30/32 query · 40–91 self-test/cal hardware · 110–126 parsing (110 illegal
+command, 111 undefined, 112 illegal query, 113 illegal set, 114 null parameter, 115 extra
+parameters, 116 missing parameters, 117 overflow, 118 bad float, 120/121 bad integer,
+122 bad hex, 126 syntax) · 170/171 communication/overrun · 254 too many errors.
+
+### ⚠ Settings changed remotely are NOT saved automatically 📖 (p. 17)
+The DG645 saves front-panel changes to non-volatile memory after ~5 s, but **not changes made
+over the remote interface** (to protect the memory). After a power cycle it recalls the last
+saved settings → **a delay set by our program is lost at power-off** unless we `*SAV`
+explicitly (and even then, which slot is recalled at power-on is unclear: the manual's `*SAV`
+description says "1.TODO"). ⏳ decide with the user; verify on hardware.
+
+### Things to verify on the real unit ⏳
+1. `*IDN?` reply, CR LF reply terminator, RTS/CTS needed with our USB-RS232 adapter (null-modem
+   or straight cable? DG645 is DCE → straight cable to a PC).
+2. `DLAY?c` reply format and number of decimals; how a non-multiple of 5 ps is rounded.
+3. Space after the mnemonic accepted (manual examples use it; syntax section says no spaces).
+4. Front panel stays usable while we talk over RS-232 (no `REMT`), and the display updates.
+5. Behaviour of `*SAV` / power-on recall (only if the user wants the delay kept over power-off).
+
+---
+
 ## Thorlabs MFF101/M (×2, not installed yet) — flip mount
 
 Source: Thorlabs *APT Communications Protocol*. 📖 (to verify)
