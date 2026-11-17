@@ -4,8 +4,8 @@
 - **Phase 0 — done** (MFF101 parts deferred until installed). 0.1 ✅, 0.2 ✅, 0.3 ✅, 0.4 ✅
   (HIT-MV both axes, ELL14 all ELLO functions).
 - **Phase 1 — in progress.** 1.1 ✅, 1.2 ✅, 1.3 ✅ (2 devices; MFF101/DG645 not installed).
-  1.4 ELL14 and 1.6 HIT-MV: code + unit tests ✅, read-only hardware check ✅,
-  **motion validation on hardware ⏳ (needs user permission per move)**. 1.5 / 1.6b wait for 0.5.
+  **1.4 ELL14 ✅ validated on hardware** (2026-11-17). 1.6 HIT-MV: code + unit tests ✅, read-only
+  hardware check ✅, **motion validation ⏳ (needs user permission per move)**. 1.5 / 1.6b wait for 0.5.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -116,6 +116,20 @@
     `B:n,50000,1000000,200,250000`. ELL14 position **−355.31°** (counter not wrapped; left there
     by the capture's Clean→Stop), velocity `gv` = 100 %. Recorded in protocols.md.
 
+### 2026-11-17
+- **ELL14 hardware validation (1.4), user-approved moves:**
+  - Move 1 ✅ 11:03:48 `home ccw`: TX `0ho1<07>` → `0POFFFFFFFE` after 0.36 s (from −355.31° ≙ 4.69°),
+    ends at −2 p = −0.005° (within ELLO's ±3 p). User checked physically.
+  - User then allowed **free ELL14 motion tests** (restore the original state afterwards); HIT-MV
+    moves still need permission each time.
+  - Full test 11:05–11:06 (our driver, all ELLO functions) ✅: `ma` 10/45/90° within +2 p,
+    readback OK; `fw`/`bw` ±1991 p; `mr` ±0.1°; `ho0` (0.98 s) and `ho1` (0.44 s); `sj`/`so` same values
+    → `GS00`; `cm` → `GS09`, stopped after 6 s: **`st` replies `GS00` by itself** (1.9 s later, when
+    the motion has stopped) → open question closed. Clean stopped at −355.32° (≈ where we found the
+    mount, so that position came from the capture's Clean→Stop).
+  - Restored: counter −141491 (original −141493, 2 p = 0.005°), jog step 5.0°, home offset 3.214°.
+  - **1.4 ELL14 validated on hardware ✅** (`clean_and_optimize` not run: it rewrites motor tuning).
+
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
   *Current code:* relative `M:` as SGSample, refused unless the axis is at 0 (`move_abs` exists
@@ -124,7 +138,6 @@
   *Current code:* `0x07` (config `terminator`), works on hardware.
 - ELL14 position counter can be outside 0–360° (now −355.31°). Show it modulo 360 in the GUI?
   `ma` to 0–360° from there turns the long way (harmless; homing resets the counter).
-- ELL14 `st` reply: manual says `GS`; capture showed one `GS00` for `st`+`gs`. Check in Phase 1.
 - ELL14 GUI: allow continuous jog (jog step 0)? If yes, must set `sv` 50–70 % first (overheating).
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
@@ -132,7 +145,5 @@
 - ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
 - Phase 1 hardware validation, **each move only after user permission**:
-  - ELL14 (1.4): home ccw → move_abs 3 angles → jog fw/bw → move_rel ±0.1° → (clean + stop to
-    see whether `st` replies).
   - HIT-MV (1.6): mirror (axis 1) insert with fast homing (expect ≈ 30 s, ends at 0) → retract →
     stop mid-move test; then photodiode (axis 0).

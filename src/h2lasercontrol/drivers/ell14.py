@@ -282,8 +282,8 @@ class Ell14(Driver):
         return self._stop()
 
     def _stop(self) -> dict[str, Any]:
-        # Manual: `st` replies GS (GS09 and/or GS00). Capture: only one GS00 for st+gs, so it is
-        # not certain that `st` replies. Read GS until GS00; if nothing comes, ask with `gs`.
+        # Manual: `st` replies GS (GS09 and/or GS00). Hardware 2026-11-17: `st` during cleaning
+        # replied GS00 after 1.9 s. Read GS until GS00; if nothing comes, ask with `gs`.
         tx = self._send("st")
         replies = []
         deadline = time.monotonic() + self.stop_reply_timeout

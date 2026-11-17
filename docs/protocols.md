@@ -293,6 +293,21 @@ Compact log: `docs/captures/2026-11-16_ell14_ello_all_functions.txt`. Clean & Op
 - `cm` (clean) answers `GS09` at once and runs in the background; after `st`, `gs` → `GS00`.
 - `i1`/`i2` replies recorded raw (motor 1/2 info: frequencies etc.), decoded below.
 
+### Our driver on hardware ✅ (2026-11-17 11:05, `0x07` terminator, all functions except `om`)
+| Command | Reply | Notes |
+|---|---|---|
+| `0ma00000F8E` / `00004600` / `00008C00` (10/45/90°) | `PO…F90` / `…4601` / `…8C00` | within +2 p; 0.2–0.34 s |
+| `0fw` / `0bw` | `PO000093C8` / `PO00008C04` | ±1991 p (5°) |
+| `0mr00000028` / `0mrFFFFFFD8` | `PO00008C2A` / `PO00008C06` | ±0.1° |
+| `0ho0` (CW) / `0ho1` (CCW) | `PO00000003` / `PO00000002` | 0.98 s / 0.44 s from 90° |
+| `0sj000007C7`, `0so00000500` | `GS00` | same values rewritten |
+| `0cm` | `GS09` (after 1.3 s) | `gs` during clean → `GS09` (1.2 s delay) |
+| `0st` (during clean) | **`GS00` after 1.9 s** | ✅ **`st` replies by itself** (manual ✔); then `gs` → `GS00` |
+| `0mrFFFDD000` (−360°) | `POFFFDD74C` | full-turn relative move, 0.94 s |
+- After Clean → Stop (6 s) the counter read −355.32°: the same place we found the mount on 11-16
+  (−355.31°), so that odd position came from the capture's Clean → Stop.
+- Replies to `cm`/`gs` during cleaning come ~1.2 s late (the module is busy); reply timeout 2 s is OK.
+
 ### Cross-check: capture vs. ELLO driver source (2026-11-16) — no contradictions
 | Item | ELLO_DLL source | Capture | Result |
 |---|---|---|---|
