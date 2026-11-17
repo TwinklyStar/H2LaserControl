@@ -186,6 +186,9 @@ Unknown: whether `B` is volatile (lost at power-off) or persists like a memory s
   on whether `B` persists, and SGSample behaviour is unaffected if it is used again.
 - Verify on hardware (with user permission): insert time, final position exactly 0, overshoot
   past the origin still acceptable (was ≈ 0.1 mm real at the slower speed).
+- ✅ **Hardware 2026-11-17 11:08 (mirror, axis 1, our driver):** `B:1,50000,1000000,200,250000` →
+  `OK`, `H:,1,,,,,,` → `OK`, finished in **32.0 s** (was 62 s), ended at exactly **0**, `Q:S` 00.
+  Overshoot not measured (driver polls only `!:` while waiting).
 
 **SGSample "timeout" popup explained:** polling pauses for 2 s at 18:52:25 — exactly **30 s after
 `H:`** — while the homing takes 62 s. SGSample evidently uses a fixed ~30 s motion timeout; the

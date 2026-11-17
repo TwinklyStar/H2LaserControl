@@ -129,6 +129,13 @@
     mount, so that position came from the capture's Clean→Stop).
   - Restored: counter −141491 (original −141493, 2 p = 0.005°), jog step 5.0°, home offset 3.214°.
   - **1.4 ELL14 validated on hardware ✅** (`clean_and_optimize` not run: it rewrites motor tuning).
+- **HIT-MV hardware validation (1.6), user-approved, user watching the mirror:**
+  - H1 ✅ 11:08:53 mirror (axis 1) `insert`: `!:`/`Q:` ready at 30000000 → `?:B1` →
+    **`B:1,50000,1000000,200,250000` → `OK`** → `H:,1,,,,,,` → `OK`; done after **32.0 s**
+    (SGSample: 62 s); `Q:` `30000000,0` = exactly 0; `Q:S` `00,00,00`. Fast homing works.
+  - H2 ✅ 11:10:00 mirror `retract`: ready at 0 → `D:1,100000,1000000,200` → `OK` →
+    `M:,+30000000,,,,,,` → `OK`; done after **30.3 s**; `Q:` `30000000,30000000`, `Q:S` 00.
+    Identical to SGSample. Both axes back to the normal (retracted) state.
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
