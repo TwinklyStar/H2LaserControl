@@ -481,9 +481,77 @@ description says "1.TODO"). ⏳ decide with the user; verify on hardware.
 
 ## Thorlabs MFF101/M (×2, not installed yet) — flip mount
 
-Source: Thorlabs *APT Communications Protocol*. 📖 (to verify)
-- FTDI USB device; 115200 baud, 8N1, RTS/CTS. Binary: 6-byte header (msg id LE, params, dest, src),
-  optional data packet.
-- Planned subset: `MGMSG_HW_REQ_INFO`, `MGMSG_MOT_MOVE_JOG` (direction 1/2 = position 1/2),
-  `MGMSG_MOT_REQ_STATUSBITS` / `GET_STATUSBITS`.
-- Access options: pyserial after enabling VCP, `ftd2xx`, or Thorlabs Kinesis .NET via `pythonnet`.
+Source: `ref/Kinesis_apt_communications_protocol.pdf` = Thorlabs *Motion Controllers
+Host-Controller Communications Protocol*, **Issue 48, DOC-103274, 10 Aug 2026** (494 pp.;
+page numbers below = PDF page). Plus the Kinesis C header
+`C:\Program Files\Thorlabs\Kinesis\ThorLabs.MotionControl.FilterFlipper.h`. 📖 unless marked.
+
+### Our unit on this PC ✅ (2026-11-17, Windows device list, read-only)
+- **One** flip mount connected: USB `VID_0403&PID_FAF0`, USB serial **`37011815`**
+  (prefix 37 = "Motorized filter flipper MFF10x", p. 35), Windows name "APT USB Device".
+  **No COM port**: it uses the FTDI **D2XX** driver (`ftd2xx.dll` present in System32 and in the
+  Kinesis folder). ⏳ The second MFF101 is not connected yet.
+- User controlled it successfully with Kinesis (2026-11-17).
+- Read-only probe attempt: `FT_OpenEx("37011815")` → **FT_STATUS 3 (DEVICE_NOT_OPENED)**;
+  D2XX device list shows it **already opened by another process** (flags = 1, no details
+  readable). No Thorlabs/Kinesis process name visible. ⏳ Close whatever holds it (Kinesis,
+  possibly in the tray) before our program can open it — same rule as the other devices.
+  Nothing was sent to the device.
+
+### USB set-up (p. 33) 📖
+Thorlabs software does, per device: `FT_SetBaudRate 115200` → `FT_SetDataCharacteristics 8N1`
+→ sleep 50 ms → `FT_Purge(RX|TX)` → sleep 50 ms → `FT_ResetDevice` → `FT_SetFlowControl
+RTS_CTS` → `FT_SetRts`. Device is opened by its USB serial number.
+
+### Message format (pp. 36–38) 📖
+- Binary, little-endian. **6-byte header**: `id(2) p1 p2 dest src` (header only), or
+  `id(2) len(2) dest|0x80 src` followed by `len` data bytes.
+- Host → device: `dest = 0x50` (generic USB unit), `src = 0x01` (host). Replies have them
+  swapped (`dest 0x01`, `src 0x50`; with data: `0x81 0x50`).
+- Channel ident = 1 for the MFF.
+
+### Messages applicable to MFF101/MFF102 (p. 18 — the complete list) 📖
+| ID | Name | Bytes (TX) | Use for us |
+|---|---|---|---|
+| 0x0005 / 0x0006 | HW_REQ_INFO / HW_GET_INFO (p. 59) | `05 00 00 00 50 01` → 90-byte reply: serial u32, model char[8], type u16, firmware byte[4] (minor, interim, major), …, HW version u16 @84, mod state u16 @86, channels u16 @88 | identify (check model starts `MFF`, serial matches) |
+| 0x046A | MOT_MOVE_JOG (p. 97) | `6A 04 01 dir 50 01`, dir **1 = forward, 2 = reverse** | **flip** (dir ↔ position 1/2 ⏳ verify) |
+| 0x0429 / 0x042A | MOT_REQ/GET_STATUSBITS (p. 148) | `29 04 01 00 50 01` → `2A 04 06 00 81 50` + chan u16 + bits u32 | **position + moving** |
+| 0x0223 | MOD_IDENTIFY (p. 51) | `23 02 00 00 50 01` | flash the LED (to find which unit is which) |
+| 0x0011 / 0x0012 | HW_START/STOP_UPDATEMSGS (p. 57) | `11 00 00 00 50 01` / `12 00 00 00 50 01` | not used: unsolicited status every 100 ms; we poll instead |
+| 0x0510/11/12 | MOT_SET/REQ/GET_MFF_OPERPARAMS (p. 204) | REQ `11 05 01 00 50 01` → 40-byte reply | read transit time (read-only) |
+| 0x04B9 | MOT_SET_EEPROMPARAMS (p. 113) | saves params to the device | **never** (no settings changes) |
+
+Status bits (p. 135, as for all motors): 0x01 forward (CW) hard limit, 0x02 reverse (CCW) hard
+limit, 0x10/0x20 moving fwd/rev, 0x40/0x80 jogging fwd/rev, 0x100 motor connected, 0x200 homing,
+0x400 homed, 0x1000 interlock. ⏳ For the MFF, position 1/2 is expected on the two limit bits
+(0x01/0x02); Kinesis reports `FF_PositionError = 0` when neither — verify on hardware.
+
+MFF_OPERPARAMS (p. 204): chan u16, transit time ms i32 (**300–2800 ms**), transit time ADC i32
+(= 10⁷ × t^−1.591), DigIO1/2: oper mode u16 (1 input-toggle, 2 input-goto, 3 output-at-position,
+4 output-in-motion), signal mode u16 (1 button, 2 logic edge, 4 swap, 0x10 level output, 0x20
+pulse output, 0x40 inverted), pulse width i32 (10–200 ms), 6 unused bytes. Manual example (SET
+500 ms): `10 05 22 00 D0 01 01 00 F4 01 00 00 FC 01 00 00 01 00 01 00 C8 00 00 00 01 00 01 00
+C8 00 00 00 00 00 00 00 00 00 00 00`. The back-panel DIG IO connectors can flip the mount on
+their own — ⏳ ask whether anything is wired to them.
+
+Move end: after a jog the controller sends **MOT_MOVE_COMPLETED 0x0464** (p. 97) unsolicited.
+⏳ Verify on hardware whether the MFF sends it; we rely on polling status bits anyway (as Kinesis
+does: `FF_GetPosition` = last polled position).
+
+Kinesis C API (header) for comparison: `FF_MoveToPosition(serial, 1|2)`, `FF_GetPosition`
+(0 = error, 1, 2), `FF_Get/SetTransitTime` (300–2800 ms), `FF_Home`, `FF_Get/SetIOSettings`.
+
+### Access route — decision proposal
+D2XX through `ctypes` (`ftd2xx.dll`, already installed with Kinesis): no driver changes, works
+with the serial number directly. Alternatives rejected: enabling the FTDI VCP (changes the
+Windows driver setting that Kinesis relies on), Kinesis .NET via `pythonnet` (heavy, opaque, no
+raw bytes for the log). A `D2xxTransport` only needs `_open/_close/_write/_read_some/
+_discard_input` (same Transport ABC).
+
+### To verify on hardware ⏳ (read-only first; any flip needs the user's permission)
+1. HW_GET_INFO reply (model `MFF101`, serial 37011815, firmware).
+2. Status bits at each position (which bit = position 1 / position 2; what during motion).
+3. Jog direction 1/2 ↔ position 1/2; time to flip (transit time read via MFF_OPERPARAMS).
+4. Whether MOVE_COMPLETED arrives after a flip.
+5. Which physical state (beam blocked / passing) is position 1 vs 2 for each unit → names in
+   config (e.g. `DUMP` / `PASS`).

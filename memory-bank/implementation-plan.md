@@ -79,9 +79,16 @@ Working rules:
 - ✅ Validation: unit tests (encoding/decoding, exact captured bytes); on hardware: home, move to
   3 angles, read back within tolerance; jog, move_rel; `st` reply observed; oplog shows all commands.
 
-**1.5 MFF101 driver** (after 0.5 for MFF101 — not installed yet)
-- APT framing (header encode/decode). Operations: `identify` (HW_REQ_INFO),
-  `position()` (status bits), `flip(1|2)` (MOT_MOVE_JOG direction) → named `DUMP`/`PASS`.
+**1.5 MFF101 driver** (protocol recorded 2026-11-17, `docs/protocols.md` § MFF101; one unit,
+serial 37011815, connected; D2XX, no COM port)
+- `transport/d2xx_transport.py`: `D2xxTransport(serial)` via ctypes `ftd2xx.dll`, set-up as
+  manual p. 33 (115200 8N1, purge, reset, RTS/CTS, RTS). Config: `usb_serial`, `transport = "d2xx"`.
+- APT framing (header encode/decode, read 6 bytes then `len` data bytes). Operations:
+  `identify` (HW_REQ_INFO, refuse if model is not MFF*), `status`/`snapshot` (STATUSBITS →
+  position 1/2/moving/unknown), `flip_to(1|2)` / named `move_to("DUMP"|"PASS")` (MOT_MOVE_JOG,
+  poll status until at position, timeout ≈ transit time + margin), `identify_led`
+  (MOD_IDENTIFY), `get_transit_time` (REQ_MFF_OPERPARAMS, read-only). Never EEPROM / SET params.
+- Two units = two config entries (two tabs or one tab with two cards — ask the user).
 - ✅ Validation: unit tests on byte frames vs. manual examples; on hardware: flip both ways,
   position read back correctly both ways (known issue: verify *both* directions work).
 

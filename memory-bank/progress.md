@@ -195,7 +195,17 @@
     `LERR?`), 5 ps resolution, **remote changes are not saved at power-off**. Plan written
     (implementation-plan 1.6b). No code yet (record before code).
 
+  - **MFF101 Phase 0.5:** user connected one flip mount and controlled it with Kinesis. Seen by
+    Windows as "APT USB Device", serial **37011815**, D2XX (no COM port). User supplied the APT
+    protocol manual (Issue 48) → `ref/Kinesis_apt_communications_protocol.pdf`; MFF message
+    subset, framing, USB set-up, status bits recorded in `docs/protocols.md` § MFF101.
+    Read-only probe could not open it: **held by another process** (D2XX flag "opened").
+    Nothing sent. Plan in implementation-plan 1.5 (D2XX via ctypes).
+
 ## Open questions
+- MFF101: what holds the device open (Kinesis still running / in the tray)? Which position
+  (1/2) = beam blocked/passing, names? Second unit: when connected? GUI: one tab per flip mount
+  or one "Flip mounts" tab with two cards? Anything wired to the DIG IO connectors?
 - DG645 (before coding): which channel (A–H), and its reference (T0 or another channel)? Typical
   value, allowed min/max, display unit and step sizes? Keep the value over power-off (`*SAV`)
   or not? Is cutting one pulse cycle short when the delay changes acceptable? RS-232 cable /
