@@ -4,8 +4,7 @@
 - **Phase 0 — done** (MFF101 parts deferred until installed). 0.1 ✅, 0.2 ✅, 0.3 ✅, 0.4 ✅
   (HIT-MV both axes, ELL14 all ELLO functions).
 - **Phase 1 — in progress.** 1.1 ✅, 1.2 ✅, 1.3 ✅ (2 devices; MFF101/DG645 not installed).
-  **1.4 ELL14 ✅ and 1.6 HIT-MV ✅ validated on hardware** (2026-11-17; HIT-MV post-stop settle fix
-  only simulator-tested). 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
+  **1.4 ELL14 ✅ and 1.6 HIT-MV ✅ validated on hardware** (2026-11-17, incl. post-stop settle fix). 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -149,8 +148,11 @@
     `0,30000000`, `Q:S` 00.
   - H7 ✅ 11:18:43 photodiode `retract`: `D:0,100000,1000000,200` → `OK`, `M:+30000000,,,,,,,` → `OK`;
     done after **30.3 s**; `Q:` `30000000,30000000`, `Q:S` 00. **Both axes retracted (normal state).**
-  - **1.6 HIT-MV validated on hardware ✅** (both axes insert/retract, stop). Only the post-stop
-    settle fix is not yet exercised on hardware (needs another stop test, with permission).
+  - **1.6 HIT-MV validated on hardware ✅** (both axes insert/retract, stop).
+  - H3b ✅ 11:2x repeat stop test on the mirror (user-approved) to confirm the settle fix: stop
+    requested 5.0 s after start → `Aborted` returned **0.64 s later** (poll wait + `L:` + settle);
+    position right after = 25219040 (≈ 9.6 mm real in) and **unchanged over the next 2 s** → fix
+    works on hardware. Then insert 27.5 s → 0, retract 30.7 s → 30000000. Both axes retracted.
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
@@ -166,6 +168,5 @@
 ## Next step
 - ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
-- Optional (with permission): repeat the mirror stop test to confirm the settle fix on hardware.
 - Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation → can start **Phase 2
   (GUI)** with HIT-MV + ELL14 now (simulators allow GUI work without hardware).

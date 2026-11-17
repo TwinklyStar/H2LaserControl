@@ -198,6 +198,8 @@ Unknown: whether `B` is volatile (lost at power-off) or persists like a memory s
 stage is standing still; wait until `Q:` stops changing before reporting "stopped" or sending the next
 command. Homing from that position (H4) then took 27.1 s and ended at exactly 0; retract (H5) 30.4 s
 → 30000000. No alarms.
+✅ Repeat with the settle fix (2026-11-17, mirror): `Aborted` returned 0.64 s after the stop request;
+position 25219040 and **no further change over 2 s**. Driver behaviour confirmed.
 
 **SGSample "timeout" popup explained:** polling pauses for 2 s at 18:52:25 — exactly **30 s after
 `H:`** — while the homing takes 62 s. SGSample evidently uses a fixed ~30 s motion timeout; the
