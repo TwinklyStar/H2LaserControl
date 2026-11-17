@@ -4,8 +4,8 @@
 - **Phase 0 — done** (MFF101 parts deferred until installed). 0.1 ✅, 0.2 ✅, 0.3 ✅, 0.4 ✅
   (HIT-MV both axes, ELL14 all ELLO functions).
 - **Phase 1 — in progress.** 1.1 ✅, 1.2 ✅, 1.3 ✅ (2 devices; MFF101/DG645 not installed).
-  **1.4 ELL14 ✅ validated on hardware** (2026-11-17). 1.6 HIT-MV: code + unit tests ✅, read-only
-  hardware check ✅, **motion validation ⏳ (needs user permission per move)**. 1.5 / 1.6b wait for 0.5.
+  **1.4 ELL14 ✅ and 1.6 HIT-MV ✅ validated on hardware** (2026-11-17; HIT-MV post-stop settle fix
+  only simulator-tested). 1.5 MFF101 / 1.6b DG645 wait for 0.5 (not installed). 1.7 demo needs MFF101.
 
 ## Device inventory
 | Device | Qty | Port | FTDI serial | Status |
@@ -146,7 +146,11 @@
     the axis is still moving. `HitMvSim` now coasts after `L:` like the real unit. 50 tests pass.
   - H6 ✅ 11:17:41 photodiode (axis 0) `insert` (new double-`Q:` ready check passed):
     `B:0,50000,1000000,200,250000` → `OK`, `H:1,,,,,,,` → `OK`; done after **31.9 s**; `Q:`
-    `0,30000000`, `Q:S` 00. **Photodiode left INSERTED** (retract H7 awaits permission).
+    `0,30000000`, `Q:S` 00.
+  - H7 ✅ 11:18:43 photodiode `retract`: `D:0,100000,1000000,200` → `OK`, `M:+30000000,,,,,,,` → `OK`;
+    done after **30.3 s**; `Q:` `30000000,30000000`, `Q:S` 00. **Both axes retracted (normal state).**
+  - **1.6 HIT-MV validated on hardware ✅** (both axes insert/retract, stop). Only the post-stop
+    settle fix is not yet exercised on hardware (needs another stop test, with permission).
 
 ## Open questions
 - Retract in our driver: replicate relative `M:` exactly, or use absolute `A:,30000000`?
@@ -162,6 +166,6 @@
 ## Next step
 - ⚠ **Memo:** go back to Phase 0 (step 0.5) for **MFF101 ×2** and **DG645** once they are
   installed (DG645: RS-232 now, maybe LAN later; manual from printed p. 41).
-- Phase 1 hardware validation, **each move only after user permission**:
-  - HIT-MV (1.6): mirror (axis 1) insert with fast homing (expect ≈ 30 s, ends at 0) → retract →
-    stop mid-move test; then photodiode (axis 0).
+- Optional (with permission): repeat the mirror stop test to confirm the settle fix on hardware.
+- Phase 1 remainder (1.5, 1.6b, 1.7) waits for MFF101/DG645 installation → can start **Phase 2
+  (GUI)** with HIT-MV + ELL14 now (simulators allow GUI work without hardware).
