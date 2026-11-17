@@ -88,7 +88,12 @@ serial 37011815, connected; D2XX, no COM port)
   position 1/2/moving/unknown), `flip_to(1|2)` / named `move_to("DUMP"|"PASS")` (MOT_MOVE_JOG,
   poll status until at position, timeout ≈ transit time + margin), `identify_led`
   (MOD_IDENTIFY), `get_transit_time` (REQ_MFF_OPERPARAMS, read-only). Never EEPROM / SET params.
-- Two units = two config entries (two tabs or one tab with two cards — ask the user).
+- Two units, **one tab "Flip mounts" with one card per unit** (user, like the HIT-MV tab): so
+  one config entry `type = "mff"` listing `units` (key, label, usb_serial, position names e.g.
+  `{1 = "retract", 2 = "insert"}`); the service owns one D2XX transport per unit. A unit that is
+  not connected shows as offline on its card without blocking the other.
+- At position = limit bit set **and** moving bit 0x10 clear; poll every 50 ms, timeout 3 s
+  (transit 500 ms).
 - ✅ Validation: unit tests on byte frames vs. manual examples; on hardware: flip both ways,
   position read back correctly both ways (known issue: verify *both* directions work).
 

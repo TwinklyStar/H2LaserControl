@@ -199,13 +199,17 @@
     Windows as "APT USB Device", serial **37011815**, D2XX (no COM port). User supplied the APT
     protocol manual (Issue 48) → `ref/Kinesis_apt_communications_protocol.pdf`; MFF message
     subset, framing, USB set-up, status bits recorded in `docs/protocols.md` § MFF101.
-    Read-only probe could not open it: **held by another process** (D2XX flag "opened").
-    Nothing sent. Plan in implementation-plan 1.5 (D2XX via ctypes).
+    First probe: device held open after Kinesis; user re-plugged USB → probe OK (model string
+    "MFF002", fw 1.0.3). **Flip test (user-approved, unit not on the bench):** jog dir 1 →
+    position 1 (bit 0x01), dir 2 → position 2 (bit 0x02), ≈0.4 s, moving bit 0x10 both ways,
+    repeat jog = no-op, no MOVE_COMPLETED → poll. Unit 37011815: **position 2 = "insert"**
+    (current), **position 1 = "retract"** (user). Restored to insert. User decisions: **both
+    flip mounts on one tab, cards like the HIT-MV tab**; second unit connected ~tomorrow;
+    DIG IO not wired. Plan in implementation-plan 1.5 (D2XX via ctypes).
 
 ## Open questions
-- MFF101: what holds the device open (Kinesis still running / in the tray)? Which position
-  (1/2) = beam blocked/passing, names? Second unit: when connected? GUI: one tab per flip mount
-  or one "Flip mounts" tab with two cards? Anything wired to the DIG IO connectors?
+- MFF101 second unit: serial and position ↔ name (tomorrow). What does each flip mount do in
+  the beam path (for Phase 3 interlock rules with the feedthroughs)?
 - DG645 (before coding): which channel (A–H), and its reference (T0 or another channel)? Typical
   value, allowed min/max, display unit and step sizes? Keep the value over power-off (`*SAV`)
   or not? Is cutting one pulse cycle short when the delay changes acceptable? RS-232 cable /

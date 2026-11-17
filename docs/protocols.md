@@ -492,11 +492,45 @@ page numbers below = PDF page). Plus the Kinesis C header
   **No COM port**: it uses the FTDI **D2XX** driver (`ftd2xx.dll` present in System32 and in the
   Kinesis folder). ⏳ The second MFF101 is not connected yet.
 - User controlled it successfully with Kinesis (2026-11-17).
-- Read-only probe attempt: `FT_OpenEx("37011815")` → **FT_STATUS 3 (DEVICE_NOT_OPENED)**;
-  D2XX device list shows it **already opened by another process** (flags = 1, no details
-  readable). No Thorlabs/Kinesis process name visible. ⏳ Close whatever holds it (Kinesis,
-  possibly in the tray) before our program can open it — same rule as the other devices.
-  Nothing was sent to the device.
+- First probe attempt: `FT_OpenEx("37011815")` → **FT_STATUS 3 (DEVICE_NOT_OPENED)**;
+  D2XX listed it as opened by another process (after using Kinesis). Re-plugging USB fixed it.
+  → Our driver must report this clearly ("in use by another program — close Kinesis or
+  re-plug").
+
+### Read-only probe ✅ (2026-11-17, after the user re-plugged USB; `tools/probe_mff_readonly.py`)
+(The earlier "already opened" state is gone after re-plugging — Kinesis had kept it open.)
+```
+TX 05 00 00 00 50 01                                   HW_REQ_INFO
+RX 06 00 54 00 81 50 + 84 bytes: serial 37011815, model "MFF002" (not "MFF101"!), type 16,
+   firmware 1.0.3, notes "APT Filter Flipper", hw version 2, mod state 0, channels 1
+TX 29 04 01 00 50 01                                   REQ_STATUSBITS
+RX 2a 04 06 00 81 50 01 00 02 00 00 90                 chan 1, bits 0x90000002
+```
+→ identify check: model starts with `MFF`. Bits 28 and 31 are always set (undocumented; ignore).
+
+### Flip test ✅ (2026-11-17 user-approved; unit not on the optical bench, no laser)
+Status polled every 20 ms (`REQ_STATUSBITS`); full log in the session scratchpad, summary:
+```
+REQ_MFF_OPERPARAMS → transit 500 ms, ADC 508, DigIO1 = (1 input-toggle, 1 button, 200 ms),
+                     DigIO2 = (3 output-at-position, 0x10 level, 200 ms)  [DIG IO not wired]
+start            0x90000002                          ← at "insert"
+JOG dir 1   +0.016 s 0x90000012  (moving + still on limit 2)
+            +0.094 s 0x90000010  (moving, between)
+            +0.41 s  0x90000011  → +0.44 s 0x90000001   ← at position 1 = "retract"
+JOG dir 1 again: no motion, bits unchanged (already there)
+JOG dir 2   +0.016 s 0x90000011 → 0x90000010 → +0.39 s 0x90000002   ← back at "insert"
+JOG dir 2 again: no motion, bits unchanged
+end              0x90000002 (original state restored)
+```
+Findings:
+1. **Position = limit bits: 0x01 → position 1, 0x02 → position 2**; neither → between/unknown.
+2. **Jog dir 1 → position 1, dir 2 → position 2** (a jog is a "go to position", not a toggle;
+   repeating it is harmless).
+3. Moving bit is **0x10 in both directions** (0x20 never seen). Briefly both a limit bit and
+   0x10 at start/end → "at position" must mean limit bit set **and** 0x10 clear.
+4. Flip takes **≈0.4–0.45 s** (transit time 500 ms).
+5. **No MOVE_COMPLETED (0x0464)** or any other unsolicited message was received → poll.
+6. Unit 37011815: **position 2 = "insert" (current state), position 1 = "retract"** (user).
 
 ### USB set-up (p. 33) 📖
 Thorlabs software does, per device: `FT_SetBaudRate 115200` → `FT_SetDataCharacteristics 8N1`
@@ -548,10 +582,7 @@ Windows driver setting that Kinesis relies on), Kinesis .NET via `pythonnet` (he
 raw bytes for the log). A `D2xxTransport` only needs `_open/_close/_write/_read_some/
 _discard_input` (same Transport ABC).
 
-### To verify on hardware ⏳ (read-only first; any flip needs the user's permission)
-1. HW_GET_INFO reply (model `MFF101`, serial 37011815, firmware).
-2. Status bits at each position (which bit = position 1 / position 2; what during motion).
-3. Jog direction 1/2 ↔ position 1/2; time to flip (transit time read via MFF_OPERPARAMS).
-4. Whether MOVE_COMPLETED arrives after a flip.
-5. Which physical state (beam blocked / passing) is position 1 vs 2 for each unit → names in
-   config (e.g. `DUMP` / `PASS`).
+### Still to verify ⏳
+1. ~~Info, status bits, jog ↔ position, timing, MOVE_COMPLETED~~ ✅ done above (unit 37011815).
+2. Second unit (connected tomorrow, user): serial, position ↔ name.
+3. Behaviour when a flip is blocked mechanically (expect: no limit bit → timeout → error).
