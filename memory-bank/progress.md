@@ -240,6 +240,9 @@
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
+- **Merge with the DAQ program (F8, one program)** on the DAQ PC (PicoScope + camera). First
+  study the DAQ program's code (language, GUI toolkit, threading, data/log locations) and write
+  `memory-bank/merge-plan.md`; then merge on the DAQ PC, where it can be tested with hardware.
 - DG645: answer the open questions → write driver + simulator + GUI tab (1.6b, can be done
   before installation against `Dg645Sim`) → hardware checks in `docs/protocols.md` once installed.
 - MFF101 second unit (expected 2026-11-18): read serial (Windows device list), short flip test,

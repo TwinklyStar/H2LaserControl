@@ -98,6 +98,10 @@ is where every command passes through.
   stored persistently on disk and viewable.
 - F6. (Phase 3) Ordering rules defined in config, checked before every action.
 - F7. (Phase 4) User macros: named sequences of actions, runnable with one button.
+- F8. **Merge with the DAQ program (user, 2026-11-17): ideally ONE program.** The DAQ PC
+  runs PicoScope waveform acquisition and camera operation; these become part of this program
+  (e.g. their own tabs), not a separate program beside it. The merged program runs on the DAQ
+  PC. Details (language/toolkit of the DAQ program, structure) still to be studied → merge plan.
 
 ### GUI structure (user, 2026-11-17)
 - **One tab per device**, like browser (Chrome) tabs; the user switches between tabs. Devices are
@@ -122,7 +126,7 @@ operator error but are not a substitute for a hardware interlock; if a mistake c
 injury (not only equipment damage), a hardware interlock should be considered separately.
 
 ## 6. Out of scope (for now)
-- Non-serial devices (cameras, DAQ, Ethernet/GPIB instruments) — may be added later via the
-  same driver interface.
+- Other Ethernet/GPIB instruments — may be added later via the same driver interface.
+  (PicoScope + camera are now in scope via F8.)
 - Remote / multi-PC access.
 - Detailed interlock rule design (deferred to Phase 3).
