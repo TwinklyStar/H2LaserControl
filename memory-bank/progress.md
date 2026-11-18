@@ -442,6 +442,14 @@
   and redraws per poll. Trend points / CSV rows unchanged (per 100 triggers). Hardware (real
   ScopeTab, 3405D + NOCell, 20 s): 36.5 redraws/s total = each scope ~25/s (the two scopes'
   triggers arrive at different phases). Before: one redraw per 100 triggers (4 s). 317 passed.
+- **User: the rotation mount always fails to connect at program start (Connect later works).**
+  Log: `COM3 … PermissionError 13 Access is denied` at 22:42:37.088, while the flip mounts
+  (D2XX) opened at 37.344, all devices connecting in parallel. *Hardware test (open/close
+  only):* during each D2XX `FT_OpenEx(flip serial)` (~130 ms) opening COM3 fails with Access
+  denied (74/95 attempts) → FT_OpenEx briefly opens every FTDI chip (ELL14 and HIT-MV adapters
+  are FTDI FT230X). Fix: `transport.base.USB_OPEN_LOCK` around serial opens and FT_OpenEx, plus
+  one retry after 0.5 s on "Access is denied". *Hardware:* ELL14 + HIT-MV + flip mounts connected
+  in parallel 10×: old code 1 failure, with the lock 0 (with and without retry). 317 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

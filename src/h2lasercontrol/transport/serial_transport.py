@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import time
+
 import serial
 
-from .base import Transport, TransportError
+from .base import USB_OPEN_LOCK, Transport, TransportError
 
 _POLL = 0.05  # seconds _read_some waits for the first byte
+_RETRY_S = 0.5  # one retry when the port is busy for a moment (another program enumerating FTDI)
 
 
 class SerialTransport(Transport):
@@ -36,12 +39,19 @@ class SerialTransport(Transport):
         self._ser: serial.Serial | None = None
 
     def _open(self) -> None:
-        try:
-            self._ser = serial.Serial(port=self.port, **self._settings)
-        except serial.SerialException as e:
-            raise TransportError(
-                f"cannot open {self.port}: {e} (is the vendor software still using it?)"
-            ) from e
+        for attempt in (1, 2):
+            try:
+                with USB_OPEN_LOCK:  # not while a D2XX device is being opened (see base)
+                    self._ser = serial.Serial(port=self.port, **self._settings)
+                return
+            except serial.SerialException as e:
+                busy = "Access is denied" in str(e) or "PermissionError" in str(e)
+                if attempt == 1 and busy:
+                    time.sleep(_RETRY_S)
+                    continue
+                raise TransportError(
+                    f"cannot open {self.port}: {e} (is the vendor software still using it?)"
+                ) from e
 
     def _close(self) -> None:
         if self._ser is not None:

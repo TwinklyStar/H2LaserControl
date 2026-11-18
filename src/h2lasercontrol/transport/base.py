@@ -7,11 +7,18 @@ Implementations: `SerialTransport` (now), `FakeTransport` (tests/simulation). A 
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Self
 
 log = logging.getLogger(__name__)
+
+# Opening a D2XX device by serial (flip mounts) briefly opens every FTDI chip to compare serials,
+# so a COM port on an FTDI adapter (ELL14 COM3, HIT-MV COM4) opened at the same moment fails
+# with "Access is denied" (hardware test 2026-11-18: COM3 blocked for the ~130 ms of each
+# FT_OpenEx). All devices connect in parallel at program start, so opens take turns.
+USB_OPEN_LOCK = threading.Lock()
 
 
 class TransportError(Exception):

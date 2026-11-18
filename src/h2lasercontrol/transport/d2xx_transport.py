@@ -11,7 +11,7 @@ import ctypes
 import time
 from typing import Any
 
-from .base import Transport, TransportError
+from .base import USB_OPEN_LOCK, Transport, TransportError
 
 FT_OPEN_BY_SERIAL_NUMBER = 1
 FT_PURGE_RX, FT_PURGE_TX = 1, 2
@@ -54,8 +54,9 @@ class D2xxTransport(Transport):
     def _open(self) -> None:
         d = _load_dll()
         h = ctypes.c_void_p()
-        st = d.FT_OpenEx(ctypes.c_char_p(self.usb_serial.encode("ascii")),
-                         FT_OPEN_BY_SERIAL_NUMBER, ctypes.byref(h))
+        with USB_OPEN_LOCK:  # FT_OpenEx briefly blocks other FTDI COM ports (see base)
+            st = d.FT_OpenEx(ctypes.c_char_p(self.usb_serial.encode("ascii")),
+                             FT_OPEN_BY_SERIAL_NUMBER, ctypes.byref(h))
         if st == 2:
             raise TransportError(f"USB device {self.usb_serial} not found. Is it plugged in?")
         if st == 3:
