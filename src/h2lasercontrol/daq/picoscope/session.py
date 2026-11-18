@@ -165,6 +165,10 @@ class PicoSession:
                 skipped = {n: d.skipped for n, d in self.digitizers.items() if d.skipped}
                 if skipped:  # waveforms lost to failed readouts (gaps in the data)
                     result["skipped_waveforms"] = skipped
+                reconnects = {n: d.reconnects for n, d in self.digitizers.items()
+                              if d.reconnects}
+                if reconnects:
+                    result["reconnects"] = reconnects
                 if self._stop_requested:
                     self.oplog.write(device=self.key, action="stop", result=result)
                 self.state = STOPPED

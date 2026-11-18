@@ -177,6 +177,7 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
 | "PicoSDK (ps2000) not found" | Install the PicoSDK (§2.4) and open a new prompt / restart the program. |
 | PicoScope "not found" when starting a scope tab | Close PicoScope 7 and the old H2LaserDAQ; check the serial in `devices.toml`; re-plug the scope. |
 | "No trigger for 10 s" in a scope tab | No trigger signal arrives (laser off, cable, trigger level). The acquisition keeps waiting. |
+| "readout failed … waveform skipped" / "scope not responding: reconnecting" | The scope's USB link dropped out; the tab skips the waveform or reopens the scope and goes on (counts in the operation log). If it happens often: keep the 3405D on a different USB hub from the 2204A scopes (on this PC: 3405D on the control-device hub). |
 | Camera does not open / "not responding" | Close IDS peak Cockpit and the old LaserDAQ, then unplug and re-plug the camera's USB cable. |
 | Camera status bar: "SLOW USB LINK … USB 2.0" | The camera is on a USB 2 link (max ~19 fps full frame). Use a USB 3 port and cable, directly on the PC. |
 

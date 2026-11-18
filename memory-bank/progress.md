@@ -339,6 +339,21 @@
   concurrent SDK calls; the 3405D drops out on this PC's USB setup when a 2204A acquires at
   the same time.** Next: user to try other USB ports (3405D directly on the PC, 2204As
   elsewhere); where/how the old program ran without this.
+  User: the old program ran on a different PC with different cabling. Data rates are tiny
+  (3405D ≈ 100 kB/s, 2204A ≈ 50–100 kB/s at 25 Hz), so not a bandwidth problem.
+- **Re-cabled (user): 3405D moved to the control-device hub** (VID 35D6 PID 2510), the
+  2204As stay on the DAQ hub. *Hardware tests:* both monitor scopes 3 min: 4505 + 4309
+  waveforms at 25.0 Hz, 0 skipped, no gaps. **Both tabs together 15 min** (monitor + VUV PD
+  snapshot, i.e. both 2204A at once, with Pause 20 s at 5:00): 0 skipped, 0 errors, 25.0 Hz on
+  all three; ROOT rotation every 10000 triggers works (files _0000–_0002); only gaps = the
+  pause, plus one 1.06 s gap in H2PD 3 s before Stop (no readout failure reported; watch in
+  long runs). → ps2000 with our per-DLL lock is fine for two 2204A in one process.
+- **Safety net added:** after 3 failed readouts in a row the scope is closed and reopened (2 s
+  wait) and the run continues in the same files, with the running CSV sums kept; 3 reconnects
+  without one good waveform → that scope ends with an error. Op-log stop entry has
+  `reconnects` and `skipped_waveforms`. 299 passed.
+- Camera in the GUI (user, 17:22): opened, 33 s live view, 184/184 frames, closed cleanly.
+  Capture and multi-shot run not yet tested.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

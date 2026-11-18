@@ -207,7 +207,49 @@ def test_failed_readout_skips_one_waveform(cfg, tmp_path, monkeypatch):
     assert stop["result"]["skipped_waveforms"] == {"DET10A2": 3}
 
 
-def test_repeated_readout_failures_end_that_scope(cfg, tmp_path, monkeypatch):
+def test_not_responding_scope_is_reconnected(cfg, tmp_path, monkeypatch):
+    """3 failures in a row: close + reopen, same files, CSV sums kept, run goes on."""
+    monkeypatch.setattr(digitizer_mod, "RECONNECT_WAIT_S", 0.01)
+    real = VirtualDigitizer._capture_block
+    real_init = VirtualDigitizer._init_hardware
+    calls = {"n": 0, "init": 0}
+
+    def capture(self):
+        if self.device == "DET10A2":
+            calls["n"] += 1
+            if 30 <= calls["n"] < 33:
+                raise digitizer_mod.ReadoutError("GetValues returned PICO_NOT_RESPONDING")
+        return real(self)
+
+    def init(self, config):
+        if self.device == "DET10A2":
+            calls["init"] += 1
+        real_init(self, config)
+
+    monkeypatch.setattr(VirtualDigitizer, "_capture_block", capture)
+    monkeypatch.setattr(VirtualDigitizer, "_init_hardware", init)
+    s, oplog = make(cfg, "scope_monitor", tmp_path)
+    s.start()
+    d = s.digitizers["DET10A2"]
+    wait(lambda: d.reconnects == 1 and calls["n"] > 250, session=s)
+    root_file = d.root_pointer.getName()
+    assert calls["init"] == 2 and s.states["DET10A2"] == RUNNING
+    assert "reconnected" in s.warnings["DET10A2"]
+    s.stop()
+    wait(lambda: s.state == STOPPED, session=s)
+    assert d.files.count(root_file) == 1  # same ROOT file before and after
+    stop = read_oplog(oplog.today_path())[-1]["result"]
+    assert stop["reconnects"] == {"DET10A2": 1} and stop["skipped_waveforms"] == {"DET10A2": 3}
+    # CSV rows still sum exactly 100 triggers: the row in progress kept its sums
+    date = time.strftime("%y%m%d")
+    with open(tmp_path / "data" / "picoscope" / "csv" / f"FreeSpacePD_2026June_{date}.csv",
+              newline="") as f:
+        vals = [float(r[1]) for r in list(csv.reader(f))[1:]]
+    assert len(vals) >= 2 and max(vals) / min(vals) < 1.5
+
+
+def test_scope_that_stays_dead_ends_with_error(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr(digitizer_mod, "RECONNECT_WAIT_S", 0.01)
     real = VirtualDigitizer._capture_block
 
     def capture(self):
@@ -219,7 +261,8 @@ def test_repeated_readout_failures_end_that_scope(cfg, tmp_path, monkeypatch):
     s, _ = make(cfg, "scope_monitor", tmp_path)
     s.start()
     wait(lambda: s.states.get("DET10A2") == "error", session=s)
-    assert f"{digitizer_mod.MAX_READOUT_FAILS} times in a row" in s.errors["DET10A2"]
+    assert f"after {digitizer_mod.MAX_RECONNECTS} reconnects" in s.errors["DET10A2"]
+    assert s.digitizers["DET10A2"].reconnects == digitizer_mod.MAX_RECONNECTS
     assert s.state == RUNNING  # NOCell goes on
     s.stop()
     wait(lambda: s.state == STOPPED, session=s)

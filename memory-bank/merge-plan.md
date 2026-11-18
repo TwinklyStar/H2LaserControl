@@ -66,8 +66,9 @@ Survey of the old code: `progress.md`, 2026-11-18.
   is). Watch for "Apply needs two clicks" / stale aborts in the hardware test.
 - Output names in `devices.toml` are the old ones (`FreeSpacePD_2026June`, `NOCell_2026June`,
   `H2PD_2026B`): new names for the merged program's data?
-- Whether the ps2000 driver is thread-safe (would allow dropping the lock); M7 hardware test
-  with both 2204A tabs running.
-- 3405D `PICO_TIMEOUT` on readout (M7, 2026-11-18, once in ~70 s of running): now skipped and
-  re-armed (deliberate change vs. old code). If it recurs often in long runs: check the USB
-  port/hub, USB selective suspend, and the 3405D's power status at open (282/286).
+- ~~Two 2204A tabs at once~~: OK for 15 min with the per-DLL lock (M7, 2026-11-18). Whether
+  the lock could be dropped is not tested (no need).
+- ~~3405D `PICO_TIMEOUT` / `PICO_NOT_RESPONDING`~~: caused by the USB cabling (3405D on the
+  same hub as the 2204As; the old code failed the same way). Fixed by moving the 3405D to the
+  other hub. Kept as safety net: skip a failed readout, reconnect after 3 in a row (deliberate
+  change vs. old code). **Keep the 3405D off the 2204As' hub.**

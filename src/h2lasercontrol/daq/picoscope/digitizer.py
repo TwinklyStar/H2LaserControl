@@ -17,8 +17,11 @@ Changes for the merged program:
 - every SDK call holds a per-DLL lock (thread safety of the drivers is not documented);
 - status / warning / error / rate items for the tab header are put on the same queue;
 - a failed readout (e.g. PICO_TIMEOUT: the 3405D once stalled 5 s on its USB link, M7) skips
-  that one waveform and re-arms; only MAX_READOUT_FAILS failures in a row end the run (the old
-  code ended the run at the first one, and stopped all scopes with it).
+  that one waveform and re-arms; after MAX_READOUT_FAILS in a row the scope is closed and
+  reopened (PICO_NOT_RESPONDING; a fresh open works, M7) and the run goes on in the same files;
+  only MAX_RECONNECTS reconnects without a good waveform end it (the old code ended the run at
+  the first failure, and stopped all scopes with it). The M7 failures came from the USB
+  cabling (3405D sharing a hub with the 2204As) and stopped after re-cabling.
 """
 
 from __future__ import annotations
@@ -43,7 +46,9 @@ _log = logging.getLogger(__name__)
 
 TRIGGERS_PER_FILE = 10000  # ~400 s at 25 Hz
 NO_TRIGGER_WARN_S = 10
-MAX_READOUT_FAILS = 3  # failed readouts in a row before the scope is given up (error)
+MAX_READOUT_FAILS = 3  # failed readouts in a row -> close and reopen the scope
+MAX_RECONNECTS = 3  # reconnects in a row without one good waveform -> error
+RECONNECT_WAIT_S = 2.0  # between closing and reopening
 _LOCKS = {"3405D": threading.RLock(), "2204A": threading.RLock()}
 
 
@@ -92,6 +97,7 @@ class Digitizer(threading.Thread):
         self.root_pointer = None
         self.files: list[str] = []  # output files opened so far (for the op log)
         self.skipped = 0  # waveforms lost to failed readouts (for the op log)
+        self.reconnects = 0  # scope closed and reopened after repeated failures (op log)
         self._lock = _LOCKS.get(self.model, threading.RLock())
         self._hw_open = False
 
@@ -240,6 +246,7 @@ class Digitizer(threading.Thread):
             time_start = time.time()
             rate_cnt = 0
             fails = 0  # failed readouts in a row
+            reconnects = 0  # reconnects since the last good waveform
             while trigger_cnt < self.trigger_per_file and not self._stop_evt.is_set():
                 if self._paused.is_set():
                     self._wait_while_paused()
@@ -252,13 +259,20 @@ class Digitizer(threading.Thread):
                     self.skipped += 1
                     _log.warning("%s %s %s: %s (%d in a row, %d skipped in this run)",
                                  self.device, self.model, self.serial, e, fails, self.skipped)
-                    if fails >= MAX_READOUT_FAILS:
-                        raise ReadoutError(f"{e} ({fails} times in a row)") from e
-                    self._post("warning", message=(
-                        f"{time.strftime('%H:%M:%S')} readout failed ({e}): waveform skipped,"
-                        f" {self.skipped} skipped so far"))
+                    if fails < MAX_READOUT_FAILS:
+                        self._post("warning", message=(
+                            f"{time.strftime('%H:%M:%S')} readout failed ({e}): waveform"
+                            f" skipped, {self.skipped} skipped so far"))
+                        continue
+                    reconnects += 1
+                    if reconnects > MAX_RECONNECTS:
+                        raise ReadoutError(
+                            f"{e}; still failing after {MAX_RECONNECTS} reconnects") from e
+                    self._reconnect(str(e), reconnects)
+                    fails = 0
+                    time_start, rate_cnt = time.time(), 0
                     continue
-                fails = 0
+                fails = reconnects = 0
                 if not captured:  # interrupted: nothing captured, nothing written
                     continue
                 trigger_cnt += 1
@@ -325,6 +339,30 @@ class Digitizer(threading.Thread):
                     time_start, rate_cnt = time.time(), 0
 
             self._close_root()
+
+    def _reconnect(self, reason: str, attempt: int) -> None:
+        """Close and reopen the scope; files and the running sums (CSV row) are kept.
+        An error while reopening (scope gone) ends the run."""
+        now = time.strftime("%H:%M:%S")
+        _log.warning("%s %s %s: not responding (%s): reconnecting, try %d/%d", self.device,
+                     self.model, self.serial, reason, attempt, MAX_RECONNECTS)
+        self._post("warning", message=(
+            f"{now} scope not responding ({reason}): reconnecting"
+            f" (try {attempt}/{MAX_RECONNECTS})"))
+        keep = (self.peak_area_buffer, self.avg_wave_buffer)
+        try:
+            self._close_scope()
+        except Exception:  # noqa: BLE001 - the scope is reopened anyway
+            _log.exception("%s: closing the scope before reconnecting failed", self.device)
+        if self._stop_evt.wait(RECONNECT_WAIT_S):
+            return
+        self._init_hardware(self.config)
+        self._hw_open = True
+        self.peak_area_buffer, self.avg_wave_buffer = keep
+        self.reconnects += 1
+        _log.info("%s: reconnected (%d reconnects in this run)", self.device, self.reconnects)
+        self._post("warning", message=(
+            f"{now} scope reconnected after: {reason}; {self.skipped} waveforms skipped so far"))
 
     def _init_buffers(self) -> None:
         if self.run_mode == "continuous":
