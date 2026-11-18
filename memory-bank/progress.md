@@ -244,6 +244,28 @@
 - **HIT-MV Insert: confirmation dialog removed** (user: not needed; design F2b). Insert starts at
   once; interlock unchanged. New GUI test checks that no dialog opens. ELL14 maintenance
   confirmations (save max energy, home offset, clean) are kept.
+- **DAQ merge (F8), step 1: old DAQ code read** (`DAQ_oldcode/`, untracked, 154 MB with zips).
+  The PicoScopes and the camera are now connected to **this PC** (the plan said "DAQ PC").
+  - `H2LaserDAQ/` (PicoScope, ~2.5k lines, no tests, no git here): PyQt5 + pyqtgraph, picosdk
+    ctypes. One `threading.Thread` per scope (`H2LaserDigitizer`), block capture loop, ADC→mV,
+    ROOT via uproot (tree `rawWave`, 10000 triggers/file, background writer), CSV of summed
+    area every 100 triggers (continuous mode), queue → GUI at 10 Hz. Modes: *continuous*
+    (multi-scope, trend + waveforms) and *snapshot* (1 scope, averaged waveform, area ± err,
+    Pause/Freeze/Save CSV). Python-file configs (`config/*.py`, `DIGITIZER_CONFIGS`), TUI launcher.
+    Models: 3405D (ps3000a, ser. JY926/0005: 212/820 nm DET10A2, Ext trigger) and 2204A
+    (ps2000, ser. 12017/0359 NO cell, 12017/0366 H2 VUV PD, 12017/0137 laser-room PD).
+    Area = plain sum × dt (no baseline subtraction).
+  - `IDS-Camera/` (package `laserdaq`, ~7.4k lines, ~290 tests, own memory bank): PySide6 +
+    pyqtgraph, `ids_peak` SDK. `CameraBase`/`IDSCamera`/`MockCamera`, `AcquisitionController`
+    (daemon thread, back-pressure, settings written on the acquisition thread),
+    `FrameRecorder` (BMP per frame + frames.csv, 25 Hz), offline BMP→ROOT, auto gain with ROI,
+    hang watchdog, TOML configs. Known: camera link unstable (USB 2.0, drops after a few
+    open/close cycles); its docs say `signal_stop()` must not call `KillWait()`, but the code
+    does (discrepancy to check).
+  - This PC (read-only check): Windows sees 2× PicoScope 2000, 1× PicoScope 3000, IDS
+    U3-327xCP-C ser. **4110039161**; also a Newport "Picomotor Controller" (not in scope).
+    `ps2000.dll`/`ps3000a.dll` only inside PicoScope 7 (not on PATH); IDS peak runtime installed
+    (Python bindings come from PyPI). The `H2LaserControl` env has none of the DAQ packages.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
