@@ -85,6 +85,10 @@ is where every command passes through.
   the driver (scripts can't bypass it); unknown position ⇒ blocked.
 - F2b. **No confirmation dialog when inserting the VUV photodiode or mirror** (user,
   2026-11-18): the Insert button starts the move at once (the interlock F2a still applies).
+- F2c. **Positions lost after a controller restart ⇒ nothing moves** (user, 2026-11-18): a
+  power cycle resets both counters to 0 whatever the real position. Both reading 0 (impossible
+  under F2a) ⇒ GUI shows "POSITION UNKNOWN", Insert and Retract locked, also in the driver.
+  Recovery by the user: check by eye, home + retract with HIT Sample.
 - F3. MFF101: flip to position 1 / 2 (named, e.g. "DUMP" / "PASS"), query current position.
 - F3b. DG645: **only adjust the delay of one channel** (user, 2026-11-17): show it, set a new
   value, step it up/down; no other DG645 operations. Transport must allow RS-232 now and LAN

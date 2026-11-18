@@ -160,14 +160,29 @@ def test_interlock_never_two_inserted(other_pos):
 
 
 def test_interlock_allows_getting_out():
-    # abnormal state (both inserted, e.g. via vendor software): retracting is always allowed
-    drv, sim = make(HitMvSim(positions=(0, 0)))
+    # abnormal state (both in the beam, e.g. via vendor software): retracting is always allowed
+    drv, sim = make(HitMvSim(positions=(0, 12345678)))
     drv.retract(1)
     assert sim.pos[:2] == [0, 30000000]
     drv.move_abs(1, 30000000)  # moving to the retracted end is fine too
     drv.retract(0)
     drv.insert(1)  # now the photodiode is out -> mirror may go in
     assert sim.pos[:2] == [30000000, 0]
+
+
+def test_positions_lost_after_power_cycle_refuses_every_move():
+    # hardware 2026-11-18: after a controller restart both counters read 0 whatever the real
+    # position; a relative retract could then drive 60 mm into the limit
+    drv, sim = make(HitMvSim(positions=(0, 0)))
+    assert drv.snapshot()["positions_lost"] is True
+    for call in (lambda: drv.retract(0), lambda: drv.retract(1), lambda: drv.insert(1),
+                 lambda: drv.move_abs(1, 30000000)):
+        with pytest.raises(DeviceError, match="restarted"):
+            call()
+    assert motion_commands(sim) == []
+    assert make()[0].snapshot()["positions_lost"] is False
+    assert make(HitMvSim(positions=(0, 0)), exclusive_axes=False)[0].snapshot()[
+        "positions_lost"] is False
 
 
 def test_interlock_can_be_disabled_in_config():

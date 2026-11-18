@@ -395,6 +395,12 @@
   Test data deleted afterwards (user request): data/ and scratch runs.
   **M7 scope + camera acceptance on hardware: done.** Open: ELL14 adapter (COM6) has no
   serial in Windows since the re-cabling; HIT-MV power-cut detection (both axes 0) proposed.
+- User: rotation mount back on COM3 (serial found), connected OK. Long GUI run: not needed now.
+- **F2c HIT-MV "positions lost" lock** (user OK): all axes at 0 under the interlock ⇒ driver
+  refuses insert/retract/move_abs with a plain message, snapshot has `positions_lost`, tab
+  shows red "POSITION UNKNOWN" and disables the buttons. The old test "retract allowed when
+  both read 0" now uses (0, partly inserted). README troubleshooting updated. 301 passed.
+- Next: user's changes to the waveform display.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

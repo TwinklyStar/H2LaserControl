@@ -71,6 +71,17 @@ def test_flip_mount_retract_and_insert(window, qtbot):
     assert ("retract", {"unit": "flip1"}) in done and ("insert", {"unit": "flip1"}) in done
 
 
+def test_positions_lost_locks_both_feedthroughs(window, qtbot):
+    hit = panel(window, "hitmv")
+    hit.state = {**hit.state, "positions_lost": True,
+                 "axes": {n: {**i, "position": 0} for n, i in hit.state["axes"].items()}}
+    hit.update_view()
+    for card in hit.cards.values():
+        assert card.state_label.text() == "POSITION UNKNOWN"
+        assert not card.insert_btn.isEnabled() and not card.retract_btn.isEnabled()
+        assert "HIT Sample" in card.hint_label.text()
+
+
 def test_insert_and_retract_mirror(window, qtbot):
     hit = panel(window, "hitmv")
     card = hit.cards[1]

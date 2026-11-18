@@ -173,7 +173,7 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
 | Flip mount "in use by another program" (FT_STATUS 3) | Close Kinesis, also from the system tray. If that does not help, unplug and re-plug its USB cable. |
 | Flip mount: `ftd2xx.dll` not found | Install the FTDI CDM driver or Kinesis (§2.3). |
 | Launcher closes at once / "Conda not found" | Conda is installed somewhere else: edit the folder list at the top of the `.bat` file. |
-| HIT-MV position looks wrong after a power cut | Retract/insert once with the user watching (homing resets the counter). |
+| Feedthroughs show "POSITION UNKNOWN" (both read 0) | The HIT-MV controller was switched off or restarted and lost its positions; Insert/Retract are locked. Check both feedthroughs by eye, home them with HIT Sample (ORG) and retract them there, close HIT Sample, then reconnect. |
 | "PicoSDK (ps2000) not found" | Install the PicoSDK (§2.4) and open a new prompt / restart the program. |
 | PicoScope "not found" when starting a scope tab | Close PicoScope 7 and the old H2LaserDAQ; check the serial in `devices.toml`; re-plug the scope. |
 | "No trigger for 10 s" in a scope tab | No trigger signal arrives (laser off, cable, trigger level). The acquisition keeps waiting. |

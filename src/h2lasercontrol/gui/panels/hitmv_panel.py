@@ -60,11 +60,29 @@ class AxisCard(QGroupBox):
         lay.addLayout(buttons)
 
     def display(self, info: dict[str, Any] | None, *, can_act: bool, moving: str | None,
-                elapsed: float | None, blocked_by: str | None = None) -> None:
+                elapsed: float | None, blocked_by: str | None = None,
+                positions_lost: bool = False) -> None:
         """`blocked_by`: label of another feedthrough that is not retracted (interlock F2a:
-        never two inserted at once) -> Insert is disabled. Retract is never blocked."""
+        never two inserted at once) -> Insert is disabled. Retract is only blocked when
+        `positions_lost` (all axes read 0 after a controller restart): then nothing may move."""
         pos = None if info is None else info.get("position")
         upmm = self.panel.units_per_mm
+        if positions_lost and pos is not None and not moving:
+            self._set_state("POSITION UNKNOWN", RED,
+                            "The controller was restarted: its position reading (0) is not "
+                            "the real position. Check by eye, then home and retract with "
+                            "HIT Sample (ORG). Insert/Retract are locked until then.")
+            self.pos_label.setText(f"Controller reads {pos / upmm:.2f} mm (not valid)")
+            self.bar.setValue(0)
+            self.insert_btn.setEnabled(False)
+            self.retract_btn.setEnabled(False)
+            tip = "Locked: position unknown after a controller restart"
+            self.insert_btn.setToolTip(tip)
+            self.retract_btn.setToolTip(tip)
+            alarms = (info or {}).get("alarms") or []
+            self.alarm_label.setText("Alarm: " + ", ".join(alarms) if alarms else "")
+            self.alarm_label.setVisible(bool(alarms))
+            return
         if pos is None:
             self._set_state("—", GREY, "No data" if not self.panel.connected else "Axis not connected")
             self.pos_label.setText("")
@@ -158,6 +176,7 @@ class HitMvPanel(DevicePanel):
         if not self.busy:
             self.moving = None
         exclusive = bool(self.cfg.settings.get("exclusive_axes", True))
+        lost = bool(self.connected and self.state.get("positions_lost"))
         # axes that are not exactly retracted (or are moving / unknown) lock the others
         not_retracted = set()
         for n, card in self.cards.items():
@@ -176,4 +195,4 @@ class HitMvPanel(DevicePanel):
                     info = {**(info or {}), "position": self.progress_info["position"]}
                     elapsed = self.progress_info.get("elapsed")
             card.display(info, can_act=self.can_act, moving=moving, elapsed=elapsed,
-                         blocked_by=blocked_by)
+                         blocked_by=blocked_by, positions_lost=lost)

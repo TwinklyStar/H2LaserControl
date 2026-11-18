@@ -20,6 +20,14 @@ from ..transport import Transport, TransportTimeout
 from .base import Aborted, DeviceError, DeviceTimeout, Driver, action
 
 N_SLOTS = 8
+# After a controller power cycle every position counter reads 0 ("inserted"), whatever the real
+# position (hardware 2026-11-18). With the interlock, all axes inserted at once cannot happen
+# otherwise, so that reading means "positions lost": no move is allowed (a relative retract from
+# a stage that is really out would drive 60 mm into the limit).
+POSITIONS_LOST_MSG = (
+    "All feedthroughs read position 0. This happens when the controller was switched off or "
+    "restarted: the real positions are unknown. Check both feedthroughs by eye, then home them "
+    "with the vendor program (HIT Sample, ORG) and retract them there.")
 # Q:S slave-status bits that mean something went wrong (bit 0 -LS, 1 +LS, 5 scale, 6 driver alarm)
 ALARM_BITS = {0: "-limit switch", 1: "+limit switch", 5: "scale alarm", 6: "driver alarm"}
 
@@ -156,7 +164,21 @@ class HitMv(Driver):
         return out
 
     def snapshot(self) -> dict[str, Any]:
-        return {"axes": self.status()}
+        axes = self.status()
+        pos = [None] * N_SLOTS
+        for info in axes.values():
+            pos[info["axis"]] = info["position"]
+        return {"axes": axes, "positions_lost": self._positions_lost(pos)}
+
+    def _positions_lost(self, pos: list[int | None]) -> bool:
+        """True if every configured axis reads its inserted position (see POSITIONS_LOST_MSG).
+        Only meaningful with the interlock and two or more axes."""
+        return (self.exclusive_axes and len(self.axes) >= 2
+                and all(pos[n] == ax.inserted for n, ax in self.axes.items()))
+
+    def _refuse_if_positions_lost(self) -> None:
+        if self._positions_lost(self._positions()):
+            raise DeviceError(f"{self.name}: {POSITIONS_LOST_MSG}")
 
     @action()
     def get_speed(self, axis: int) -> dict[str, int]:
@@ -244,6 +266,7 @@ class HitMv(Driver):
         """Insert = origin return (`H:`), ends at position 0. Takes ~62 s (~30 s with fast homing)."""
         ax = self._axis(axis)
         self._require_ready(axis)
+        self._refuse_if_positions_lost()
         self._check_interlock(axis)
         sent_b = None
         if self.homing_max_speed:
@@ -263,9 +286,11 @@ class HitMv(Driver):
     def retract(self, axis: int) -> dict[str, Any]:
         """Retract = speed `D:` + relative `M:+(retracted - current)`. From the inserted position
         this is exactly SGSample's `M:+30000000`; after a stop halfway it moves out by the
-        remaining distance (user, 2026-11-17). Never blocked by the interlock (out = safe)."""
+        remaining distance (user, 2026-11-17). Never blocked by the interlock (out = safe), but
+        refused when the positions are lost (power cycle: the counter is not the position)."""
         ax = self._axis(axis)
         pos = self._require_ready(axis)
+        self._refuse_if_positions_lost()
         lo, hi = sorted((ax.inserted, ax.retracted))
         if pos == ax.retracted:
             return {"position": pos, "note": "already retracted"}
@@ -288,6 +313,7 @@ class HitMv(Driver):
         if not isinstance(units, int) or not lo <= units <= hi:
             raise ValueError(f"target must be an integer within [{lo}, {hi}], not {units!r}")
         self._require_ready(axis)
+        self._refuse_if_positions_lost()
         if units != ax.retracted:
             self._check_interlock(axis)
         s, f, r = self.speed
