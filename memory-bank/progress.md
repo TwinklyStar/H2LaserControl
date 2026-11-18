@@ -432,6 +432,10 @@
   then 0366, closes 0359 → 8.1 s (was 11.6 s). Monitor: NOCell 3.5 s (was 11.6 s; the
   3405D opens in parallel). H2PD while the monitor runs (0359 busy): 3.5 s. No errors, 0
   skipped. Test data deleted.
+- Start-page description updated for the new display (user). **Snapshot refresh rate on
+  hardware** (real ScopeTab + H2PD, offscreen, 20 s): poll 40 ms → 20.9 redraws/s at 25.0 Hz
+  triggers (timer jitter puts 2 waveforms in one poll); poll 20 ms → **25.0 redraws/s**, one
+  per trigger. POLL_MS = 20. (On-screen painting not measured; 1000-point curves are cheap.)
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

@@ -34,7 +34,10 @@ from ...oplog import OpLog
 from ..style import BLUE, GREEN, GREY, ORANGE, set_role
 from .scope_views import ContinuousView, SnapshotView
 
-POLL_MS = 40  # 25 Hz: the snapshot plot is redrawn per poll with new waveforms (user: 10-25 fps)
+# The snapshot plot is redrawn per poll that brought new waveforms (user: 10-25 fps). Polling at
+# the trigger period (40 ms) gave 20.9 fps at 25 Hz on hardware (timer jitter merges waveforms);
+# 20 ms lets nearly every waveform get its own frame.
+POLL_MS = 20
 
 
 def shown_channels(dcfg: dict[str, Any]) -> list[str]:
