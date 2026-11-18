@@ -354,6 +354,24 @@
   `reconnects` and `skipped_waveforms`. 299 passed.
 - Camera in the GUI (user, 17:22): opened, 33 s live view, 184/184 frames, closed cleanly.
   Capture and multi-shot run not yet tested.
+- **Hardware test: camera + all scopes, 5 min** (user request: the 2204As share a hub with the
+  camera). Camera free-run requested 18 fps, one open/close: 3132 frames = steady 10.3 fps,
+  ~42 % of frame IDs skipped from the start, no errors, clean close. Scopes: 0 skipped, no
+  gaps (25 Hz). Camera-alone baseline still to do (likely our RGB conversion is the limit,
+  not the hub).
+- **Hardware finding + fix: starting/stopping one 2204A tab blocked the other 2204A.** The
+  ps2000 search-and-open (~7 s) and close_unit (~1 s) ran under the shared per-DLL lock, so
+  the running NOCell scope lost 7 s of triggers when the VUV PD tab started and 1 s when it
+  stopped (and the last H2PD waveform was stamped ~1 s late at stop). Fix: open/close have
+  their own lock (`_OPEN_LOCKS`), readout keeps `_LOCKS`. Hardware test: monitor running,
+  VUV PD tab started/stopped 4 times → NOCell 25.00 Hz, no gaps; no crash (ps2000 tolerates
+  opening one unit while another reads out).
+- **Motor test (3405D + VUV mirror) not run:** user allowed it this once without watching.
+  Windows now lists the FTDI COM adapters by hub port instead of serial since the re-cabling
+  at 18:27 (pyserial serial "7"/"6"; D2XX still reads DU0DFFMC = COM5, DP06TVEF = COM6), so
+  `resolve_port` cannot find hitmv/ell14 by serial. ELL14 answers on COM6. **HIT-MV on COM5
+  does not answer** read-only `?:N`, `?:V`, `Q:` (CTS active). Only read-only queries were
+  sent; nothing moved. To check: HIT-MV controller power / RS-232 cable after re-cabling.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

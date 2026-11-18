@@ -50,6 +50,10 @@ MAX_READOUT_FAILS = 3  # failed readouts in a row -> close and reopen the scope
 MAX_RECONNECTS = 3  # reconnects in a row without one good waveform -> error
 RECONNECT_WAIT_S = 2.0  # between closing and reopening
 _LOCKS = {"3405D": threading.RLock(), "2204A": threading.RLock()}
+# Opening / closing a unit is slow (ps2000 search-and-open ~7 s, close ~1 s). It has its own
+# lock, so a tab that starts or stops does not block the readout of a running scope of the
+# same model (M7: holding _LOCKS there cost the running NOCell scope 7 s of triggers).
+_OPEN_LOCKS = {"3405D": threading.RLock(), "2204A": threading.RLock()}
 
 
 class DigitizerInitError(Exception):
@@ -99,6 +103,7 @@ class Digitizer(threading.Thread):
         self.skipped = 0  # waveforms lost to failed readouts (for the op log)
         self.reconnects = 0  # scope closed and reopened after repeated failures (op log)
         self._lock = _LOCKS.get(self.model, threading.RLock())
+        self._open_lock = _OPEN_LOCKS.get(self.model, threading.RLock())
         self._hw_open = False
 
     # --- control (any thread) -----------------------------------------------------------------
@@ -143,11 +148,13 @@ class Digitizer(threading.Thread):
             from picosdk.ps3000a import ps3000a
             with self._lock:
                 ps3000a.ps3000aStop(self.chandle)
+            with self._open_lock:
                 ps3000a.ps3000aCloseUnit(self.chandle)
         elif self.model == "2204A":
             from picosdk.ps2000 import ps2000
             with self._lock:
                 ps2000.ps2000_stop(self.chandle)
+            with self._open_lock:
                 ps2000.ps2000_close_unit(self.chandle)
 
     # --- thread -------------------------------------------------------------------------------
@@ -405,7 +412,7 @@ class Digitizer(threading.Thread):
         lock = self._lock
         self.status = {}
         self.chandle = ctypes.c_int16()
-        with lock:
+        with self._open_lock:
             self.status["openunit"] = ps3000a.ps3000aOpenUnit(
                 ctypes.byref(self.chandle), ctypes.c_char_p(str(self.serial).encode()))
         st = self.status["openunit"]
@@ -531,9 +538,9 @@ class Digitizer(threading.Thread):
         lock = self._lock
         self.status = {}
         # ps2000_open_unit opens the next *free* unit (no serial argument): open all free
-        # units, keep ours, close the rest (as the old code). Under the lock, so two tabs
-        # starting at once cannot grab each other's unit.
-        with lock:
+        # units, keep ours, close the rest (as the old code). Under the open lock, so two tabs
+        # starting at once cannot grab each other's unit; a running unit's readout goes on.
+        with self._open_lock:
             handles = {}
             while True:
                 h = ps2000.ps2000_open_unit()
