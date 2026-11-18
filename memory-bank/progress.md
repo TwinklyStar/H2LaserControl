@@ -401,6 +401,16 @@
   shows red "POSITION UNKNOWN" and disables the buttons. The old test "retract allowed when
   both read 0" now uses (0, partly inserted). README troubleshooting updated. 301 passed.
 - Next: user's changes to the waveform display.
+- **Waveform display changes 1+2 (F8e, F8f), sim-tested:** trigger channels (= each
+  digitizer's `trigger_channel`: NOCell "Trig", H2PD "Trig"; 3405D uses Ext) are not plotted,
+  in both views; files unchanged. Trigger rate per scope in each view's status row (removed
+  from the tab header). Monitor: "Show last" drop-down (10 min … 14 days, default 5 hr, kept
+  between runs) + "Latest" (follow newest after zoom/pan). History from the daily CSV files
+  via new `daq/picoscope/history.py` (rows selected by timestamp, one extra day read because
+  the CSV date switch happens only at a new ROOT file; half-written lines skipped; past files
+  cached by mtime/size). Plots use peak downsampling + clip-to-view. Timing (synthetic 14 days,
+  one row / 4 s, 302k rows/channel): first load 1.3 s, cached 0.02 s, redraw 0.25 s, live update
+  ~0.1 s. 307 passed. Next: user checks in the simulation; then change 3 (snapshot).
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

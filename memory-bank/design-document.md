@@ -120,6 +120,13 @@ is where every command passes through.
   - F8c. **Output formats stay exactly the same** (PicoScope ROOT `rawWave` + CSV + snapshot CSV;
     camera BMP / frames.csv / config TOML / BMP→ROOT).
   - The merged program runs on this PC (scopes and camera are connected here).
+  - F8e. Waveform display (user, 2026-11-18): **no trigger waveform** in the monitor or the
+    snapshot (the trigger channel = each scope's `trigger_channel`; files unchanged); the
+    **trigger rate** of each scope is shown in the status bar instead.
+  - F8f. Monitor trend **time window selectable**: last 10 min, 30 min, 1 hr, 3 hr, 5 hr, 12 hr,
+    1 day, 3 days, 7 days, 14 days (old: fixed 4000 points ≈ 5 h); the history is read
+    automatically from the old daily CSV files.
+  - F8g. Snapshot-mode changes: to be specified by the user (next).
 
 ### GUI structure (user, 2026-11-17)
 - **One tab per device**, like browser (Chrome) tabs; the user switches between tabs. Devices are

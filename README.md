@@ -89,6 +89,12 @@ started, an acquisition keeps running while you look at other tabs, until you st
 the program. Pause = no data is taken or saved and the display freezes; Resume continues in the
 same files.
 
+The plots do not show the trigger channel (it is still saved in the files); the trigger rate of
+each scope is in the status bar under the plots. In the **Scope monitor**, **Show last** sets the
+time span of the trend plots (10 min … 14 days, default 5 hr); older points are read from the
+daily CSV files in `data/picoscope/csv` (copy old CSV files there to see them). The plot follows
+the newest data; after zooming or panning, press **Latest** to follow again.
+
 **Data files** (formats unchanged from the old programs):
 - `data/picoscope/root/<output_name>_<YYMMDD>_<NNNN>.root`: tree `rawWave`, every waveform,
   a new file every 10000 triggers.

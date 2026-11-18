@@ -27,12 +27,26 @@ from PySide6.QtWidgets import (
 
 from ...config import PROGRAM_DIR, DeviceConfig
 from ...daq.picoscope.configs import ScopeConfig, list_scope_configs
+from ...daq.picoscope.history import DEFAULT_WINDOW, TrendSource
 from ...daq.picoscope.session import PAUSED, RUNNING, STARTING, STOPPED, STOPPING, PicoSession
 from ...oplog import OpLog
 from ..style import BLUE, GREEN, GREY, ORANGE, set_role
 from .scope_views import ContinuousView, SnapshotView
 
 POLL_MS = 100  # 10 Hz, as the old monitor windows
+
+
+def shown_channels(dcfg: dict[str, Any]) -> list[str]:
+    """Channels plotted for one digitizer: all except its trigger channel (user 2026-11-18:
+    the trigger waveform is not shown; its rate is in the status row). Files keep all channels."""
+    trig = dcfg.get("trigger_channel")
+    shown = [c for c in dcfg["channels"] if c != trig]
+    return shown or list(dcfg["channels"])
+
+
+def shown_channel_names(dcfg: dict[str, Any]) -> list[str]:
+    names = dict(zip(dcfg["channels"], dcfg["channel_name"], strict=True))
+    return [names[c] for c in shown_channels(dcfg)]
 
 STATE_TEXT = {
     STOPPED: ("Stopped", GREY),
@@ -65,6 +79,7 @@ class ScopeTab(QWidget):
         self.scope_config: ScopeConfig | None = None
         self.session: PicoSession | None = None
         self.view: Any = None  # plot view while started
+        self.trend_window = DEFAULT_WINDOW  # monitor trend span, kept between runs
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -256,15 +271,25 @@ class ScopeTab(QWidget):
         assert s is not None
         if s.mode == "snapshot":
             name, dcfg = next(iter(s.configs.items()))
+            shown = shown_channels(dcfg)
             view: Any = SnapshotView(
-                dcfg["channels"], dcfg["channel_name"], device=name,
+                shown, [dict(zip(dcfg["channels"], dcfg["channel_name"], strict=True))[c]
+                        for c in shown], device=name,
                 signal_channel=dcfg.get("snapshot_channel", dcfg["channels"][0]),
                 snapshot_dir=os.path.join(s.data_path(dcfg), "snapshots"))
             view.saved.connect(self._on_snapshot_saved)
         else:
-            view = ContinuousView(s.channel_names(), s.channel_groups())
+            groups = [shown_channel_names(c) for c in s.configs.values()]
+            sources = [TrendSource(os.path.join(s.data_path(c), "csv"), c["output_name"],
+                                   tuple(shown_channel_names(c))) for c in s.configs.values()]
+            view = ContinuousView([n for g in groups for n in g], groups,
+                                  history_sources=sources, window=self.trend_window)
+            view.window_combo.currentTextChanged.connect(self._remember_window)
         self.view = view
         self.view_holder.addWidget(view, 1)
+
+    def _remember_window(self, label: str) -> None:
+        self.trend_window = label
 
     def _drop_view(self) -> None:
         if self.view is not None:
@@ -319,14 +344,16 @@ class ScopeTab(QWidget):
                 st = s.states.get(name, STOPPED) if s.digitizers else STOPPED
                 part = (f"<b>{name}</b> ({dcfg.get('model')} {dcfg.get('serial')}, "
                         f"{', '.join(dcfg['channel_name'])}): {st}")
-                if name in s.rates and st == RUNNING:
-                    part += f", {s.rates[name]:.1f} triggers/s"
                 if name in s.warnings:
                     part += f" <span style='color:{ORANGE}'><b>⚠ {s.warnings[name]}</b></span>"
                 lines.append(part)
             paths = sorted({s.data_path(c) for c in s.configs.values()})
             lines.append("Data: " + ", ".join(paths))
             self.detail_label.setText("<br>".join(lines))
+            if self.view is not None:  # trigger rate in the plot's status row (user 2026-11-18)
+                self.view.set_rates({
+                    name: s.rates.get(name) if s.states.get(name) == RUNNING else None
+                    for name in s.configs})
             if s.errors and state != STOPPED:
                 self.error_label.setText(self._errors_html())
                 self.error_label.show()

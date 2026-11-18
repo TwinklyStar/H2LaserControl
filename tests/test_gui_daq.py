@@ -83,6 +83,61 @@ def test_scope_tabs_are_independent(window, qtbot):
     assert mon.session.state == RUNNING
 
 
+def test_monitor_hides_trigger_shows_rate_and_reads_history(window, qtbot, tmp_path):
+    # history written by an earlier run: one row per minute for the last 2 days
+    csv_dir = tmp_path / "data" / "picoscope" / "csv"
+    csv_dir.mkdir(parents=True)
+    now = time.time()
+    files: dict[str, list[str]] = {}
+    for t in range(int(now - 2 * 86400), int(now) - 60, 60):
+        day = time.strftime("%y%m%d", time.localtime(t))
+        files.setdefault(day, []).append(f"{t},{t % 3},{t % 4}\n")
+    for day, rows in files.items():
+        (csv_dir / f"NOCell_2026June_{day}.csv").write_text("timestamp,NO_cell,Trig\n" + "".join(rows))
+    t: ScopeTab = tab(window, "scope_monitor")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == RUNNING, timeout=10000)
+    v = t.view
+    # trigger channel (NOCell ch B "Trig") not plotted; the 3405D has an external trigger
+    assert v.channels == ["212", "820", "NO_cell"]
+    assert v.window == "5 hr" and v.window_combo.count() == 10
+    assert 295 <= v.n_points["NO_cell"] <= 302  # 5 h of history, one row per minute
+    v.set_window("1 day")
+    assert 1435 <= v.n_points["NO_cell"] <= 1442
+    v.window_combo.setCurrentText("10 min")
+    assert v.n_points["NO_cell"] <= 12 and t.trend_window == "10 min"
+    # follows the newest data until the user zooms; "Latest" follows again
+    assert not v.latest_btn.isEnabled()
+    v._on_manual_range()
+    assert v.latest_btn.isEnabled()
+    v.latest_btn.click()
+    assert not v.latest_btn.isEnabled()
+    # trigger rate in the status row (posted every 5 s by each digitizer)
+    qtbot.waitUntil(lambda: "DET10A2" in v._lbl_rate.text() and "NOCell" in v._lbl_rate.text()
+                    and v._lbl_rate.text().count("Hz") == 2, timeout=15000)
+    assert "triggers/s" not in t.detail_label.text()
+    # the CSV file itself still has the trigger column (format unchanged)
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+    today = csv_dir / f"NOCell_2026June_{time.strftime('%y%m%d')}.csv"
+    assert today.read_text().splitlines()[0] == "timestamp,NO_cell,Trig"
+    # the window choice is kept for the next run
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.view is not None, timeout=10000)
+    assert t.view.window == "10 min"
+
+
+def test_snapshot_hides_trigger_channel(window, qtbot):
+    t: ScopeTab = tab(window, "vuv_pd")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.view is not None and t.view._last_item is not None, timeout=10000)
+    assert t.view.channels == ["A"] and t.view.channel_labels == ["Sig"]
+    qtbot.waitUntil(lambda: "H2PD" in t.view._lbl_rate.text() and "Hz" in t.view._lbl_rate.text(),
+                    timeout=15000)
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+
+
 def test_snapshot_freeze_and_save(window, qtbot, tmp_path):
     t: ScopeTab = tab(window, "vuv_pd")
     t.start_btn.click()

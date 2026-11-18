@@ -6,6 +6,9 @@ They are plain widgets now: the tab feeds them the data items (`show_items`) ins
 window polling its own queue. Layout and mouse controls are unchanged (left drag = zoom box,
 right drag = pan, wheel = zoom; +/- step the Y range). Colours: light theme matching the rest
 of the program (user 2026-11-18; the old windows were dark).
+Changes (user 2026-11-18): trigger channels are not shown (the tab passes only the others; the
+files still contain them); the status row shows each scope's trigger rate instead; the monitor
+trend has a selectable time window (10 min ... 14 days) filled from the daily CSV files.
 Removed: the snapshot window's own Pause button (the tab's Pause stops the acquisition and the
 display freezes with it, user 2026-11-18) and the Ctrl+C handler (no terminal).
 """
@@ -14,13 +17,15 @@ from __future__ import annotations
 
 import math
 import os
-from collections import deque
+import time
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 import pyqtgraph as pg
 from PySide6 import QtCore, QtWidgets
+
+from ...daq.picoscope.history import DEFAULT_WINDOW, WINDOWS, TrendSource, load_history
 
 _BG = "#ffffff"  # plot background
 _FG = "#212121"  # text, axes
@@ -52,6 +57,12 @@ def _style_plot(p: pg.PlotItem) -> None:
 
 def _colour(i: int) -> str:
     return _CH_COLOURS[i % len(_CH_COLOURS)]
+
+
+def _rate_text(rates: dict[str, float | None]) -> str:
+    """Status-row text: trigger rate per scope (posted every 5 s by the digitizers)."""
+    parts = [f"{name} {'—' if hz is None else f'{hz:.1f} Hz'}" for name, hz in rates.items()]
+    return "  Trigger rate: " + ("  ·  ".join(parts) if parts else "—") + "  "
 
 
 # Signed range list. Positive value -> signal points up; negative -> down.
@@ -176,12 +187,19 @@ class _RangeMixin:
 # Continuous monitor
 # ----------------------------------------------------------------------------------------------
 class ContinuousView(QtWidgets.QWidget, _RangeMixin):
-    """Trend of the summed area per channel (nV*s vs time) + averaged waveforms (V vs s)."""
+    """Trend of the summed area per channel (nV*s vs time) + averaged waveforms (V vs s).
 
-    _BUFFER = 4000  # trend points kept per channel
+    The trend shows the last `window` (drop-down, 10 min ... 14 days; the old window kept a fixed
+    4000 points = ~4.4 h). On a window change the history is read from the daily CSV files
+    (`history_sources`), then live points are appended. The x range follows the latest data
+    until the user zooms / pans; "Latest" (or picking a window) follows again.
+    Trigger channels are not passed in (not shown, user 2026-11-18); the trigger rate of each
+    scope is in the status row (`set_rates`)."""
 
     def __init__(self, channels: list[str], channel_groups: list[list[str]] | None = None,
-                 parent: QtWidgets.QWidget | None = None) -> None:
+                 parent: QtWidgets.QWidget | None = None, *,
+                 history_sources: list[TrendSource] | None = None,
+                 window: str = DEFAULT_WINDOW) -> None:
         super().__init__(parent)
         self.setObjectName("scopeView")
         self.setStyleSheet(VIEW_STYLE)
@@ -191,8 +209,12 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         self._group_of = {ch: g for g, grp in enumerate(channel_groups) for ch in grp}
         self._wfm_group_tail = {[c for c in grp if c in channels][-1]
                                 for grp in channel_groups if any(c in channels for c in grp)}
-        self._ts = {ch: deque(maxlen=self._BUFFER) for ch in channels}
-        self._val = {ch: deque(maxlen=self._BUFFER) for ch in channels}
+        self._history_sources = history_sources or []
+        self._windows = dict(WINDOWS)
+        self.window = window if window in self._windows else DEFAULT_WINDOW
+        self._ts: dict[str, list[float]] = {ch: [] for ch in channels}
+        self._val: dict[str, list[float]] = {ch: [] for ch in channels}
+        self._follow = True
         self._range_idx: dict[str, int | None] = {}
         self._range_labels: dict[str, QtWidgets.QLabel] = {}
 
@@ -210,19 +232,38 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([900, 600])
         vlay.addWidget(self._build_status_row())
+        self.load_history()
 
     def _make_trend_panel(self):
         panel = QtWidgets.QWidget()
         lay = QtWidgets.QVBoxLayout(panel)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
+        head = QtWidgets.QHBoxLayout()
+        head.setSpacing(6)
         title = QtWidgets.QLabel("Signal Trends  (nV·s)")
         title.setObjectName("panelTitle")
-        lay.addWidget(title)
+        head.addWidget(title, 1)
+        head.addWidget(QtWidgets.QLabel("Show last:"))
+        self.window_combo = QtWidgets.QComboBox()
+        for label, _ in WINDOWS:
+            self.window_combo.addItem(label)
+        self.window_combo.setCurrentText(self.window)
+        self.window_combo.setToolTip("Time span of the trend plots. Older points are read from "
+                                     "the daily CSV files in data/picoscope/csv.")
+        self.window_combo.currentTextChanged.connect(self.set_window)
+        head.addWidget(self.window_combo)
+        self.latest_btn = QtWidgets.QPushButton("Latest")
+        self.latest_btn.setToolTip("Follow the newest data again (after zooming or panning)")
+        self.latest_btn.clicked.connect(self.follow_latest)
+        self.latest_btn.setEnabled(False)
+        head.addWidget(self.latest_btn)
+        lay.addLayout(head)
         gw = pg.GraphicsLayoutWidget()
         gw.setBackground(_BG)
         lay.addWidget(gw)
         curves = {}
+        self._trend_plots: list[pg.PlotItem] = []
         prev = None
         n = len(self.channels)
         for i, ch in enumerate(self.channels):
@@ -234,14 +275,74 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
             p.getAxis("left").enableAutoSIPrefix(False)  # compound unit: no "knV·s"
             p.showGrid(x=True, y=True, alpha=0.20)
             p.getAxis("left").setWidth(90)
+            # up to 14 days = ~300k points per channel: draw only what is visible, decimated
+            p.setDownsampling(auto=True, mode="peak")
+            p.setClipToView(True)
+            p.setAutoVisible(y=True)  # y auto-range over the visible time span only
             if i < n - 1:
                 p.hideAxis("bottom")
             if prev is not None:
                 p.setXLink(prev)
+            p.getViewBox().sigRangeChangedManually.connect(self._on_manual_range)
             curves[ch] = p.plot(pen=pg.mkPen(col, width=2))
             gw.ci.layout.setRowStretchFactor(i, 1)
+            self._trend_plots.append(p)
             prev = p
         return panel, curves
+
+    # --- trend window / history ---------------------------------------------------------------
+    @property
+    def window_s(self) -> int:
+        return self._windows[self.window]
+
+    def set_window(self, label: str) -> None:
+        if label not in self._windows:
+            return
+        self.window = label
+        if self.window_combo.currentText() != label:
+            self.window_combo.setCurrentText(label)
+        self.load_history()
+        self.follow_latest()
+
+    def load_history(self) -> None:
+        """Replace the trend data with the CSV history of the current window (the live points
+        are in the CSV files too: one row is written and flushed per 100 triggers)."""
+        hist = load_history(self._history_sources, self.window_s) if self._history_sources else {}
+        for ch in self.channels:
+            t, v = hist.get(ch, (np.empty(0), np.empty(0)))
+            self._ts[ch] = t.tolist()
+            self._val[ch] = v.tolist()
+        self._redraw_trends()
+
+    def follow_latest(self) -> None:
+        self._follow = True
+        self.latest_btn.setEnabled(False)
+        self._apply_follow()
+
+    def _on_manual_range(self, *_: Any) -> None:
+        self._follow = False
+        self.latest_btn.setEnabled(True)
+
+    def _apply_follow(self) -> None:
+        if self._follow and self._trend_plots:
+            now = time.time()
+            self._trend_plots[0].setXRange(now - self.window_s, now, padding=0.01)
+            for p in self._trend_plots:
+                p.enableAutoRange(axis="y", enable=True)
+
+    def _trim(self) -> None:
+        t0 = time.time() - self.window_s
+        for ch in self.channels:
+            ts = self._ts[ch]
+            if ts and ts[0] < t0:
+                k = int(np.searchsorted(np.asarray(ts), t0))
+                del ts[:k]
+                del self._val[ch][:k]
+
+    def _redraw_trends(self, channels: set[str] | None = None) -> None:
+        for ch in channels if channels is not None else self.channels:
+            self._trend_curves[ch].setData(np.asarray(self._ts[ch]), np.asarray(self._val[ch]))
+        self._apply_follow()
 
     def _make_wfm_panel(self):
         panel = QtWidgets.QWidget()
@@ -301,24 +402,34 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
             lay.addWidget(lbl)
             self._ch_labels[ch] = lbl
         lay.addStretch()
+        lay.addWidget(_vline())
+        self._lbl_rate = QtWidgets.QLabel("  Trigger rate: —  ")
+        lay.addWidget(self._lbl_rate)
         return row
+
+    def set_rates(self, rates: dict[str, float | None]) -> None:
+        self._lbl_rate.setText(_rate_text(rates))
 
     def show_items(self, items: list[dict[str, Any]]) -> None:
         changed = set()
         for item in items:
             ch = item.get("channel_name")
             if ch not in self.channels:
-                continue
-            self._ts[ch].append(item["timestamp"])
-            self._val[ch].append(item["value"])
+                continue  # e.g. the trigger channel: recorded, not shown
+            ts = self._ts[ch]
+            if ts and item["timestamp"] <= ts[-1]:
+                pass  # already read from the CSV file (history loaded after it was written)
+            else:
+                ts.append(item["timestamp"])
+                self._val[ch].append(item["value"])
             wfm_v = np.asarray(item["wfm"]) * 1e-3  # mV -> V
             self._wfm_curves[ch].setData(np.asarray(item["wfm_t"]) * 1e-9, wfm_v)  # ns -> s
             self._auto_range(ch, wfm_v)
             self._ch_labels[ch].setText(f"  {ch}: {item['value']:.4g}  ")
             changed.add(ch)
-        for ch in changed:
-            self._trend_curves[ch].setData(np.array(self._ts[ch]), np.array(self._val[ch]))
         if changed:
+            self._trim()
+            self._redraw_trends(changed)
             self._lbl_time.setText(f"  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}")
 
     @property
@@ -362,9 +473,14 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         slay = QtWidgets.QHBoxLayout(status)
         slay.setContentsMargins(6, 2, 6, 2)
         self._lbl_time = QtWidgets.QLabel("  Waiting for data…")
+        self._lbl_rate = QtWidgets.QLabel("  Trigger rate: —  ")
+        slay.addWidget(self._lbl_rate)
         slay.addStretch()
         slay.addWidget(self._lbl_time)
         vlay.addWidget(status)
+
+    def set_rates(self, rates: dict[str, float | None]) -> None:
+        self._lbl_rate.setText(_rate_text(rates))
 
     def _make_wfm_panel(self):
         panel = QtWidgets.QWidget()
