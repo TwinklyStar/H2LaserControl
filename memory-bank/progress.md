@@ -380,6 +380,21 @@
   30000000 / 0); speeds back to defaults; axis 0 Q:S bit 4. See docs/protocols.md. The
   photodiode now reads INSERTED while it is (last known) retracted: its Retract would drive
   +60 mm into the limit → must be homed (H:) first, with the user's OK. Motor test still open.
+- User calibrated with HIT Sample (homing) and retracted both axes by eye (reboot clears the
+  position information). **Hardware tests (user-authorized, this run only):**
+  - *Camera + 2204As (+3405D)*: one camera open/close, 18 fps requested. Camera alone 60 s:
+    10.5 fps, ~39 % frame IDs skipped; with all 3 scopes 4 min: 10.3 fps, ~43 % skipped, no
+    errors → the hub is not the limit, our Python RGB conversion is (the user's GUI multi-shot
+    at 5 fps, 17:23: frame IDs 168–177 consecutive, 200 ms apart). Scopes 25.00 Hz, 0 skipped,
+    no gaps (also no stop-time gap any more → open-lock fix).
+  - *3405D + VUV mirror* (3405D on the control hub with the HIT-MV adapter): precondition both
+    RETRACTED 30000000; 2 cycles insert (32.3 / 32.2 s → 0) + retract (30.6 / 30.6 s →
+    30000000), photodiode stayed RETRACTED, no alarms. 3405D 4114 waveforms at 24.99 Hz, NOCell
+    25.00 Hz, 0 skipped, 0 reconnects, no gaps.
+  - Camera Capture + multi-shot were already done by the user in the GUI at 17:23 (OK).
+  Test data deleted afterwards (user request): data/ and scratch runs.
+  **M7 scope + camera acceptance on hardware: done.** Open: ELL14 adapter (COM6) has no
+  serial in Windows since the re-cabling; HIT-MV power-cut detection (both axes 0) proposed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
