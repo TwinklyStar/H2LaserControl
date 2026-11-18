@@ -19,9 +19,10 @@ from PySide6.QtWidgets import (
 )
 
 from ..oplog import OpLog, read_oplog
-from .style import GREY, RED
+from .style import C, theme
 
 MAX_ROWS = 2000
+COLOR_ROLE = Qt.ItemDataRole.UserRole + 1  # name of the row's theme colour (style.C), or None
 HIDDEN_ACTIONS = {"status", "identify"}  # routine queries: kept in the file, not shown
 
 
@@ -72,17 +73,18 @@ class LogPanel(QWidget):
         self._bridge = _Bridge()
         self._bridge.entry.connect(self.add_entry)
         oplog.listeners.append(self._bridge.entry.emit)
+        theme.changed.connect(self._retheme)
 
     def add_entry(self, e: dict[str, Any]) -> None:
         if e.get("action") in HIDDEN_ACTIONS:
             return
         event = e.get("event")
         if event == "failed":
-            result, color = f"FAILED: {e.get('error')}", QColor(RED)
+            result, kind = f"FAILED: {e.get('error')}", "RED"
         elif event == "start":
-            result, color = "started", QColor(GREY)
+            result, kind = "started", "GREY"
         else:
-            result, color = _summary(e.get("action"), e.get("result")), None
+            result, kind = _summary(e.get("action"), e.get("result")), None
         args = ", ".join(f"{k}={v}" for k, v in (e.get("args") or {}).items())
         values = [
             str(e.get("time", ""))[11:19],
@@ -96,13 +98,22 @@ class LogPanel(QWidget):
         for col, v in enumerate(values):
             item = QTableWidgetItem(v)
             item.setToolTip(v)
-            if color is not None:
-                item.setForeground(color)
+            if kind is not None:
+                item.setForeground(QColor(getattr(C, kind)))
             item.setData(Qt.ItemDataRole.UserRole, e.get("device"))
+            item.setData(COLOR_ROLE, kind)
             self.table.setItem(0, col, item)
         if self.table.rowCount() > MAX_ROWS:
             self.table.removeRow(self.table.rowCount() - 1)
         self._apply_filter_row(0)
+
+    def _retheme(self) -> None:
+        for row in range(self.table.rowCount()):
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                kind = item.data(COLOR_ROLE) if item is not None else None
+                if kind:
+                    item.setForeground(QColor(getattr(C, kind)))
 
     def _apply_filter(self) -> None:
         for row in range(self.table.rowCount()):

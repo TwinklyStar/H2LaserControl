@@ -462,6 +462,15 @@
   so a DG645 panel lands in Control automatically. The group tab's dot shows the most important
   state in it (error > busy > ok > off), so an error is visible while the other group is shown.
   Last group and sub-tabs are remembered. 318 passed.
+- **Dark theme (user):** the whole program (control tabs, scope plots, camera window, history)
+  follows the Windows light/dark setting, also when it is switched while running; dark colours =
+  the old H2LaserDAQ monitor (Catppuccin Mocha). Light look unchanged. Scope views recolour in
+  place (acquisition, averages and Freeze kept). Checked by screenshots of every tab in both
+  themes (simulation, scopes running, camera open). Tests: switch while connected; switch while
+  the snapshot runs. Test note: the `themes` fixture (tests/conftest.py) restores the app (no
+  style sheet), because the camera sidebar test relies on it (test windows are never shown, so
+  the sidebar is not re-fitted after a style-sheet change; in the program it fits, 548 ≥ 530 px).
+  320 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

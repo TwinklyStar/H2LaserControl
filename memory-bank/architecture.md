@@ -91,6 +91,17 @@ logs/             operation logs (git-ignored)
   `MainWindow.sub_tabs[group]` holds the device tabs. Group by type: `DAQ_TABS` → DAQ,
   `PANELS` → Control. Group tab dot = most important sub-tab state (error > busy > ok > off).
   QSettings keys `group`, `subtab/<group>`.
+- **Light / dark theme (2026-11-19), all in `gui/style.py`:** `LIGHT` / `DARK` colour sets
+  (dark = Catppuccin Mocha, the old H2LaserDAQ windows), copied into the live object `C` by
+  `apply_theme`, which also sets the app palette (Fusion standard / `dark_palette()`) and the
+  style sheet (`style_sheet()`), then emits `theme.changed`. `follow_system(app)` applies the
+  Windows setting at start and on `styleHints().colorSchemeChanged`. Rules for code: read
+  colours from `C` when drawing (never copy `C.X` into a constant, e.g. `STATE_TEXT` stores
+  colour *names*); fixed-colour widgets use a style-sheet role (`sep`, `muted`, `alarm`,
+  `error`, `sim`) or redraw on `theme.changed` (panels `_retheme`, scope tab, camera header,
+  log rows via `COLOR_ROLE`, main-window dots). Scope views register their themed items
+  (`_Themed`) and recolour in place, so a switch does not interrupt an acquisition. The camera
+  window has no own colours: it follows the palette.
 - `DevicePanel` base: header (connection, busy text, STOP, Connect/Disconnect), plain error line,
   `build_body()` / `update_view()` / `on_progress()` hooks. Buttons are enabled only when the
   action makes sense (e.g. Retract only from INSERTED), with tooltips saying why not.

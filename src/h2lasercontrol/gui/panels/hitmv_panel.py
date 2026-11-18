@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..style import BLUE, GREEN, GREY, ORANGE, RED, set_role
+from ..style import C, set_role
 from .base import DevicePanel
 
 DEFAULT_UNITS_PER_MM = 500000  # our stages: 30000000 units = 60 mm real (1 unit = 2 nm)
@@ -41,7 +41,7 @@ class AxisCard(QGroupBox):
         self.pos_label = QLabel()
         set_role(self.pos_label, "muted")
         self.alarm_label = QLabel()
-        self.alarm_label.setStyleSheet(f"color:{RED}; font-weight:bold")
+        set_role(self.alarm_label, "alarm")
         self.alarm_label.hide()
 
         buttons = QHBoxLayout()
@@ -68,7 +68,7 @@ class AxisCard(QGroupBox):
         pos = None if info is None else info.get("position")
         upmm = self.panel.units_per_mm
         if positions_lost and pos is not None and not moving:
-            self._set_state("POSITION UNKNOWN", RED,
+            self._set_state("POSITION UNKNOWN", C.RED,
                             "The controller was restarted: its position reading (0) is not "
                             "the real position. Check by eye, then home and retract with "
                             "HIT Sample (ORG). Insert/Retract are locked until then.")
@@ -84,7 +84,7 @@ class AxisCard(QGroupBox):
             self.alarm_label.setVisible(bool(alarms))
             return
         if pos is None:
-            self._set_state("—", GREY, "No data" if not self.panel.connected else "Axis not connected")
+            self._set_state("—", C.GREY, "No data" if not self.panel.connected else "Axis not connected")
             self.pos_label.setText("")
             self.bar.setValue(0)
         else:
@@ -96,18 +96,18 @@ class AxisCard(QGroupBox):
             if moving:
                 verb = {"insert": "Inserting", "retract": "Retracting"}.get(moving, "Moving")
                 t = f" ({elapsed:.0f} s so far)" if elapsed is not None else ""
-                self._set_state(f"{verb} …", BLUE, f"Moving{t}, about 30 s in total. "
+                self._set_state(f"{verb} …", C.BLUE, f"Moving{t}, about 30 s in total. "
                                 "Press STOP to stop.")
             elif pos == self.retracted and blocked_by:
-                self._set_state("RETRACTED", GREEN,
+                self._set_state("RETRACTED", C.GREEN,
                                 f"🔒 Locked: retract the {blocked_by} first "
                                 "(the two must never be inserted together).")
             elif pos == self.retracted:
-                self._set_state("RETRACTED", GREEN, "Out of the beam (normal state).")
+                self._set_state("RETRACTED", C.GREEN, "Out of the beam (normal state).")
             elif pos == self.inserted:
-                self._set_state("INSERTED", ORANGE, "In the beam: the 122 nm beam does not reach the target.")
+                self._set_state("INSERTED", C.ORANGE, "In the beam: the 122 nm beam does not reach the target.")
             else:
-                self._set_state("PARTLY INSERTED", ORANGE,
+                self._set_state("PARTLY INSERTED", C.ORANGE,
                                 "Stopped between the ends: choose Insert or Retract.")
         alarms = (info or {}).get("alarms") or []
         self.alarm_label.setText("Alarm: " + ", ".join(alarms) if alarms else "")

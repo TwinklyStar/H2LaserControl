@@ -158,6 +158,28 @@ def test_snapshot_hides_trigger_channel(window, qtbot):
     qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
 
 
+def test_scope_plots_follow_dark_theme_while_running(window, qtbot, themes):
+    """Light/dark switch while acquiring: plots recoloured in place, data and average kept."""
+    from h2lasercontrol.gui.style import DARK, LIGHT
+
+    t: ScopeTab = tab(window, "vuv_pd")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.view is not None and t.view.averager.count > 0, timeout=10000)
+    v = t.view
+    assert v._gws[0].backgroundBrush().color().name() == LIGHT.PLOT_BG
+    themes(True)
+    assert v._gws[0].backgroundBrush().color().name() == DARK.PLOT_BG
+    assert v._wfm_curves["A"].opts["pen"].color().name() == DARK.CH[0]
+    assert DARK.PLOT_FG in v._stats_box.textItem.toHtml()
+    n = v.frames
+    qtbot.waitUntil(lambda: v.frames > n, timeout=5000)  # still drawing, same view
+    assert t.view is v and t.session.state == RUNNING
+    themes(False)
+    assert v._wfm_curves["A"].opts["pen"].color().name() == LIGHT.CH[0]
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+
+
 def test_snapshot_freeze_and_save(window, qtbot, tmp_path):
     t: ScopeTab = tab(window, "vuv_pd")
     t.start_btn.click()

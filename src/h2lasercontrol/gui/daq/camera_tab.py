@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 
 from ...config import PROGRAM_DIR, DeviceConfig
 from ...oplog import OpLog
-from ..style import GREEN, GREY, set_role
+from ..style import C, set_role, theme
 
 _log = logging.getLogger(__name__)
 
@@ -101,7 +101,9 @@ class CameraTab(QWidget):
         header = CameraHeader()
         head = QHBoxLayout(header)
         head.setContentsMargins(0, 0, 0, 0)
-        self.open_label = QLabel(f"<b style='color:{GREEN}'>●</b> <b>Camera open</b>")
+        self.open_label = QLabel()
+        self._render_open_label()
+        theme.changed.connect(self._render_open_label)
         self.close_btn = QPushButton("■  Close camera")
         set_role(self.close_btn, "stop")
         self.close_btn.setToolTip("Stop the live view, close the camera, back to the start page")
@@ -114,6 +116,9 @@ class CameraTab(QWidget):
         olay.addLayout(self.window_holder, 1)
         self.stack.addWidget(self.open_page)
         self._emit_state("off")
+
+    def _render_open_label(self) -> None:
+        self.open_label.setText(f"<b style='color:{C.GREEN}'>●</b> <b>Camera open</b>")
 
     # --- state ------------------------------------------------------------------------------
     @property
@@ -212,7 +217,7 @@ class CameraTab(QWidget):
             self.stack.setCurrentIndex(0)
             self.oplog.write(device=self.cfg.key, action="close")
             self._emit_state("off")
-            self.start_status.setText(f"<span style='color:{GREY}'>Camera closed.</span>")
+            self.start_status.setText("Camera closed.")  # grey: role "muted"
         return True
 
     def shutdown(self) -> None:

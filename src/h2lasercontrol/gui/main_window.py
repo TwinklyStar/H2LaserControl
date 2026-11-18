@@ -25,7 +25,7 @@ from ..services import DeviceService
 from .daq import DAQ_TABS
 from .log_panel import LogPanel
 from .panels import PANELS, DevicePanel
-from .style import TAB_STATES, dot_icon, set_role
+from .style import dot_icon, set_role, state_color, theme
 
 log = logging.getLogger(__name__)
 
@@ -122,6 +122,8 @@ class MainWindow(QMainWindow):
         root.addWidget(split, 1)
         self.setCentralWidget(central)
 
+        theme.changed.connect(self._retheme)
+
         last = self.settings.value("group", 0, int)
         if 0 <= last < self.tabs.count():
             self.tabs.setCurrentIndex(last)
@@ -138,9 +140,15 @@ class MainWindow(QMainWindow):
             lambda s, g=group, i=index: self._set_sub_state(g, i, s))
 
     def _set_sub_state(self, group: str, index: int, state: str) -> None:
-        self.sub_tabs[group].setTabIcon(index, dot_icon(TAB_STATES[state]))
+        self.sub_tabs[group].setTabIcon(index, dot_icon(state_color(state)))
         self._sub_states[group][index] = state
         self._update_group_icon(group)
+
+    def _retheme(self) -> None:
+        for group, states in self._sub_states.items():
+            for index, state in states.items():
+                self.sub_tabs[group].setTabIcon(index, dot_icon(state_color(state)))
+            self._update_group_icon(group)
 
     def _update_group_icon(self, group: str) -> None:
         """The group tab shows its most important device state: an error anywhere in the group
@@ -150,7 +158,7 @@ class MainWindow(QMainWindow):
             return
         states = self._sub_states[group].values()
         state = next((s for s in ("error", "busy", "ok") if s in states), "off")
-        self.tabs.setTabIcon(i, dot_icon(TAB_STATES[state]))
+        self.tabs.setTabIcon(i, dot_icon(state_color(state)))
 
     def start(self, auto_connect: bool = True) -> None:
         for s in self.services:

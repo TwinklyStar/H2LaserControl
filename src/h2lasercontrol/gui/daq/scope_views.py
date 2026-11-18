@@ -4,8 +4,8 @@
 `SnapshotView` = the old snapshot window (averaged waveforms + area statistics, Freeze / Save).
 They are plain widgets now: the tab feeds them the data items (`show_items`) instead of each
 window polling its own queue. Layout and mouse controls are unchanged (left drag = zoom box,
-right drag = pan, wheel = zoom; +/- step the Y range). Colours: light theme matching the rest
-of the program (user 2026-11-18; the old windows were dark).
+right drag = pan, wheel = zoom; +/- step the Y range). Colours follow the program's light / dark
+theme (style.C; dark = the old windows' colours) and switch in place (`apply_theme`).
 Changes (user 2026-11-18): trigger channels are not shown (the tab passes only the others; the
 files still contain them); the status row shows each scope's trigger rate instead; the monitor
 trend has a selectable time window (10 min ... 14 days) filled from the daily CSV files.
@@ -29,37 +29,72 @@ from PySide6 import QtCore, QtWidgets
 
 from ...daq.picoscope.averaging import N_CHOICES, WaveAverager, n_label
 from ...daq.picoscope.history import DEFAULT_WINDOW, WINDOWS, TrendSource, load_history
+from ..style import C, theme
 
-_BG = "#ffffff"  # plot background
-_FG = "#212121"  # text, axes
-_SURF = "#e6e6e6"  # panel titles / statistics labels
-_GRID = "#c8c8c8"  # separators
-_MATH = "#8d6e00"  # Freeze "Math" value (dark amber, readable on light grey)
-# channel colours readable on white (same family as the program's status colours)
-_CH_COLOURS = ["#1565c0", "#2e7d32", "#e65100", "#c62828", "#6a1b9a", "#00838f", "#6d4c41",
-               "#ad1457"]
 
-VIEW_STYLE = f"""
+def view_style() -> str:
+    return f"""
     QLabel#panelTitle     {{ font-weight: bold; padding: 4px 8px;
-                            background: {_SURF}; border-radius: 4px; }}
-    QLabel#statsLabel     {{ padding: 2px 10px; background: {_SURF}; border-radius: 4px; }}
-    QWidget#statusRow     {{ background: {_SURF}; border-top: 1px solid {_GRID}; }}
-    QSplitter::handle     {{ background: {_GRID}; width: 3px; }}
-    QFrame#statsSep       {{ color: {_GRID}; }}
+                            background: {C.SURF}; border-radius: 4px; }}
+    QLabel#statsLabel     {{ padding: 2px 10px; background: {C.SURF}; border-radius: 4px; }}
+    QWidget#statusRow     {{ background: {C.SURF}; border-top: 1px solid {C.GRID}; }}
+    QSplitter::handle     {{ background: {C.GRID}; width: 3px; }}
+    QFrame#statsSep       {{ color: {C.GRID}; }}
     QWidget#scopeView QPushButton {{ font-weight: bold; padding: 0px; }}
 """
 
 
 def _style_plot(p: pg.PlotItem) -> None:
-    """Dark axes and tick labels on the white plot (pyqtgraph defaults are for black)."""
+    """Axes, grid and tick labels in the theme's text colour."""
     for name in ("left", "bottom"):
         ax = p.getAxis(name)
-        ax.setPen(pg.mkPen(_FG))
-        ax.setTextPen(pg.mkPen(_FG))
+        ax.setPen(pg.mkPen(C.PLOT_FG))
+        ax.setTextPen(pg.mkPen(C.PLOT_FG))
 
 
 def _colour(i: int) -> str:
-    return _CH_COLOURS[i % len(_CH_COLOURS)]
+    return C.CH[i % len(C.CH)]
+
+
+class _Themed:
+    """Remembers what a view draws in theme colours and recolours it on a light/dark switch."""
+
+    def _init_theme(self) -> None:
+        self._gws: list[pg.GraphicsLayoutWidget] = []
+        self._themed_axes: list[tuple[pg.PlotItem, int, str, str]] = []
+        self._themed_pens: list[tuple[Any, int, dict[str, Any]]] = []
+        self._themed_labels: list[tuple[QtWidgets.QLabel, int, str]] = []
+
+    def _new_gw(self) -> pg.GraphicsLayoutWidget:
+        gw = pg.GraphicsLayoutWidget()
+        self._gws.append(gw)
+        return gw
+
+    def _theme_axis(self, p: pg.PlotItem, i: int, label: str, units: str) -> None:
+        self._themed_axes.append((p, i, label, units))
+
+    def _theme_curve(self, curve: Any, i: int, **pen: Any) -> Any:
+        self._themed_pens.append((curve, i, pen))
+        return curve
+
+    def _theme_label(self, label: QtWidgets.QLabel, i: int, css: str) -> None:
+        self._themed_labels.append((label, i, css))
+
+    def apply_theme(self) -> None:
+        self.setStyleSheet(view_style())
+        for gw in self._gws:
+            gw.setBackground(C.PLOT_BG)
+        for p, i, label, units in self._themed_axes:
+            _style_plot(p)
+            p.setLabel("left", label, units=units, color=_colour(i), size="10pt")
+        for curve, i, pen in self._themed_pens:
+            curve.setPen(pg.mkPen(_colour(i), **pen))
+        for lbl, i, css in self._themed_labels:
+            lbl.setStyleSheet(f"color: {_colour(i)}; {css}")
+        self._apply_theme_extra()
+
+    def _apply_theme_extra(self) -> None:
+        pass
 
 
 def _rate_text(rates: dict[str, float | None]) -> str:
@@ -139,7 +174,7 @@ def _vline() -> QtWidgets.QFrame:
 class _RangeMixin:
     """+/- buttons stepping the Y range of one channel's waveform plot."""
 
-    def _make_range_buttons(self, key: str, col: str) -> QtWidgets.QWidget:
+    def _make_range_buttons(self, key: str, i: int) -> QtWidgets.QWidget:
         btn_panel = QtWidgets.QWidget()
         btn_panel.setFixedWidth(52)
         lay = QtWidgets.QVBoxLayout(btn_panel)
@@ -150,7 +185,7 @@ class _RangeMixin:
         plus.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         label = QtWidgets.QLabel("—")
         label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        label.setStyleSheet(f"color: {col}; font-size: 10px;")
+        self._theme_label(label, i, "font-size: 10px;")
         minus = QtWidgets.QPushButton("−")
         minus.setFixedSize(44, 26)
         minus.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
@@ -189,7 +224,7 @@ class _RangeMixin:
 # ----------------------------------------------------------------------------------------------
 # Continuous monitor
 # ----------------------------------------------------------------------------------------------
-class ContinuousView(QtWidgets.QWidget, _RangeMixin):
+class ContinuousView(QtWidgets.QWidget, _RangeMixin, _Themed):
     """Trend of the summed area per channel (nV*s vs time) + averaged waveforms (V vs s).
 
     The trend shows the last `window` (drop-down, 10 min ... 14 days; the old window kept a fixed
@@ -209,8 +244,8 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
                  window: str = DEFAULT_WINDOW) -> None:
         super().__init__(parent)
         self.setObjectName("scopeView")
-        self.setStyleSheet(VIEW_STYLE)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._init_theme()
         self.channels = channels
         channel_groups = channel_groups or [channels]
         self._group_of = {ch: g for g, grp in enumerate(channel_groups) for ch in grp}
@@ -242,6 +277,8 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([900, 600])
         vlay.addWidget(self._build_status_row())
+        self.apply_theme()
+        theme.changed.connect(self.apply_theme)
         self.load_history()
 
     def _make_trend_panel(self):
@@ -269,19 +306,16 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         self.latest_btn.setEnabled(False)
         head.addWidget(self.latest_btn)
         lay.addLayout(head)
-        gw = pg.GraphicsLayoutWidget()
-        gw.setBackground(_BG)
+        gw = self._new_gw()
         lay.addWidget(gw)
         curves = {}
         self._trend_plots: list[pg.PlotItem] = []
         prev = None
         n = len(self.channels)
         for i, ch in enumerate(self.channels):
-            col = _colour(i)
             p = gw.addPlot(row=i, col=0, axisItems={"bottom": pg.DateAxisItem(orientation="bottom")},
                            viewBox=_ZoomPanViewBox())
-            _style_plot(p)
-            p.setLabel("left", ch, units="nV·s", color=col, size="10pt")
+            self._theme_axis(p, i, ch, "nV·s")
             p.getAxis("left").enableAutoSIPrefix(False)  # compound unit: no "knV·s"
             p.showGrid(x=True, y=True, alpha=0.20)
             p.getAxis("left").setWidth(90)
@@ -294,7 +328,7 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
             if prev is not None:
                 p.setXLink(prev)
             p.getViewBox().sigRangeChangedManually.connect(self._on_manual_range)
-            curves[ch] = p.plot(pen=pg.mkPen(col, width=2))
+            curves[ch] = self._theme_curve(p.plot(), i, width=2)
             gw.ci.layout.setRowStretchFactor(i, 1)
             self._trend_plots.append(p)
             prev = p
@@ -366,18 +400,15 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         self._wfm_plots = plots
         prev_per_group: dict[int, Any] = {}
         for i, ch in enumerate(self.channels):
-            col = _colour(i)
             g_idx = self._group_of.get(ch, 0)
             prev = prev_per_group.get(g_idx)
             row = QtWidgets.QWidget()
             row_lay = QtWidgets.QHBoxLayout(row)
             row_lay.setContentsMargins(0, 0, 0, 0)
             row_lay.setSpacing(2)
-            gw = pg.GraphicsLayoutWidget()
-            gw.setBackground(_BG)
+            gw = self._new_gw()
             p = gw.addPlot(row=0, col=0, viewBox=_ZoomPanViewBox())
-            _style_plot(p)
-            p.setLabel("left", ch, units="V", color=col, size="10pt")
+            self._theme_axis(p, i, ch, "V")
             p.showGrid(x=True, y=True, alpha=0.20)
             p.getAxis("left").setWidth(75)
             if ch in self._wfm_group_tail:
@@ -388,9 +419,9 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
                 p.setXLink(prev)  # X linked only within one digitizer
             plots[ch] = p
             row_lay.addWidget(gw, stretch=1)
-            row_lay.addWidget(self._make_range_buttons(ch, col))
+            row_lay.addWidget(self._make_range_buttons(ch, i))
             vlay.addWidget(row, stretch=1)
-            curves[ch] = p.plot(pen=pg.mkPen(col, width=1.5))
+            curves[ch] = self._theme_curve(p.plot(), i, width=1.5)
             prev_per_group[g_idx] = p
         return panel, curves, plots
 
@@ -408,7 +439,7 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         for i, ch in enumerate(self.channels):
             lay.addWidget(_vline())
             lbl = QtWidgets.QLabel(f"  {ch}: —  ")
-            lbl.setStyleSheet(f"color: {_colour(i)}; font-weight: bold;")
+            self._theme_label(lbl, i, "font-weight: bold;")
             lay.addWidget(lbl)
             self._ch_labels[ch] = lbl
         lay.addStretch()
@@ -474,7 +505,7 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
 # ----------------------------------------------------------------------------------------------
 # Snapshot monitor
 # ----------------------------------------------------------------------------------------------
-class SnapshotView(QtWidgets.QWidget, _RangeMixin):
+class SnapshotView(QtWidgets.QWidget, _RangeMixin, _Themed):
     """Averaged waveforms like an oscilloscope (user 2026-11-18).
 
     The scope sends every waveform; the plot shows the average of the last N (▲ / ▼: 1, 2, 4 …
@@ -491,8 +522,8 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
                  parent: QtWidgets.QWidget | None = None, *, n_avg: int | None = 128) -> None:
         super().__init__(parent)
         self.setObjectName("scopeView")
-        self.setStyleSheet(VIEW_STYLE)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._init_theme()
         self.channels = channels
         self.channel_labels = channel_labels
         self.device = device
@@ -523,7 +554,8 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         slay.addStretch()
         slay.addWidget(self._lbl_time)
         vlay.addWidget(status)
-        self._update_stats_box()
+        self.apply_theme()  # also draws the statistics box
+        theme.changed.connect(self.apply_theme)
 
     def set_rates(self, rates: dict[str, float | None]) -> None:
         self._lbl_rate.setText(_rate_text(rates))
@@ -541,16 +573,13 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         prev = None
         n = len(self.channels)
         for i, (ch, label) in enumerate(zip(self.channels, self.channel_labels, strict=True)):
-            col = _colour(i)
             row = QtWidgets.QWidget()
             row_lay = QtWidgets.QHBoxLayout(row)
             row_lay.setContentsMargins(0, 0, 0, 0)
             row_lay.setSpacing(2)
-            gw = pg.GraphicsLayoutWidget()
-            gw.setBackground(_BG)
+            gw = self._new_gw()
             p = gw.addPlot(row=0, col=0, viewBox=_ZoomPanViewBox())
-            _style_plot(p)
-            p.setLabel("left", label, units="V", color=col, size="10pt")
+            self._theme_axis(p, i, label, "V")
             p.showGrid(x=True, y=True, alpha=0.20)
             p.getAxis("left").setWidth(75)
             if i < n - 1:
@@ -561,11 +590,11 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
                 p.setXLink(prev)
             plots[ch] = p
             row_lay.addWidget(gw, stretch=1)
-            row_lay.addWidget(self._make_range_buttons(ch, col))
+            row_lay.addWidget(self._make_range_buttons(ch, i))
             vlay.addWidget(row, stretch=1)
-            curves[ch] = p.plot(pen=pg.mkPen(col, width=2))
-            self._frozen_curves[ch] = p.plot(
-                pen=pg.mkPen(col, width=1.5, style=QtCore.Qt.PenStyle.DashLine))
+            curves[ch] = self._theme_curve(p.plot(), i, width=2)
+            self._frozen_curves[ch] = self._theme_curve(
+                p.plot(), i, width=1.5, style=QtCore.Qt.PenStyle.DashLine)
             if ch == self._signal_ch:
                 self._make_stats_box(p)
             prev = p
@@ -574,8 +603,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
     def _make_stats_box(self, p: pg.PlotItem) -> None:
         """Statistics 'legend' in the top-right corner of the signal plot (fixed on screen)."""
         vb = p.getViewBox()
-        self._stats_box = pg.TextItem(anchor=(1, 0), fill=pg.mkBrush(255, 255, 255, 225),
-                                      border=pg.mkPen(_GRID))
+        self._stats_box = pg.TextItem(anchor=(1, 0))  # fill / border: _apply_theme_extra
         self._stats_box.setParentItem(vb)
 
         def place() -> None:
@@ -616,10 +644,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         self._freeze_btn.setToolTip("Keep the current signal waveform as a dashed reference")
         self._freeze_btn.clicked.connect(self._on_freeze)
         self._lbl_math = QtWidgets.QLabel("")
-        self._lbl_math.setObjectName("statsLabel")
-        self._lbl_math.setStyleSheet(
-            f"color: {_MATH}; font-weight: bold;"
-            f"padding: 2px 10px; background: {_SURF}; border-radius: 4px;")
+        self._lbl_math.setObjectName("statsLabel")  # colour: _apply_theme_extra
         self._save_btn = QtWidgets.QPushButton("Save")
         self._save_btn.setFixedSize(60, 28)
         self._save_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
@@ -632,6 +657,15 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         lay.addWidget(self._save_btn)
         self._update_n_label()
         return bar
+
+    def _apply_theme_extra(self) -> None:
+        self._lbl_math.setStyleSheet(
+            f"color: {C.MATH}; font-weight: bold;"
+            f"padding: 2px 10px; background: {C.SURF}; border-radius: 4px;")
+        if hasattr(self, "_stats_box"):
+            self._stats_box.fill = pg.mkBrush(*C.STATS_FILL)
+            self._stats_box.border = pg.mkPen(C.GRID)
+            self._update_stats_box()
 
     # --- averaging ----------------------------------------------------------------------------
     @property
@@ -678,7 +712,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
                        f"<td align='right' style='padding:2px 6px'><b>{v}</b></td></tr>"
                        for k, v in rows)
         self._stats_box.setHtml(
-            f"<div style='color:{_FG}; font-size:16pt'><b style='color:{col}'>"
+            f"<div style='color:{C.PLOT_FG}; font-size:16pt'><b style='color:{col}'>"
             f"&nbsp;{self.channel_labels[self.channels.index(self._signal_ch)]}</b>"
             f"<table cellspacing='0'>{html}</table></div>")
 

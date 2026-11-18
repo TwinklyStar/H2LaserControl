@@ -10,7 +10,7 @@ from typing import Any
 
 from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from ..style import BLUE, GREEN, GREY, ORANGE, set_role
+from ..style import C, set_role
 from .base import DevicePanel
 
 
@@ -55,20 +55,20 @@ class FlipCard(QGroupBox):
         online = bool(info and info.get("connected"))
         pos = info.get("position") if online and info else None
         if info is None:
-            self._set_state("—", GREY, "No data" if self.panel.connected else "Not connected")
+            self._set_state("—", C.GREY, "No data" if self.panel.connected else "Not connected")
         elif not online:
             err = info.get("error") or "not connected"
-            self._set_state("NOT CONNECTED", GREY,
+            self._set_state("NOT CONNECTED", C.GREY,
                             f"{err}\nThe program tries again every few seconds.")
         elif moving or info.get("moving"):
             verb = {"insert": "Inserting", "retract": "Retracting"}.get(moving or "", "Moving")
-            self._set_state(f"{verb} …", BLUE, "Flipping (about half a second).")
+            self._set_state(f"{verb} …", C.BLUE, "Flipping (about half a second).")
         elif pos == "insert":
-            self._set_state("INSERTED", ORANGE, "Flipped into the beam path.")
+            self._set_state("INSERTED", C.ORANGE, "Flipped into the beam path.")
         elif pos == "retract":
-            self._set_state("RETRACTED", GREEN, "Flipped out of the beam path.")
+            self._set_state("RETRACTED", C.GREEN, "Flipped out of the beam path.")
         else:
-            self._set_state("BETWEEN POSITIONS", ORANGE,
+            self._set_state("BETWEEN POSITIONS", C.ORANGE,
                             "Neither position is reached: choose Insert or Retract.")
         ok = can_act and online
         self.insert_btn.setEnabled(ok and pos != "insert")

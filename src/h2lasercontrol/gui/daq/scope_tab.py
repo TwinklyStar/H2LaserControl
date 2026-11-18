@@ -31,7 +31,7 @@ from ...daq.picoscope.configs import ScopeConfig, list_scope_configs
 from ...daq.picoscope.history import DEFAULT_WINDOW, TrendSource
 from ...daq.picoscope.session import PAUSED, RUNNING, STARTING, STOPPED, STOPPING, PicoSession
 from ...oplog import OpLog
-from ..style import BLUE, GREEN, GREY, ORANGE, set_role
+from ..style import C, set_role, theme
 from .scope_views import ContinuousView, SnapshotView
 
 # The snapshot plot is redrawn per poll that brought new waveforms (user: 10-25 fps). Polling at
@@ -52,12 +52,12 @@ def shown_channel_names(dcfg: dict[str, Any]) -> list[str]:
     names = dict(zip(dcfg["channels"], dcfg["channel_name"], strict=True))
     return [names[c] for c in shown_channels(dcfg)]
 
-STATE_TEXT = {
-    STOPPED: ("Stopped", GREY),
-    STARTING: ("Starting … (opening a scope takes up to about 10 s)", BLUE),
-    RUNNING: ("Running", GREEN),
-    PAUSED: ("Paused: no data is taken or saved", ORANGE),
-    STOPPING: ("Stopping … (closing files)", BLUE),
+STATE_TEXT = {  # colour = name of a theme colour (style.C)
+    STOPPED: ("Stopped", "GREY"),
+    STARTING: ("Starting … (opening a scope takes up to about 10 s)", "BLUE"),
+    RUNNING: ("Running", "GREEN"),
+    PAUSED: ("Paused: no data is taken or saved", "ORANGE"),
+    STOPPING: ("Stopping … (closing files)", "BLUE"),
 }
 
 
@@ -96,8 +96,8 @@ class ScopeTab(QWidget):
         lay = QVBoxLayout(start)
         lay.setContentsMargins(40, 30, 40, 30)
         lay.setSpacing(14)
-        title = QLabel(f"<b style='font-size:15pt'>{s.get('label', cfg.key)}</b>"
-                       + ("  <span style='color:#7a5b00'>(simulated scopes)</span>" if sim else ""))
+        self._title = title = QLabel()
+        self._render_title()
         row = QHBoxLayout()
         row.addWidget(QLabel("Config:"))
         self.config_combo = QComboBox()
@@ -164,7 +164,7 @@ class ScopeTab(QWidget):
         rlay.addWidget(self.detail_label)
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: #dddddd;")
+        set_role(line, "sep")
         rlay.addWidget(line)
         self.error_label = QLabel()
         self.error_label.setWordWrap(True)
@@ -181,6 +181,23 @@ class ScopeTab(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(POLL_MS)
+        theme.changed.connect(self._retheme)
+
+    # --- light / dark theme -------------------------------------------------------------------
+    def _render_title(self) -> None:
+        self._title.setText(
+            f"<b style='font-size:15pt'>{self.cfg.settings.get('label', self.cfg.key)}</b>"
+            + (f"  <span style='color:{C.SIM_FG}'>(simulated scopes)</span>" if self.sim else ""))
+
+    def _render_no_config(self) -> None:
+        self.config_info.setText(f"<span style='color:{C.RED}'>No {self.mode} config file in "
+                                 f"{self.config_dir}.</span>")
+
+    def _retheme(self) -> None:
+        self._render_title()
+        if self.scope_config is None:
+            self._render_no_config()
+        self._refresh()  # state line (the plot view recolours itself)
 
     # --- config selection ---------------------------------------------------------------------
     def reload_configs(self, *, select: str | None = None) -> None:
@@ -208,9 +225,7 @@ class ScopeTab(QWidget):
         sc = self.scope_config
         if sc is None:
             self.session = None
-            self.config_info.setText(
-                f"<span style='color:#c62828'>No {self.mode} config file in "
-                f"{self.config_dir}.</span>")
+            self._render_no_config()
         else:
             self.session = PicoSession(self.cfg.key, sc.settings(), self.oplog, sim=self.sim,
                                        base_dir=self.base_dir)
@@ -341,9 +356,10 @@ class ScopeTab(QWidget):
                 self.start_error.show()
 
         text, color = STATE_TEXT[state]
+        color = getattr(C, color)
         self.state_label.setText(f"<b style='color:{color}; font-size:13pt'>●</b> "
                                  f"<b style='font-size:13pt'>{text}</b>"
-                                 + (f"  <span style='color:{GREY}'>— {self.scope_config.title} "
+                                 + (f"  <span style='color:{C.GREY}'>— {self.scope_config.title} "
                                     f"({self.scope_config.name})</span>"
                                     if self.scope_config else ""))
         self.start_btn.setEnabled(s is not None and state == STOPPED)
@@ -360,7 +376,7 @@ class ScopeTab(QWidget):
                 part = (f"<b>{name}</b> ({dcfg.get('model')} {dcfg.get('serial')}, "
                         f"{', '.join(dcfg['channel_name'])}): {st}")
                 if name in s.warnings:
-                    part += f" <span style='color:{ORANGE}'><b>⚠ {s.warnings[name]}</b></span>"
+                    part += f" <span style='color:{C.ORANGE}'><b>⚠ {s.warnings[name]}</b></span>"
                 lines.append(part)
             paths = sorted({s.data_path(c) for c in s.configs.values()})
             lines.append("Data: " + ", ".join(paths))

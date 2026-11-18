@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from ...config import DeviceConfig
 from ...services import DeviceService
-from ..style import GREEN, GREY, set_role
+from ..style import C, set_role, theme
 
 ACTION_TEXT = {"connect": "Connecting", "disconnect": "Disconnecting"}
 
@@ -33,6 +33,8 @@ class DevicePanel(QWidget):
         self.busy = False
         self.state: dict[str, Any] = {}
         self.has_error = False
+        self._conn_message = ""
+        theme.changed.connect(self._retheme)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 12, 16, 12)
@@ -60,7 +62,7 @@ class DevicePanel(QWidget):
 
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: #dddddd;")
+        set_role(line, "sep")
         root.addWidget(line)
 
         self.error_label = QLabel()
@@ -131,14 +133,25 @@ class DevicePanel(QWidget):
         self.show_error("")
         self.service.submit("disconnect" if self.connected else "connect")
 
+    def _render_status(self) -> None:
+        if self.connected:
+            self.status_label.setText(f"<b style='color:{C.GREEN}'>●</b> Connected "
+                                      f"<span style='color:{C.GREY}'>({self._conn_message})</span>")
+        else:
+            self.status_label.setText(f"<b style='color:{C.GREY}'>●</b> Not connected")
+
+    def _retheme(self) -> None:
+        """Light/dark switch: redraw everything drawn with theme colours."""
+        self._render_status()
+        self.update_view()
+
     def _on_connection(self, connected: bool, message: str) -> None:
         self.connected = connected
+        self._conn_message = message
+        self._render_status()
         if connected:
-            self.status_label.setText(f"<b style='color:{GREEN}'>●</b> Connected "
-                                      f"<span style='color:{GREY}'>({message})</span>")
             self.connect_btn.setText("Disconnect")
         else:
-            self.status_label.setText(f"<b style='color:{GREY}'>●</b> Not connected")
             self.connect_btn.setText("Connect")
             self.state = {}
             if message not in ("disconnected", "not connected"):

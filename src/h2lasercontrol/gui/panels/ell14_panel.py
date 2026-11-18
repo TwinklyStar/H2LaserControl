@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...drivers.ell14 import MIN_HOME_OFFSET_DEG
-from ..style import GREY, set_role
+from ..style import C, set_role
 from .base import DevicePanel
 
 BUSY_TEXT = {
@@ -244,7 +244,7 @@ class Ell14Panel(DevicePanel):
         pos = self.state.get("position")
         if pos is None or not self.connected:
             self.angle_label.setText("—")
-            self.angle_label.setStyleSheet(f"font-size: 28pt; color:{GREY}")
+            self.angle_label.setStyleSheet(f"font-size: 28pt; color:{C.GREY}")
             self.info_label.setText("")
             self.step_label.setText("—")
         else:

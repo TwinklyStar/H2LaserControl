@@ -55,6 +55,24 @@ def test_group_tabs_with_one_sub_tab_per_device(window):
     assert texts(window.sub_tabs["DAQ"]) == ["Scope monitor", "VUV PD snapshot", "Camera"]
 
 
+def test_dark_theme_switch_while_connected(window, themes):
+    from PySide6.QtGui import QPalette
+
+    from h2lasercontrol.gui.style import DARK, LIGHT, C, theme
+
+    hit = panel(window, "hitmv")
+    assert LIGHT.GREEN in hit.status_label.text()  # "● Connected" in the light green
+    themes(True)
+    assert theme.dark and C.GREEN == DARK.GREEN
+    assert window.palette().color(QPalette.ColorRole.Window).name() == "#1e1e2e"
+    assert DARK.GREEN in hit.status_label.text()  # redrawn without reconnecting
+    icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
+    assert icon.pixelColor(6, 6).name() == DARK.GREEN  # Control: all connected
+    themes(False)
+    assert LIGHT.GREEN in hit.status_label.text()
+    assert window.palette().color(QPalette.ColorRole.Window).name() != "#1e1e2e"
+
+
 def test_group_tab_shows_error_of_hidden_device(window):
     window.tabs.setCurrentIndex(1)  # DAQ shown, Control hidden
     window._set_sub_state("Control", 1, "error")
