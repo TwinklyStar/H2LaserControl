@@ -14,6 +14,7 @@ from dataclasses import dataclass, fields, replace
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtWidgets import QProxyStyle, QStyle, QStyleFactory
 
 
 @dataclass
@@ -202,6 +203,19 @@ def follow_system(app) -> None:
     """Apply the Windows light/dark setting now and whenever it is changed."""
     apply_theme(app)
     app.styleHints().colorSchemeChanged.connect(lambda *_: apply_theme(app))
+
+
+class AppStyle(QProxyStyle):
+    """Fusion with one change: a left click on a slider bar jumps to that point (user
+    2026-11-19, camera gain sliders; Fusion only steps one page towards the click)."""
+
+    def __init__(self) -> None:
+        super().__init__(QStyleFactory.create("Fusion"))
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.StyleHint.SH_Slider_AbsoluteSetButtons:
+            return Qt.MouseButton.LeftButton.value
+        return super().styleHint(hint, option, widget, returnData)
 
 
 def dot_icon(color: str, size: int = 12) -> QIcon:

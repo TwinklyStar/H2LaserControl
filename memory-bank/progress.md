@@ -483,6 +483,10 @@
   standard green/orange are ~2:1 on white. Orange #c45c00 instead of Apple's #c93400, which
   looks red next to the error red (INSERTED must not read as an error). Selection/links
   #007aff. Checked by screenshots.
+- **Slider click jumps (user: camera gain bar could only be dragged):** `style.AppStyle` =
+  Fusion + `SH_Slider_AbsoluteSetButtons` = left button, set in `app.py` (program-wide, camera
+  code untouched). Click at 75 % of the analog gain bar: before 1.00 → 1.10 (one page step),
+  now → 9.75. Test with the program's style sheet, light and dark.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

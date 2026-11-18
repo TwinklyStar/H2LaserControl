@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from ..config import DEFAULT_CONFIG, load_config
 from ..oplog import OpLog
 from .main_window import MainWindow
-from .style import follow_system
+from .style import AppStyle, follow_system
 
 LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 
@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
-    app.setStyle("Fusion")
+    app.setStyle(AppStyle())  # Fusion; slider click jumps to the clicked point
     follow_system(app)  # light / dark like Windows, also when it is switched while running
 
     # only one real instance: two programs cannot share the serial ports
