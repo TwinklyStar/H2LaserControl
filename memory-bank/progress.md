@@ -427,7 +427,11 @@
   11.6 s (3405D by serial: 3 s). Cause: ps2000 has no open-by-serial; the search opened every
   free 2204A (~4 s each) plus a final "no more units" call. Change: the search stops as soon as
   our serial is open (expected NOCell ~4 s, H2PD ~8 s since 0359 enumerates first); each
-  open/close call is now timed in the debug log. ⏳ To verify on hardware at the next start.
+  open/close call is now timed in the debug log. ✅ *Hardware test (scripts, GUI scopes idle):*
+  `ps2000_open_unit` = 3.5 s per unit, `ps2000_close_unit` = 1.1 s. H2PD alone: opens 0359,
+  then 0366, closes 0359 → 8.1 s (was 11.6 s). Monitor: NOCell 3.5 s (was 11.6 s; the
+  3405D opens in parallel). H2PD while the monitor runs (0359 busy): 3.5 s. No errors, 0
+  skipped. Test data deleted.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
