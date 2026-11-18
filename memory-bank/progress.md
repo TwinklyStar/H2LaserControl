@@ -436,6 +436,12 @@
   hardware** (real ScopeTab + H2PD, offscreen, 20 s): poll 40 ms → 20.9 redraws/s at 25.0 Hz
   triggers (timer jitter puts 2 waveforms in one poll); poll 20 ms → **25.0 redraws/s**, one
   per trigger. POLL_MS = 20. (On-screen painting not measured; 1000-point curves are cheap.)
+- **Monitor live waveforms (right panel) refreshed per trigger** (user): continuous-mode
+  digitizers also post every waveform (`{device, t, dt, waves: {channel name: mV}}`); the view
+  keeps a sliding average of the last 100 per scope (`WaveAverager`, trigger channel left out)
+  and redraws per poll. Trend points / CSV rows unchanged (per 100 triggers). Hardware (real
+  ScopeTab, 3405D + NOCell, 20 s): 36.5 redraws/s total = each scope ~25/s (the two scopes'
+  triggers arrive at different phases). Before: one redraw per 100 triggers (4 s). 317 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

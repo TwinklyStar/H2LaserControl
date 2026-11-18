@@ -127,6 +127,25 @@ def test_monitor_hides_trigger_shows_rate_and_reads_history(window, qtbot, tmp_p
     assert t.view.window == "10 min"
 
 
+def test_monitor_waveforms_refresh_with_every_trigger(window, qtbot, monkeypatch):
+    monkeypatch.setattr(VirtualDigitizer, "TRIGGER_RATE_HZ", 25.0)  # the real trigger rate
+    t: ScopeTab = tab(window, "scope_monitor")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.view is not None and t.view.wave_frames > 0, timeout=10000)
+    v = t.view
+    f0, t0 = v.wave_frames, time.monotonic()
+    qtbot.wait(2000)
+    fps = (v.wave_frames - f0) / (time.monotonic() - t0)
+    assert fps > 15, fps  # was one redraw per 100 triggers (every 4 s)
+    # sliding average of the last 100 waveforms per scope; trigger channel not averaged
+    qtbot.waitUntil(lambda: v._wave_avg["DET10A2"].count >= 60, timeout=10000)
+    assert set(v._wave_avg["NOCell"].mean_waves()) == {"NO_cell"}
+    x, y = v._wfm_curves["212"].getData()
+    assert len(x) == 1000 and y.min() < 0
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+
+
 def test_snapshot_hides_trigger_channel(window, qtbot):
     t: ScopeTab = tab(window, "vuv_pd")
     t.start_btn.click()

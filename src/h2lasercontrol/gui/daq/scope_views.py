@@ -197,7 +197,11 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
     (`history_sources`), then live points are appended. The x range follows the latest data
     until the user zooms / pans; "Latest" (or picking a window) follows again.
     Trigger channels are not passed in (not shown, user 2026-11-18); the trigger rate of each
-    scope is in the status row (`set_rates`)."""
+    scope is in the status row (`set_rates`).
+    Live waveforms (right): sliding average of the last WAVE_AVG waveforms, redrawn with every
+    trigger (user 2026-11-18; before: one 100-trigger average every 4 s)."""
+
+    WAVE_AVG = 100  # same averaging as the trend point / CSV row
 
     def __init__(self, channels: list[str], channel_groups: list[list[str]] | None = None,
                  parent: QtWidgets.QWidget | None = None, *,
@@ -218,6 +222,9 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         self._ts: dict[str, list[float]] = {ch: [] for ch in channels}
         self._val: dict[str, list[float]] = {ch: [] for ch in channels}
         self._follow = True
+        self._wave_avg: dict[str, WaveAverager] = {}  # per digitizer: sliding waveform average
+        self._wave_t: dict[str, np.ndarray] = {}
+        self.wave_frames = 0  # waveform redraws (for tests)
         self._range_idx: dict[str, int | None] = {}
         self._range_labels: dict[str, QtWidgets.QLabel] = {}
 
@@ -414,8 +421,24 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
         self._lbl_rate.setText(_rate_text(rates))
 
     def show_items(self, items: list[dict[str, Any]]) -> None:
+        """Two kinds of items: one waveform per trigger ('waves': sliding average of the last
+        WAVE_AVG, redrawn once per call = per tab poll) and one trend point per 100 triggers
+        ('channel_name': the CSV row value)."""
         changed = set()
+        new_waves: set[str] = set()
         for item in items:
+            if "waves" in item:
+                dev = item.get("device", "")
+                shown = {ch: w for ch, w in item["waves"].items() if ch in self.channels}
+                if not shown:
+                    continue
+                av = self._wave_avg.get(dev)
+                if av is None:
+                    av = self._wave_avg[dev] = WaveAverager(self.WAVE_AVG, next(iter(shown)))
+                av.add(shown, float(item.get("dt") or 1.0))
+                self._wave_t[dev] = np.asarray(item["t"]) * 1e-9  # ns -> s
+                new_waves.add(dev)
+                continue
             ch = item.get("channel_name")
             if ch not in self.channels:
                 continue  # e.g. the trigger channel: recorded, not shown
@@ -425,11 +448,19 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
             else:
                 ts.append(item["timestamp"])
                 self._val[ch].append(item["value"])
-            wfm_v = np.asarray(item["wfm"]) * 1e-3  # mV -> V
-            self._wfm_curves[ch].setData(np.asarray(item["wfm_t"]) * 1e-9, wfm_v)  # ns -> s
-            self._auto_range(ch, wfm_v)
+            if not self._wave_avg:  # no per-trigger waveforms (older data source)
+                wfm_v = np.asarray(item["wfm"]) * 1e-3  # mV -> V
+                self._wfm_curves[ch].setData(np.asarray(item["wfm_t"]) * 1e-9, wfm_v)
+                self._auto_range(ch, wfm_v)
             self._ch_labels[ch].setText(f"  {ch}: {item['value']:.4g}  ")
             changed.add(ch)
+        for dev in new_waves:
+            for ch, w in self._wave_avg[dev].mean_waves().items():
+                wfm_v = w * 1e-3  # mV -> V
+                self._wfm_curves[ch].setData(self._wave_t[dev], wfm_v)
+                self._auto_range(ch, wfm_v)
+        if new_waves:
+            self.wave_frames += 1
         if changed:
             self._trim()
             self._redraw_trends(changed)

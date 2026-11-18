@@ -294,6 +294,12 @@ class Digitizer(threading.Thread):
                 self.root_pointer.fill(**wave)
 
                 if self.run_mode == "continuous":
+                    # every waveform also goes to the display (sliding average there, redrawn
+                    # per trigger; user 2026-11-18). The CSV row + trend item stay per 100.
+                    self.update_queue.put({
+                        "device": self.device, "t": self.t, "dt": self.delta_t,
+                        "waves": {self.channel_name[c]: wave[f"Ch{c}"] for c in self.channels},
+                    })
                     for ch_idx in self.channels:
                         self.peak_area_buffer[ch_idx] += (
                             np.sum(wave[f"Ch{ch_idx}"]) * self.delta_t / 100 * 1e-3
