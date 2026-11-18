@@ -1,0 +1,39 @@
+# PicoScope config, converted from the old H2LaserDAQ config/config_monitor_2026A.py (2026-11-18).
+# Keys as in the old DIGITIZER_CONFIGS; see config/devices.toml for their meaning.
+# data_path: relative to the program folder (old 'data' -> 'data/picoscope').
+title = "H2 Laser Regular DAQ (NO cell + DET10A2 PD)"
+mode = "continuous"  # continuous | snapshot
+
+[digitizers.DET10A2]
+model = "3405D"
+serial = "JY926/0005"
+channels = ["B", "C"]
+channel_name = ["212", "820"]
+voltage_range = { B = "200MV", C = "1V" }
+offset = { B = 0, C = 0 }
+timebase = 1
+sample_number = 1000
+trigger_channel = "Ext"
+trigger_level = 1000
+pre_trigger = 10
+trigger_edge = "RISING"
+trigger_delay = 0
+auto_trigger = 0
+output_name = "FreeSpacePD_2026June"
+data_path = "data/picoscope"
+
+[digitizers.NOCell]
+model = "2204A"
+serial = "12017/0359"
+channels = ["A", "B"]
+channel_name = ["NO_cell", "Trig"]
+voltage_range = { A = "2V", B = "10V" }
+timebase = 9
+sample_number = 1000
+trigger_channel = "B"
+trigger_level = 1000
+pre_trigger = 10
+trigger_edge = "RISING"
+auto_trigger = 1000
+output_name = "NOCell_2026June"
+data_path = "data/picoscope"

@@ -305,6 +305,11 @@
   show); scope tabs now show only a start page (scopes, data folder, Start) until Start and
   again after Stop / when every scope failed (error shown there); waveform views in a light
   theme matching the GUI (white plots, dark axes, darker channel colours). 293 passed.
+- **Scope config drop-down** (user request): the 8 old digitizer configs converted to
+  `config/picoscope/*.toml` (6 snapshot, 2 continuous); each scope tab's start page lists the
+  files of its mode (default from devices.toml), describes the chosen one, ↺ re-reads the
+  folder, invalid files are listed with the reason; locked while running; the op-log start
+  entry names the config. 296 passed, ruff clean.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

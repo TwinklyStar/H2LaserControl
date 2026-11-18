@@ -9,9 +9,14 @@ import numpy as np
 import pytest
 import uproot
 
-from h2lasercontrol.config import DEFAULT_CONFIG, load_config
+from h2lasercontrol.config import DEFAULT_CONFIG, PROGRAM_DIR, load_config
 from h2lasercontrol.daq.picoscope import assistant
 from h2lasercontrol.daq.picoscope import session as session_mod
+from h2lasercontrol.daq.picoscope.configs import (
+    ScopeConfigError,
+    list_scope_configs,
+    load_scope_config,
+)
 from h2lasercontrol.daq.picoscope.session import PAUSED, RUNNING, STOPPED, PicoSession
 from h2lasercontrol.daq.picoscope.virtual import VirtualDigitizer, range_mv, sample_interval_ns
 from h2lasercontrol.oplog import OpLog, read_oplog
@@ -20,6 +25,10 @@ from h2lasercontrol.oplog import OpLog, read_oplog
 @pytest.fixture(autouse=True)
 def fast_triggers(monkeypatch):
     monkeypatch.setattr(VirtualDigitizer, "TRIGGER_RATE_HZ", 2000.0)
+
+
+SCOPE_DIR = PROGRAM_DIR / "config" / "picoscope"
+FILES = {"scope_monitor": "monitor_2026A.toml", "vuv_pd": "H2PD_261103.toml"}
 
 
 @pytest.fixture
@@ -40,17 +49,20 @@ def wait(cond, timeout=10.0, session=None):
 
 def make(cfg, key, tmp_path):
     oplog = OpLog(tmp_path / "logs", user="tester")
-    return PicoSession(key, cfg[key].settings, oplog, sim=True, base_dir=tmp_path), oplog
+    settings = load_scope_config(SCOPE_DIR / FILES[key]).settings()
+    return PicoSession(key, settings, oplog, sim=True, base_dir=tmp_path), oplog
 
 
 def test_config_matches_old_programs(cfg):
-    mon = cfg["scope_monitor"].settings
-    assert mon["mode"] == "continuous"
-    assert {n: (d["model"], d["serial"]) for n, d in mon["digitizers"].items()} == {
+    assert cfg["scope_monitor"].settings["default_config"] == FILES["scope_monitor"]
+    assert cfg["vuv_pd"].settings["default_config"] == FILES["vuv_pd"]
+    mon = load_scope_config(SCOPE_DIR / FILES["scope_monitor"])
+    assert mon.mode == "continuous"
+    assert {n: (d["model"], d["serial"]) for n, d in mon.digitizers.items()} == {
         "DET10A2": ("3405D", "JY926/0005"), "NOCell": ("2204A", "12017/0359")}
-    snap = cfg["vuv_pd"].settings
-    assert snap["mode"] == "snapshot"
-    h2pd = snap["digitizers"]["H2PD"]
+    snap = load_scope_config(SCOPE_DIR / FILES["vuv_pd"])
+    assert snap.mode == "snapshot"
+    h2pd = snap.digitizers["H2PD"]
     assert (h2pd["serial"], h2pd["output_name"], h2pd["refresh_trigger_cnt"]) == (
         "12017/0366", "H2PD_2026B", 100)
     assert cfg["camera"].usb_serial == "4110039161"
@@ -191,3 +203,25 @@ def test_session_needs_digitizers(tmp_path):
     with pytest.raises(ValueError):
         PicoSession("x", {"mode": "continuous"}, OpLog(tmp_path), sim=True)
     assert session_mod.STOPPED == STOPPED
+
+
+def test_all_old_configs_converted():
+    cont, errors = list_scope_configs(SCOPE_DIR, "continuous")
+    snap, _ = list_scope_configs(SCOPE_DIR, "snapshot")
+    assert not errors
+    assert [c.name for c in cont] == ["H2PD_monitor_261103.toml", "monitor_2026A.toml"]
+    assert [c.name for c in snap] == ["H2PD.toml", "H2PD_260628.toml", "H2PD_261008_cali.toml",
+                                      "H2PD_261103.toml", "LaserRoomPD.toml", "NOCell.toml"]
+    cali = load_scope_config(SCOPE_DIR / "H2PD_261008_cali.toml")
+    assert cali.digitizers["H2PD"]["data_path"] == "data/picoscope/PDcal_261013"  # was data/...
+
+
+def test_invalid_config_files_are_reported(tmp_path):
+    (tmp_path / "a.toml").write_text('mode = "snapshot"\n[digitizers.X]\nmodel = "2204A"\n')
+    (tmp_path / "b.toml").write_text("not toml [")
+    (tmp_path / "c.toml").write_text('mode = "weird"\n')
+    good, errors = list_scope_configs(tmp_path)
+    assert good == [] and len(errors) == 3
+    assert "missing" in errors[0] and "cannot be read" in errors[1] and "mode" in errors[2]
+    with pytest.raises(ScopeConfigError):
+        load_scope_config(tmp_path / "a.toml")

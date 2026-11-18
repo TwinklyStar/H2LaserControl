@@ -52,6 +52,10 @@ Survey of the old code: `progress.md`, 2026-11-18.
   in `config/camera` (was `configs/`).
 - Scope tabs: start page until Start / after Stop, fresh plots on each Start; light colours
   instead of the dark Catppuccin theme (user 2026-11-18).
+- Scope config chosen in a drop-down on the start page (user 2026-11-18): the old
+  `config/*.py` files are now `config/picoscope/*.toml` (same keys + title + mode; data_path
+  `data/...` -> `data/picoscope/...`); invalid files are listed with the reason; the old
+  history viewer config was not converted (viewer dropped).
 - Camera sidebar width = its content's minimum width (was a fixed 276 px, cut off in the
   merged program's Fusion style; user 2026-11-18). Otherwise the camera window is unchanged.
 

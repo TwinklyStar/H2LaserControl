@@ -157,3 +157,24 @@ def test_scope_start_failure_returns_to_start_page(window, qtbot, monkeypatch):
                     timeout=10000)
     assert t.start_error.isVisibleTo(t) and "not found" in t.start_error.text()
     assert ("vuv_pd", "acquire", "failed") in actions(window)
+
+
+def test_scope_config_dropdown(window, qtbot):
+    t: ScopeTab = tab(window, "vuv_pd")
+    names = [t.config_combo.itemData(i) for i in range(t.config_combo.count())]
+    assert "H2PD_261103.toml" in names and "monitor_2026A.toml" not in names  # snapshot only
+    assert t.config_combo.currentData() == "H2PD_261103.toml"  # default from devices.toml
+    t.config_combo.setCurrentIndex(names.index("LaserRoomPD.toml"))
+    assert "12017/0137" in t.config_info.text()  # description follows the choice
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == RUNNING, timeout=10000)
+    assert not t.config_combo.isEnabled()  # no change while running
+    assert t.view.device == "LaserRoomPD"
+    start = [e for e in read_oplog(window.oplog.today_path()) if e["action"] == "start"]
+    assert start[-1]["args"]["config"] == "LaserRoomPD.toml"
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.stack.currentIndex() == 0, timeout=10000)
+    assert t.config_combo.isEnabled() and t.config_combo.currentData() == "LaserRoomPD.toml"
+    mon = tab(window, "scope_monitor")
+    mon_names = [mon.config_combo.itemData(i) for i in range(mon.config_combo.count())]
+    assert mon_names == ["H2PD_monitor_261103.toml", "monitor_2026A.toml"]

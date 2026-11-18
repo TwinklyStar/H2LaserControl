@@ -81,8 +81,10 @@ Only one program can use a device at a time: **close SGSample / ELLO / Kinesis, 
 IDS peak Cockpit and the old DAQ programs first.** Only one copy of this program can run at a
 time (lock file).
 
-**DAQ tabs** (Scope monitor, VUV PD snapshot, Camera): nothing starts by itself. Each tab has its
-own **Start** (and **Pause** / **Stop** for the scopes, **Close camera** for the camera). Once
+**DAQ tabs** (Scope monitor, VUV PD snapshot, Camera): nothing starts by itself. On a scope tab's
+start page, choose the acquisition setup in the **Config** drop-down (files in
+`config/picoscope/*.toml` of that tab's mode, converted from the old H2LaserDAQ configs; add a
+file there and press ↺ to see it). Each tab has its own **Start** (and **Pause** / **Stop** for the scopes, **Close camera** for the camera). Once
 started, an acquisition keeps running while you look at other tabs, until you stop it or close
 the program. Pause = no data is taken or saved and the display freezes; Resume continues in the
 same files.
@@ -143,7 +145,10 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
 
 ## 6. Configuration: `config/devices.toml`
 
-- Each device has a `type` (`hitmv`, `ell14`, `mff`), a tab `label` and its USB serial.
+- Each device has a `type` (`hitmv`, `ell14`, `mff`, `picoscope`, `ids_camera`), a tab `label`
+  and its USB serial. PicoScope tabs instead name a `mode`, a `config_dir` and a
+  `default_config`; the scope setups themselves are in `config/picoscope/*.toml` (keys as in
+  the old H2LaserDAQ `DIGITIZER_CONFIGS`). Camera settings: `config/camera/*.toml`.
 - If the serial is not found, connecting **fails**. It never falls back to a COM number, which
   could belong to another device.
 - To find serials: COM-port devices with `python tools/list_ports.py`. Flip mounts: the serial

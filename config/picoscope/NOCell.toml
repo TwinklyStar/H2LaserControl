@@ -1,0 +1,23 @@
+# PicoScope config, converted from the old H2LaserDAQ config/config_NOCell.py (2026-11-18).
+# Keys as in the old DIGITIZER_CONFIGS; see config/devices.toml for their meaning.
+# data_path: relative to the program folder (old 'data' -> 'data/picoscope').
+title = "NO Cell"
+mode = "snapshot"  # continuous | snapshot
+
+[digitizers.H2PD]
+model = "2204A"
+serial = "12017/0359"
+snapshot_channel = "A"
+refresh_trigger_cnt = 1
+channels = ["A", "B"]
+channel_name = ["Sig", "Trig"]
+voltage_range = { A = "2V", B = "2V" }
+timebase = 9
+sample_number = 1000
+trigger_channel = "B"
+trigger_level = 1000
+pre_trigger = 10
+trigger_edge = "RISING"
+auto_trigger = 1000
+output_name = "NOCell_test2026A"
+data_path = "data/picoscope"

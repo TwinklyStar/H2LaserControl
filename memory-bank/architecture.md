@@ -115,6 +115,8 @@ src/h2lasercontrol/
                   virtual.py    VirtualDigitizer (simulation; real loop, fake hardware hooks)
                   session.py    PicoSession: the digitizers of one tab; start/pause/resume/stop,
                                 poll() -> plot items, op log; plain Python (no Qt)
+                  configs.py    config/picoscope/*.toml (one file = title, mode, digitizers with
+                                the old keys); load + validate, list by mode
   laserdaq/       old IDS-Camera package, copied unchanged except: configs_dir/base_dir
                   parameters of its MainWindow, output_dir default data/camera, mock without
                   the 12 MB Ref BMP -> synthetic spot. cli/ (TUI) and camera/select.py dropped.
@@ -123,8 +125,10 @@ src/h2lasercontrol/
                                   per-scope status line, plot view made on each Start)
                   camera_tab.py   CameraTab: start page <-> embedded laserdaq MainWindow
                   DAQ_TABS registry by type ("picoscope", "ids_camera")
-config/devices.toml  [devices.scope_monitor|vuv_pd] type "picoscope", digitizers.<name> with the
-                     old DIGITIZER_CONFIGS keys; [devices.camera] type "ids_camera"
+config/devices.toml  [devices.scope_monitor|vuv_pd] type "picoscope", mode, config_dir,
+                     default_config; [devices.camera] type "ids_camera"
+config/picoscope/    scope setups (old H2LaserDAQ config/*.py converted; chosen in the tab's
+                     drop-down, which shows only files of the tab's mode)
 config/camera/       camera settings TOMLs (old configs/, output_dir = data/camera)
 data/picoscope/      root/, csv/, snapshots/ (git-ignored);  data/camera/YYYY-MM-DD/... 
 ```

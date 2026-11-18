@@ -44,8 +44,9 @@ def load_config(path: str | os.PathLike[str] = DEFAULT_CONFIG) -> dict[str, Devi
             devices[key] = DeviceConfig(key=key, type=table["type"],
                                         usb_serial=table.get("usb_serial"), port=None,
                                         baudrate=0, settings=table)
-            if table["type"] == "picoscope" and not table.get("digitizers"):
-                raise ConfigError(f"[devices.{key}] needs [devices.{key}.digitizers.<name>]")
+            if table["type"] == "picoscope" and table.get("mode") not in ("continuous",
+                                                                          "snapshot"):
+                raise ConfigError(f"[devices.{key}] needs mode = 'continuous' or 'snapshot'")
             continue
         try:
             devices[key] = DeviceConfig(

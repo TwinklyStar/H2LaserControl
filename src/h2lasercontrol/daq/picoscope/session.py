@@ -76,6 +76,7 @@ class PicoSession:
         self._stop_requested = False
         self.state = STARTING
         self.oplog.write(device=self.key, action="start", args={
+            "config": self.settings.get("config"),
             "mode": self.mode,
             "scopes": {n: f"{c.get('model')} {c.get('serial')}" for n, c in self.configs.items()},
             "outputs": {n: c.get("output_name") for n, c in self.configs.items()},

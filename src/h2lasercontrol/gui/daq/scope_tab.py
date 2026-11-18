@@ -1,10 +1,11 @@
-"""PicoScope tab: start page, then Pause / Stop + the ported plot view (F8a).
+"""PicoScope tab: start page (config drop-down + Start), then Pause / Stop + plots (F8a).
 
-Nothing starts by itself. Until Start, and again after Stop, the tab shows only a start page
-(which scopes, where the data goes, one Start button; user 2026-11-18). Once started, the
-acquisition keeps running in its own threads while other tabs are shown, until Stop is pressed
-(or the program is closed). Pause: no triggers are taken and nothing is written; the display
-freezes; Resume continues in the same files. Each Start gets a fresh plot view.
+Nothing starts by itself. Until Start, and again after Stop, the tab shows only a start page:
+a drop-down of the config files (config/picoscope/*.toml of this tab's mode, user 2026-11-18),
+what the selected config does, and one Start button. Once started, the acquisition keeps running
+in its own threads while other tabs are shown, until Stop is pressed (or the program is closed).
+Pause: no triggers are taken and nothing is written; the display freezes; Resume continues in
+the same files. Each Start gets a fresh plot view.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -23,7 +25,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...config import DeviceConfig
+from ...config import PROGRAM_DIR, DeviceConfig
+from ...daq.picoscope.configs import ScopeConfig, list_scope_configs
 from ...daq.picoscope.session import PAUSED, RUNNING, STARTING, STOPPED, STOPPING, PicoSession
 from ...oplog import OpLog
 from ..style import BLUE, GREEN, GREY, ORANGE, set_role
@@ -53,9 +56,15 @@ class ScopeTab(QWidget):
         self.cfg = cfg
         self.oplog = oplog
         self.sim = sim
-        self.session = PicoSession(cfg.key, cfg.settings, oplog, sim=sim, base_dir=base_dir)
+        self.base_dir = base_dir
+        s = cfg.settings
+        self.mode = s.get("mode", "continuous")
+        # config files: always the real config folder (also in simulation)
+        self.config_dir = PROGRAM_DIR / s.get("config_dir", "config/picoscope")
+        self.configs: list[ScopeConfig] = []
+        self.scope_config: ScopeConfig | None = None
+        self.session: PicoSession | None = None
         self.view: Any = None  # plot view while started
-        s = self.session
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -67,36 +76,44 @@ class ScopeTab(QWidget):
         lay = QVBoxLayout(start)
         lay.setContentsMargins(40, 30, 40, 30)
         lay.setSpacing(14)
-        title = QLabel(f"<b style='font-size:15pt'>{cfg.settings.get('label', cfg.key)}</b>")
-        scopes = "<br>".join(
-            f"• <b>{name}</b>: PicoScope {d.get('model')} {d.get('serial')}, channels "
-            + ", ".join(f"{c} = {n}" for c, n in zip(d["channels"], d["channel_name"], strict=True))
-            + f"  →  files <b>{d.get('output_name')}_…</b>"
-            for name, d in s.configs.items())
-        mode = ("continuous monitor: trend of the pulse area + averaged waveforms"
-                if s.mode == "continuous" else
-                f"snapshot: averaged waveform and pulse area of channel "
-                f"{next(iter(s.configs.values())).get('snapshot_channel', 'A')}, Freeze / Save")
-        paths = ", ".join(sorted({s.data_path(c) for c in s.configs.values()}))
-        info = QLabel(
-            f"{scopes}<br><br>Mode: {mode}"
-            + ("  —  <b>simulated scopes</b>" if sim else "") + "<br>"
-            f"Data is saved to <b>{paths}</b>.<br><br>"
-            "The scopes are <b>not open</b>. Press <b>Start</b> to open them and start taking "
-            "and saving data. It keeps running while you use other tabs, until you press Stop."
-            "<br>Close PicoScope 7 and the old H2LaserDAQ program first.")
-        info.setWordWrap(True)
-        info.setTextFormat(Qt.TextFormat.RichText)
+        title = QLabel(f"<b style='font-size:15pt'>{s.get('label', cfg.key)}</b>"
+                       + ("  <span style='color:#7a5b00'>(simulated scopes)</span>" if sim else ""))
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Config:"))
+        self.config_combo = QComboBox()
+        self.config_combo.setMinimumWidth(460)
+        self.config_combo.setToolTip(f"Config files ({self.mode} mode) in {self.config_dir}")
+        self.config_combo.currentIndexChanged.connect(self._on_config_selected)
+        self.reload_btn = QPushButton("↺")
+        self.reload_btn.setToolTip("Read the config folder again (after adding or editing a file)")
+        self.reload_btn.clicked.connect(self.reload_configs)
+        row.addWidget(self.config_combo)
+        row.addWidget(self.reload_btn)
+        row.addStretch(1)
+        self.config_info = QLabel()
+        self.config_info.setWordWrap(True)
+        self.config_info.setTextFormat(Qt.TextFormat.RichText)
+        self.config_errors = QLabel()
+        self.config_errors.setWordWrap(True)
+        set_role(self.config_errors, "muted")
+        self.config_errors.hide()
+        note = QLabel("The scopes are <b>not open</b>. Press <b>Start</b> to open them and start "
+                      "taking and saving data. It keeps running while you use other tabs, until "
+                      "you press Stop. Close PicoScope 7 and the old H2LaserDAQ program first.")
+        note.setWordWrap(True)
         self.start_btn = QPushButton("▶  Start")
         set_role(self.start_btn, "primary")
         self.start_btn.setFixedWidth(260)
-        self.start_btn.setToolTip("Open the scope(s) and start taking and saving data")
+        self.start_btn.setToolTip("Open the scope(s) with the selected config and start taking "
+                                  "and saving data")
         self.start_btn.clicked.connect(self.start)
         self.start_error = QLabel()
         self.start_error.setWordWrap(True)
         set_role(self.start_error, "error")
         self.start_error.hide()
-        for w in (title, info, self.start_btn, self.start_error):
+        lay.addWidget(title)
+        lay.addLayout(row)
+        for w in (self.config_info, self.config_errors, note, self.start_btn, self.start_error):
             lay.addWidget(w)
         lay.addStretch(1)
         self.stack.addWidget(start)
@@ -139,24 +156,81 @@ class ScopeTab(QWidget):
         self.run_page = run
         self.stack.addWidget(run)
 
+        self._last_tab_state = ""
+        self.reload_configs(select=s.get("default_config"))
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(POLL_MS)
-        self._last_tab_state = ""
+
+    # --- config selection ---------------------------------------------------------------------
+    def reload_configs(self, *, select: str | None = None) -> None:
+        """Re-read the config folder; keep the current choice (or `select`) if still there."""
+        if self.session is not None and self.session.state != STOPPED:
+            return
+        keep = select or (self.scope_config.name if self.scope_config else None)
+        self.configs, errors = list_scope_configs(self.config_dir, self.mode)
+        self.config_combo.blockSignals(True)
+        self.config_combo.clear()
+        for c in self.configs:
+            self.config_combo.addItem(f"{c.title}   ({c.name})", c.name)
+        idx = self.config_combo.findData(keep) if keep else -1
+        self.config_combo.setCurrentIndex(max(idx, 0) if self.configs else -1)
+        self.config_combo.blockSignals(False)
+        if errors:
+            self.config_errors.setText("Not usable (fix the file, then ↺):<br>"
+                                       + "<br>".join(errors))
+        self.config_errors.setVisible(bool(errors))
+        self._on_config_selected()
+
+    def _on_config_selected(self, *_: Any) -> None:
+        name = self.config_combo.currentData()
+        self.scope_config = next((c for c in self.configs if c.name == name), None)
+        sc = self.scope_config
+        if sc is None:
+            self.session = None
+            self.config_info.setText(
+                f"<span style='color:#c62828'>No {self.mode} config file in "
+                f"{self.config_dir}.</span>")
+        else:
+            self.session = PicoSession(self.cfg.key, sc.settings(), self.oplog, sim=self.sim,
+                                       base_dir=self.base_dir)
+            self.config_info.setText(self._describe(sc, self.session))
+        self.start_error.hide()
         self._refresh()
+
+    @staticmethod
+    def _describe(sc: ScopeConfig, s: PicoSession) -> str:
+        scopes = "<br>".join(
+            f"• <b>{name}</b>: PicoScope {d.get('model')} {d.get('serial')}, channels "
+            + ", ".join(f"{c} = {n}" for c, n in zip(d["channels"], d["channel_name"], strict=True))
+            + f", trigger {d.get('trigger_channel')}"
+            + f"  →  files <b>{d.get('output_name')}_…</b>"
+            for name, d in sc.digitizers.items())
+        if sc.mode == "continuous":
+            mode = "continuous monitor: trend of the pulse area + averaged waveforms"
+        else:
+            d = next(iter(sc.digitizers.values()))
+            mode = (f"snapshot: averaged waveform and pulse area of channel "
+                    f"{d.get('snapshot_channel')} (mean of {d.get('refresh_trigger_cnt')} "
+                    "triggers), Freeze / Save")
+        paths = ", ".join(sorted({s.data_path(c) for c in s.configs.values()}))
+        return f"{scopes}<br>Mode: {mode}<br>Data is saved to <b>{paths}</b>."
 
     # --- actions ------------------------------------------------------------------------------
     def start(self) -> None:
-        if self.session.state != STOPPED:
+        s = self.session
+        if s is None or s.state != STOPPED:
             return
         self.start_error.hide()
         self.error_label.hide()
         self._make_view()
-        self.session.start()
+        s.start()
         self.stack.setCurrentWidget(self.run_page)
         self._refresh()
 
     def toggle_pause(self) -> None:
+        if self.session is None:
+            return
         if self.session.state == PAUSED:
             self.session.resume()
         else:
@@ -164,19 +238,22 @@ class ScopeTab(QWidget):
         self._refresh()
 
     def stop(self) -> None:
-        self.session.stop()
+        if self.session is not None:
+            self.session.stop()
         self._refresh()
 
     @property
     def running(self) -> bool:
-        return self.session.state != STOPPED
+        return self.session is not None and self.session.state != STOPPED
 
     def shutdown(self) -> None:
         self.timer.stop()
-        self.session.shutdown()
+        if self.session is not None:
+            self.session.shutdown()
 
     def _make_view(self) -> None:
         s = self.session
+        assert s is not None
         if s.mode == "snapshot":
             name, dcfg = next(iter(s.configs.items()))
             view: Any = SnapshotView(
@@ -200,56 +277,65 @@ class ScopeTab(QWidget):
 
     # --- polling ------------------------------------------------------------------------------
     def poll(self) -> None:
+        if self.session is None:
+            return
         items = self.session.poll()
         if items and self.view is not None:
             self.view.show_items(items)
         self._refresh()
 
     def _errors_html(self) -> str:
+        assert self.session is not None
         return "<br>".join(f"{name} stopped with an error: {msg}"
                            for name, msg in self.session.errors.items())
 
     def _refresh(self) -> None:
         s = self.session
-        if s.state == STOPPED and self.stack.currentWidget() is self.run_page:
+        state = s.state if s is not None else STOPPED
+        if state == STOPPED and self.stack.currentWidget() is self.run_page:
             # stopped (by Stop, or every scope failed): back to the start page
             self._drop_view()
             self.stack.setCurrentIndex(0)
-            if s.errors:
+            if s is not None and s.errors:
                 self.start_error.setText(self._errors_html())
                 self.start_error.show()
 
-        text, color = STATE_TEXT[s.state]
+        text, color = STATE_TEXT[state]
         self.state_label.setText(f"<b style='color:{color}; font-size:13pt'>●</b> "
-                                 f"<b style='font-size:13pt'>{text}</b>")
-        self.start_btn.setEnabled(s.state == STOPPED)
-        self.pause_btn.setEnabled(s.state in (RUNNING, PAUSED, STARTING))
-        self.pause_btn.setText("▶  Resume" if s.state == PAUSED else "⏸  Pause")
-        self.stop_btn.setEnabled(s.state in (RUNNING, PAUSED, STARTING))
+                                 f"<b style='font-size:13pt'>{text}</b>"
+                                 + (f"  <span style='color:{GREY}'>— {self.scope_config.title} "
+                                    f"({self.scope_config.name})</span>"
+                                    if self.scope_config else ""))
+        self.start_btn.setEnabled(s is not None and state == STOPPED)
+        self.config_combo.setEnabled(state == STOPPED)
+        self.reload_btn.setEnabled(state == STOPPED)
+        self.pause_btn.setEnabled(state in (RUNNING, PAUSED, STARTING))
+        self.pause_btn.setText("▶  Resume" if state == PAUSED else "⏸  Pause")
+        self.stop_btn.setEnabled(state in (RUNNING, PAUSED, STARTING))
 
-        lines = []
-        for name, dcfg in s.configs.items():
-            st = s.states.get(name, STOPPED) if s.digitizers else STOPPED
-            part = (f"<b>{name}</b> ({dcfg.get('model')} {dcfg.get('serial')}, "
-                    f"{', '.join(dcfg['channel_name'])}): {st}")
-            if name in s.rates and st == RUNNING:
-                part += f", {s.rates[name]:.1f} triggers/s"
-            if name in s.warnings:
-                part += f" <span style='color:{ORANGE}'><b>⚠ {s.warnings[name]}</b></span>"
-            lines.append(part)
-        paths = sorted({s.data_path(c) for c in s.configs.values()})
-        lines.append("Data: " + ", ".join(paths))
-        self.detail_label.setText("<br>".join(lines))
+        if s is not None:
+            lines = []
+            for name, dcfg in s.configs.items():
+                st = s.states.get(name, STOPPED) if s.digitizers else STOPPED
+                part = (f"<b>{name}</b> ({dcfg.get('model')} {dcfg.get('serial')}, "
+                        f"{', '.join(dcfg['channel_name'])}): {st}")
+                if name in s.rates and st == RUNNING:
+                    part += f", {s.rates[name]:.1f} triggers/s"
+                if name in s.warnings:
+                    part += f" <span style='color:{ORANGE}'><b>⚠ {s.warnings[name]}</b></span>"
+                lines.append(part)
+            paths = sorted({s.data_path(c) for c in s.configs.values()})
+            lines.append("Data: " + ", ".join(paths))
+            self.detail_label.setText("<br>".join(lines))
+            if s.errors and state != STOPPED:
+                self.error_label.setText(self._errors_html())
+                self.error_label.show()
 
-        if s.errors and s.state != STOPPED:
-            self.error_label.setText(self._errors_html())
-            self.error_label.show()
-
-        if s.errors:
+        if s is not None and s.errors:
             tab = "error"
-        elif s.state == RUNNING:
+        elif state == RUNNING:
             tab = "ok"
-        elif s.state in (STARTING, STOPPING, PAUSED):
+        elif state in (STARTING, STOPPING, PAUSED):
             tab = "busy"
         else:
             tab = "off"

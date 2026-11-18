@@ -1,0 +1,23 @@
+# PicoScope config, converted from the old H2LaserDAQ config/config_H2PD_260628.py (2026-11-18).
+# Keys as in the old DIGITIZER_CONFIGS; see config/devices.toml for their meaning.
+# data_path: relative to the program folder (old 'data' -> 'data/picoscope').
+title = "H2 VUV Photodiode - Jun. 28, 2026"
+mode = "snapshot"  # continuous | snapshot
+
+[digitizers.H2PD]
+model = "2204A"
+serial = "12017/0366"
+snapshot_channel = "A"
+refresh_trigger_cnt = 100
+channels = ["A", "B"]
+channel_name = ["Sig", "Trig"]
+voltage_range = { A = "50MV", B = "2V" }
+timebase = 1
+sample_number = 1000
+trigger_channel = "B"
+trigger_level = 1000
+pre_trigger = 10
+trigger_edge = "RISING"
+auto_trigger = 1000
+output_name = "H2PD_2026A"
+data_path = "data/picoscope"
