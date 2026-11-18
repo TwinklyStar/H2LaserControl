@@ -372,6 +372,14 @@
   `resolve_port` cannot find hitmv/ell14 by serial. ELL14 answers on COM6. **HIT-MV on COM5
   does not answer** read-only `?:N`, `?:V`, `Q:` (CTS active). Only read-only queries were
   sent; nothing moved. To check: HIT-MV controller power / RS-232 cable after re-cabling.
+  Timeline: HIT-MV answered every poll 17:21–17:33 (GUI); nothing talked to it 17:33–19:15;
+  first contact after the 18:27 re-cabling failed → started with the re-cabling.
+- **User: the HIT-MV controller had power problems; rebooted.** HIT-MV adapter re-plugged too:
+  back as COM4 with serial DU0DFFMCA (found by serial again). ELL14 adapter still COM6 without
+  serial. *Hardware (read-only):* controller answers; **position counters reset to 0,0** (were
+  30000000 / 0); speeds back to defaults; axis 0 Q:S bit 4. See docs/protocols.md. The
+  photodiode now reads INSERTED while it is (last known) retracted: its Retract would drive
+  +60 mm into the limit → must be homed (H:) first, with the user's OK. Motor test still open.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

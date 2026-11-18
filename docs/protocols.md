@@ -64,6 +64,25 @@ does not match the actual stage pitch. Always command in controller units; conve
 
 `Q:S` slave status bits: 0 −LS, 1 +LS, 2 ORG, 3 Near, 4 Z-limit, 5 Scale alarm, 6 DRV alarm.
 
+### After a controller power cycle ✅ (hardware, 2026-11-18, read-only queries)
+The controller had a power problem and was rebooted by the user (~19:30). Before: last moves in
+the op log left photodiode (axis 0) at 30000000 = retracted and mirror (axis 1) at 0 = inserted
+(insert at 14:42); program log 17:21 `Q:` → `30000000,0`. After the reboot:
+| Query | Reply | Meaning |
+|---|---|---|
+| `?:N` / `?:V` / `?:Z` | `HIT-MV` / `V1.20-001` / `1` | unchanged, HIT mode |
+| `Q:` | `0,0,,,,,,` | **both position counters reset to 0** — not the physical positions |
+| `!:` | `0,0,,,,,,` | ready |
+| `Q:S` | `00,10,00,,,,,,` | axis 0: bit 4 (Z-limit) set; no alarm bits; axis 1: 00 |
+| `?:B0` / `?:B1` | `50000,500000,200,250000` | homing speed back to the controller default |
+| `?:D0` / `?:D1` | `10000,100000,200` | drive speed back to the default (was set by D: before) |
+⇒ After a power cut the counters say 0 ("INSERTED") whatever the real position. A relative
+retract (`M:+30000000`) from a stage that is physically retracted would drive 60 mm further
+out into the limit. Only homing (`H:`) makes the counter valid again. No counter-preset command
+is documented. Speeds: our driver sends `B:`/`D:` before every move, so the defaults do not
+matter. While the controller was failing (18:27–19:15), it did not answer `?:N`, `?:V`, `Q:`
+at all (CTS active).
+
 ### Read-only probe of our unit ✅ (2026-11-16, `tools/probe_readonly.py`)
 | Query | Reply | Meaning |
 |---|---|---|
