@@ -224,12 +224,18 @@ class ScopeTab(QWidget):
             + f"  →  files <b>{d.get('output_name')}_…</b>"
             for name, d in sc.digitizers.items())
         if sc.mode == "continuous":
-            mode = "continuous monitor: trend of the pulse area + averaged waveforms"
+            mode = ("continuous monitor: trend of the pulse area of each channel (last 10 min … "
+                    "14 days, older points from the CSV files) + waveforms averaged over 100 "
+                    "triggers. The trigger channel is saved but not plotted.")
         else:
             d = next(iter(sc.digitizers.values()))
-            mode = (f"snapshot: averaged waveform and pulse area of channel "
-                    f"{d.get('snapshot_channel')} (mean of {d.get('refresh_trigger_cnt')} "
-                    "triggers), Freeze / Save")
+            sig = dict(zip(d["channels"], d["channel_name"], strict=True)).get(
+                d.get("snapshot_channel"), d.get("snapshot_channel"))
+            mode = ("snapshot, like an oscilloscope: average of the last N waveforms "
+                    f"(starts at N = {default_n(d.get('refresh_trigger_cnt'))}; ▲ / ▼ for 1 … "
+                    "1024 or ∞), redrawn with every trigger; offset, area, std, N and stderr "
+                    f"of channel {d.get('snapshot_channel')} ({sig}); Clear / Freeze / Save. "
+                    "The trigger channel is saved but not plotted.")
         paths = ", ".join(sorted({s.data_path(c) for c in s.configs.values()}))
         return f"{scopes}<br>Mode: {mode}<br>Data is saved to <b>{paths}</b>."
 
