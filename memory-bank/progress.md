@@ -477,6 +477,12 @@
   neutral greys (window #282828, fields/plots #1e1e1e, buttons #3c3c3c, text #e5e5e5) and
   Apple's dark-mode system colours (green #30d158, orange #ff9f0a, red #ff453a, blue #0a84ff;
   channels in the same order as the light theme). Light theme unchanged.
+- **Light theme in Apple colours too (user):** plot curves = Apple's standard light system
+  colours (blue #007aff, green #34c759, orange #ff9500, red #ff3b30, …); status text and dots =
+  Apple's increased-contrast versions (green #248a3d, red #d70015, blue #0040dd), because the
+  standard green/orange are ~2:1 on white. Orange #c45c00 instead of Apple's #c93400, which
+  looks red next to the error red (INSERTED must not read as an error). Selection/links
+  #007aff. Checked by screenshots.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

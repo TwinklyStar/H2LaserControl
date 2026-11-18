@@ -45,14 +45,20 @@ class Colors:
     CH: tuple[str, ...]  # channel colours, cycled
 
 
+# Apple light mode (user 2026-11-19). Status colours (text and dots) = Apple's "increased
+# contrast" system colours: the standard ones (green #34c759, orange #ff9500) are only ~2:1 on
+# white, too pale for the big state words. Exception: orange. Apple's high-contrast orange
+# (#c93400) looks red next to the error red, so "INSERTED" (attention) could be read as an
+# error; #c45c00 stays clearly orange and readable. Plot curves = the standard system colours.
 LIGHT = Colors(
-    GREEN="#2e7d32", ORANGE="#e65100", BLUE="#1565c0", RED="#c62828", GREY="#757575",
-    ON_RED="#ffffff", STOP_OFF_BG="#e0b4b4", STOP_OFF_FG="#f5f5f5",
-    BORDER="#c8c8c8", SEP="#dddddd", ERROR_BG="#fdecea", ERROR_BORDER="#f5c2c0",
-    SIM_BG="#fff3cd", SIM_FG="#7a5b00", SIM_BORDER="#e6d28f",
-    PLOT_BG="#ffffff", PLOT_FG="#212121", SURF="#e6e6e6", GRID="#c8c8c8", MATH="#8d6e00",
+    GREEN="#248a3d", ORANGE="#c45c00", BLUE="#0040dd", RED="#d70015", GREY="#6e6e73",
+    ON_RED="#ffffff", STOP_OFF_BG="#f0b3b8", STOP_OFF_FG="#fbeff0",
+    BORDER="#d1d1d6", SEP="#e5e5ea", ERROR_BG="#fdecec", ERROR_BORDER="#f6c4c6",
+    SIM_BG="#fff4d1", SIM_FG="#7a5600", SIM_BORDER="#ecd58f",
+    PLOT_BG="#ffffff", PLOT_FG="#1d1d1f", SURF="#e8e8ed", GRID="#d1d1d6", MATH="#a05a00",
     STATS_FILL=(255, 255, 255, 225),
-    CH=("#1565c0", "#2e7d32", "#e65100", "#c62828", "#6a1b9a", "#00838f", "#6d4c41", "#ad1457"),
+    # blue, green, orange, red, purple, cyan, brown, pink (same order as DARK)
+    CH=("#007aff", "#34c759", "#ff9500", "#ff3b30", "#af52de", "#32ade6", "#a2845e", "#ff2d55"),
 )
 
 # macOS dark mode: neutral greys + Apple's dark-mode system colours
@@ -164,6 +170,18 @@ def dark_palette() -> QPalette:
     return p
 
 
+def light_palette(app) -> QPalette:
+    """Fusion's light palette with Apple's blue for selection and links."""
+    p = app.style().standardPalette()
+    for role, col in ((QPalette.ColorRole.Highlight, "#007aff"),
+                      (QPalette.ColorRole.HighlightedText, "#ffffff"),
+                      (QPalette.ColorRole.Link, "#007aff"),
+                      (QPalette.ColorRole.LinkVisited, "#af52de")):
+        p.setColor(QPalette.ColorGroup.Active, role, QColor(col))
+        p.setColor(QPalette.ColorGroup.Inactive, role, QColor(col))
+    return p
+
+
 def system_is_dark() -> bool:
     return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
 
@@ -175,7 +193,7 @@ def apply_theme(app, dark: bool | None = None) -> None:
     for f in fields(Colors):
         setattr(C, f.name, getattr(src, f.name))
     theme.dark = dark
-    app.setPalette(dark_palette() if dark else app.style().standardPalette())
+    app.setPalette(dark_palette() if dark else light_palette(app))
     app.setStyleSheet(style_sheet())
     theme.changed.emit()
 

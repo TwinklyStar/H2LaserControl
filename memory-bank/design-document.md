@@ -143,7 +143,7 @@ is where every command passes through.
   sub-tabs inside them.
 - **Dark theme (user, 2026-11-19):** the whole program follows the Windows light/dark setting,
   also when it is switched while the program runs. Dark colours: ordinary neutral dark like
-  macOS (user: not the old Digitizer DAQ's purple-blue).
+  macOS (user: not the old Digitizer DAQ's purple-blue). Both themes use Apple's colours.
 - **Window opens at 4:3** (user, 2026-11-19), as large as fits the screen.
 
 ### Non-functional

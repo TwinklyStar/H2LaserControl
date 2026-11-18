@@ -79,14 +79,16 @@ def test_dark_theme_switch_while_connected(window, themes):
 
 
 def test_group_tab_shows_error_of_hidden_device(window):
+    from h2lasercontrol.gui.style import C
+
     window.tabs.setCurrentIndex(1)  # DAQ shown, Control hidden
     window._set_sub_state("Control", 1, "error")
     assert window._sub_states["Control"][1] == "error"
     icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
-    assert icon.pixelColor(6, 6).name() == "#c62828"  # red dot on the Control tab
+    assert icon.pixelColor(6, 6).name() == C.RED  # red dot on the Control tab
     window._set_sub_state("Control", 1, "ok")
     icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
-    assert icon.pixelColor(6, 6).name() != "#c62828"
+    assert icon.pixelColor(6, 6).name() != C.RED
 
 
 def test_flip_mount_retract_and_insert(window, qtbot):
