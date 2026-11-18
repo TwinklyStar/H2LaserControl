@@ -581,6 +581,18 @@ Findings:
   since nothing was saved) until a permanent fix is chosen. Ended at position 2 (insert).
   Our driver reports a bounced flip as a failure ("did not reach … Is it blocked?"), never as
   success.
+- **After the user changed DIG IO 2 in Kinesis (≈13:28) ✅ checked 13:3x:** unit still reads
+  DigIO2 = (2 input-goto, 2 logic edge) and **still bounces** (same trace). Reason: Kinesis
+  stored the change **on the PC, not in the device**:
+  `C:\ProgramData\Thorlabs\MotionControl\ThorlabsSettingsOverrides.xml` →
+  `<DeviceSettingsList SerialNumber="37006391"><DeviceSettingsDefinition Name="FilterFlipper">
+  <Settings><Dig_IO_2_OperMode>1</Dig_IO_2_OperMode><Dig_IO_2_SignalMode>1</Dig_IO_2_SignalMode>`.
+  Kinesis applies these overrides when *it* connects; other programs (ours) see the device's own
+  setting. (The same Kinesis config lists three PDXC2 piezo stages on this PC — serials
+  112503750 "355", 112525449 "122", 112516029 "Diagnostics !!! NO LARGER THAN 3mm !!!" — not
+  in our scope.)
+  → To store it in the device: Kinesis Settings with "Persist settings to the device" (EEPROM),
+  or our driver sets it at connect (RAM). ⏳ decide.
 
 ### USB set-up (p. 33) 📖
 Thorlabs software does, per device: `FT_SetBaudRate 115200` → `FT_SetDataCharacteristics 8N1`
