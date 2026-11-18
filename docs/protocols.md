@@ -479,7 +479,7 @@ description says "1.TODO"). ⏳ decide with the user; verify on hardware.
 
 ---
 
-## Thorlabs MFF101/M (×2, not installed yet) — flip mount
+## Thorlabs MFF101/M (×2) — flip mount
 
 Source: `ref/Kinesis_apt_communications_protocol.pdf` = Thorlabs *Motion Controllers
 Host-Controller Communications Protocol*, **Issue 48, DOC-103274, 10 Aug 2026** (494 pp.;
@@ -532,6 +532,56 @@ Findings:
 5. **No MOVE_COMPLETED (0x0464)** or any other unsolicited message was received → poll.
 6. Unit 37011815: **position 2 = "insert" (current state), position 1 = "retract"** (user).
 
+### Unit 2 ✅ (2026-11-18, user-connected, **6 m USB cable**)
+- Windows device list: second "APT USB Device", USB serial **`37006391`**.
+- Probe: HW_GET_INFO serial 37006391, model "MFF002", type 16, firmware 1.0.3, "APT Filter
+  Flipper", hw 2, mod state 0, channels 1 — same as unit 1. (Bytes 66–77 differ between units:
+  unit 2 has "141201Dec…" there — undocumented, ignore.) Status `2a 04 06 00 81 50 01 00 02 00 00
+  90` = at **position 2**.
+- **Roles (user):** unit 1 (37011815) = **355 nm blocker**, unit 2 (37006391) = **820 nm
+  blocker**. Unit 2 insert position = same as unit 1 → **position 2 = insert** (blocking),
+  position 1 = retract. Unit 2 not on the optical path yet → free to test (user).
+- **Link stability test, read-only** (`tools/mff_link_test.py`, 12:42, our GUI running but not
+  using this unit): 2000 status queries back to back → 2000 OK, 0 timeouts, 0 wrong, 0 stray
+  bytes; latency median 16.0 ms, max 19.4 ms (≈ FTDI 16 ms latency timer, not the cable).
+  500 info queries (90 B) → all byte-identical, 22 ms. 50 open→info→close cycles → 50/50 OK,
+  open ≈ 120 ms. Log: `captures/mff2_link_test_2026-11-18_burst.txt`.
+- **Soak test, read-only** (12:43–13:13, one status query every 0.2 s): **8665/8665 OK**, 0
+  timeouts/wrong/stray, latency median 7.4 ms, max 15.4 ms. → **The 6 m cable link is stable.**
+- **Flip test** (13:13, 20 flips with status polled back to back): link still perfect during
+  motion (**2804/2804 status replies OK**, max 17 ms). **But 10 of 20 flips to position 1 did
+  not stay there.** Trace (scratchpad `flip_trace.py`, every change of the status word):
+  ```
+  start 0x90000002                    at position 2
+  JOG 1  +0.016 0x90000012  +0.080 0x90000010  +0.383 0x90000011   ← reaches position 1 …
+         +0.479 0x90000010  +0.767 0x90000012  +0.799 0x90000002   ← … and goes BACK to 2
+  JOG 2  no change (already at 2)
+  (identical on a second try)
+  ```
+  Unit 1 never did this (it stays at position 1, see the flip test above).
+- **MFF_OPERPARAMS of unit 2** (read-only, 13:16):
+  `12 05 22 00 81 50 01 00 f4 01 00 00 fc 01 00 00 01 00 01 00 c8 00 00 00 02 00 02 00 c8 00 00 00
+  48 4a 00 00 ee 0e ab ff` → transit 500 ms, ADC 508, DigIO1 = (1 input-toggle, 1 button,
+  200 ms) as unit 1, **DigIO2 = (2 input-goto, 2 logic edge, 200 ms)**. Unit 1's DigIO2 =
+  (3 output-at-position, 0x10 level).
+  **Data length is 34 bytes (len 0x22), not 26 + 6: the last 8 bytes are padding whose content
+  changes from read to read** (`48 4a 00 00 ee 0e ab ff`, then `00 00 ec 0e ab ff ab ff`, …) →
+  compare only the first 26 bytes.
+- Nothing is plugged into unit 2's DIG IO connectors (user, 2026-11-18).
+- **DigIO2 test ✅** (13:22–13:23, user-approved; `captures/mff2_digio_test_2026-11-18.txt`):
+  `MOT_SET_MFF_OPERPARAMS` (0x0510, RAM only, **no EEPROM save**) with DigIO2 = (3
+  output-at-position, 0x10 level, 200 ms), rest unchanged:
+  `10 05 20 00 d0 01 01 00 f4 01 00 00 fc 01 00 00 01 00 01 00 c8 00 00 00 03 00 10 00 c8 00 00 00
+  00 00 00 00 00 00` (sent with len 32 by mistake; accepted, read-back shows the new values).
+  Then **20/20 flips ended at the target**, e.g. `JOG 1: +0.016 12 | +0.080 10 | +0.384 11 |
+  +0.416 01`, `JOG 2: … +0.400 02`. → **Cause confirmed: DigIO2 "input-goto" with nothing wired
+  sends the mount back to position 2.**
+  Restored afterwards (original 34 bytes sent, len 0x22); read-back of the first 26 bytes =
+  original. **So unit 2 is back in its faulty original setting** (also after a power cycle,
+  since nothing was saved) until a permanent fix is chosen. Ended at position 2 (insert).
+  Our driver reports a bounced flip as a failure ("did not reach … Is it blocked?"), never as
+  success.
+
 ### USB set-up (p. 33) 📖
 Thorlabs software does, per device: `FT_SetBaudRate 115200` → `FT_SetDataCharacteristics 8N1`
 → sleep 50 ms → `FT_Purge(RX|TX)` → sleep 50 ms → `FT_ResetDevice` → `FT_SetFlowControl
@@ -563,7 +613,8 @@ limit, 0x10/0x20 moving fwd/rev, 0x40/0x80 jogging fwd/rev, 0x100 motor connecte
 MFF_OPERPARAMS (p. 204): chan u16, transit time ms i32 (**300–2800 ms**), transit time ADC i32
 (= 10⁷ × t^−1.591), DigIO1/2: oper mode u16 (1 input-toggle, 2 input-goto, 3 output-at-position,
 4 output-in-motion), signal mode u16 (1 button, 2 logic edge, 4 swap, 0x10 level output, 0x20
-pulse output, 0x40 inverted), pulse width i32 (10–200 ms), 6 unused bytes. Manual example (SET
+pulse output, 0x40 inverted), pulse width i32 (10–200 ms), 6 unused bytes (✅ our units: 8
+padding bytes, len 0x22 = 34; content changes between reads). Manual example (SET
 500 ms): `10 05 22 00 D0 01 01 00 F4 01 00 00 FC 01 00 00 01 00 01 00 C8 00 00 00 01 00 01 00
 C8 00 00 00 00 00 00 00 00 00 00 00`. The back-panel DIG IO connectors can flip the mount on
 their own — ⏳ ask whether anything is wired to them.
@@ -584,5 +635,5 @@ _discard_input` (same Transport ABC).
 
 ### Still to verify ⏳
 1. ~~Info, status bits, jog ↔ position, timing, MOVE_COMPLETED~~ ✅ done above (unit 37011815).
-2. Second unit (connected tomorrow, user): serial, position ↔ name.
+2. ~~Second unit: serial, position ↔ name~~ ✅ 37006391, 820 nm blocker, position 2 = insert.
 3. Behaviour when a flip is blocked mechanically (expect: no limit bit → timeout → error).

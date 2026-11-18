@@ -221,7 +221,22 @@
     Notes: `logs/` and `captures/` are git-ignored, so copy the folder, not only git; re-run
     `pip install -e ".[dev]"` on the new PC; flip mounts need `ftd2xx.dll` (FTDI CDM or Kinesis).
 
+### 2026-11-18
+- **Second flip mount connected (6 m USB cable): serial 37006391**, MFF002 fw 1.0.3. Roles (user):
+  unit 1 37011815 = **355 nm blocker**, unit 2 37006391 = **820 nm blocker**, both position 2 =
+  insert. Unit 2 not on the optical path yet → free to test (user).
+- **Link stability (new `tools/mff_link_test.py`): stable.** Burst 2500 queries + 50 reopen
+  cycles, 30-min soak 8665 queries, 2804 queries during 20 flips — all OK, 0 errors, ≤ 19 ms.
+- **Unit 2 problem found and explained:** after "go to position 1" it reached position 1 and
+  went back to 2 by itself. Cause: its **DIG IO 2 is configured as "input-goto"** (unit 1:
+  output); nothing is wired (user). With DigIO2 set like unit 1 (RAM only, user-approved):
+  20/20 flips OK. Original setting restored after the test → **unit 2 still bounces** until a
+  permanent fix is chosen. Details in protocols.md § MFF101 Unit 2.
+
 ## Open questions
+- **Unit 2 DIG IO fix (decide):** (a) save DigIO2 = output once with Kinesis (Settings → persist
+  to device), or (b) our driver checks MFF_OPERPARAMS at connect and sets DIG IO inputs it does
+  not expect (RAM only, logged), or both. Config for unit 2 is added after this.
 - MFF101 second unit: serial and position ↔ name (tomorrow). What does each flip mount do in
   the beam path (for Phase 3 interlock rules with the feedthroughs)?
 - DG645 (before coding): which channel (A–H), and its reference (T0 or another channel)? Typical
