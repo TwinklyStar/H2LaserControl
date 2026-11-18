@@ -2,7 +2,8 @@
 
 Light and dark theme (user 2026-11-19): the program follows the Windows setting (Settings →
 Personalization → Colors → "Choose your mode") and switches while it runs. The dark colours
-are the old H2LaserDAQ monitor's (Catppuccin Mocha). Code reads colours from `C` at the moment
+are neutral greys with the macOS dark-mode system colours (user 2026-11-19: not the old
+H2LaserDAQ purple-blue). Code reads colours from `C` at the moment
 it draws (`C.GREEN`, not a copied constant), and widgets that draw with fixed colours connect
 to `theme.changed` to redraw.
 """
@@ -54,19 +55,24 @@ LIGHT = Colors(
     CH=("#1565c0", "#2e7d32", "#e65100", "#c62828", "#6a1b9a", "#00838f", "#6d4c41", "#ad1457"),
 )
 
-# Catppuccin Mocha, as in the old H2LaserDAQ monitor windows
-_BASE, _MANTLE, _CRUST = "#1e1e2e", "#181825", "#11111b"
-_SURFACE0, _SURFACE1, _SURFACE2 = "#313244", "#45475a", "#585b70"
-_TEXT, _SUBTEXT0, _OVERLAY1 = "#cdd6f4", "#a6adc8", "#7f849c"
+# macOS dark mode: neutral greys + Apple's dark-mode system colours
+_WINDOW = "#282828"  # window background
+_FIELD = "#1e1e1e"  # text fields, tables, plot background
+_ALT = "#252525"  # alternating table rows
+_CONTROL = "#3c3c3c"  # buttons
+_LINE = "#3d3d3d"  # borders, separators
+_TEXT, _TEXT2, _TEXT3 = "#e5e5e5", "#98989d", "#6e6e73"  # label, secondary, disabled
+_ACCENT = "#0a84ff"  # systemBlue (selection, links)
 
 DARK = Colors(
-    GREEN="#a6e3a1", ORANGE="#fab387", BLUE="#89b4fa", RED="#f38ba8", GREY="#9399b2",
-    ON_RED=_BASE, STOP_OFF_BG="#5b3f4f", STOP_OFF_FG="#9399b2",
-    BORDER=_SURFACE1, SEP=_SURFACE1, ERROR_BG="#3a2433", ERROR_BORDER="#6e3a50",
-    SIM_BG="#3a3424", SIM_FG="#f9e2af", SIM_BORDER="#6b5d36",
-    PLOT_BG=_BASE, PLOT_FG=_TEXT, SURF=_SURFACE0, GRID=_SURFACE1, MATH="#f9e2af",
-    STATS_FILL=(30, 30, 46, 225),
-    CH=("#a6e3a1", "#89b4fa", "#fab387", "#f38ba8", "#cba6f7", "#89dceb", "#f9e2af", "#94e2d5"),
+    GREEN="#30d158", ORANGE="#ff9f0a", BLUE=_ACCENT, RED="#ff453a", GREY=_TEXT2,
+    ON_RED="#ffffff", STOP_OFF_BG="#4a2e2c", STOP_OFF_FG=_TEXT3,
+    BORDER=_LINE, SEP=_LINE, ERROR_BG="#3b2220", ERROR_BORDER="#6b2f2a",
+    SIM_BG="#3a3320", SIM_FG="#ffd60a", SIM_BORDER="#6b5a1e",
+    PLOT_BG=_FIELD, PLOT_FG=_TEXT, SURF="#323232", GRID="#464646", MATH="#ffd60a",
+    STATS_FILL=(30, 30, 30, 225),
+    # same order as LIGHT: blue, green, orange, red, purple, cyan, brown, pink
+    CH=(_ACCENT, "#30d158", "#ff9f0a", "#ff453a", "#bf5af2", "#64d2ff", "#ac8e68", "#ff375f"),
 )
 
 C = replace(LIGHT)  # the current colours (changed in place by apply_theme)
@@ -132,29 +138,29 @@ QLabel[role="sim"] {{ background: {c.SIM_BG}; color: {c.SIM_FG}; font-weight: bo
 def dark_palette() -> QPalette:
     p = QPalette()
     roles = {
-        QPalette.ColorRole.Window: _BASE, QPalette.ColorRole.WindowText: _TEXT,
-        QPalette.ColorRole.Base: _MANTLE, QPalette.ColorRole.AlternateBase: _SURFACE0,
-        QPalette.ColorRole.Text: _TEXT, QPalette.ColorRole.Button: _SURFACE0,
-        QPalette.ColorRole.ButtonText: _TEXT, QPalette.ColorRole.BrightText: "#f38ba8",
-        QPalette.ColorRole.Highlight: "#89b4fa", QPalette.ColorRole.HighlightedText: _BASE,
-        QPalette.ColorRole.ToolTipBase: _SURFACE0, QPalette.ColorRole.ToolTipText: _TEXT,
-        QPalette.ColorRole.Link: "#89b4fa", QPalette.ColorRole.LinkVisited: "#cba6f7",
-        QPalette.ColorRole.PlaceholderText: _OVERLAY1,
+        QPalette.ColorRole.Window: _WINDOW, QPalette.ColorRole.WindowText: _TEXT,
+        QPalette.ColorRole.Base: _FIELD, QPalette.ColorRole.AlternateBase: _ALT,
+        QPalette.ColorRole.Text: _TEXT, QPalette.ColorRole.Button: _CONTROL,
+        QPalette.ColorRole.ButtonText: _TEXT, QPalette.ColorRole.BrightText: "#ff453a",
+        QPalette.ColorRole.Highlight: _ACCENT, QPalette.ColorRole.HighlightedText: "#ffffff",
+        QPalette.ColorRole.ToolTipBase: _CONTROL, QPalette.ColorRole.ToolTipText: _TEXT,
+        QPalette.ColorRole.Link: _ACCENT, QPalette.ColorRole.LinkVisited: "#bf5af2",
+        QPalette.ColorRole.PlaceholderText: _TEXT3,
         # Fusion draws bevels and frames from these
-        QPalette.ColorRole.Light: _SURFACE2, QPalette.ColorRole.Midlight: _SURFACE1,
-        QPalette.ColorRole.Mid: _SURFACE0, QPalette.ColorRole.Dark: _CRUST,
-        QPalette.ColorRole.Shadow: "#0a0a12",
+        QPalette.ColorRole.Light: "#565656", QPalette.ColorRole.Midlight: "#474747",
+        QPalette.ColorRole.Mid: "#333333", QPalette.ColorRole.Dark: "#141414",
+        QPalette.ColorRole.Shadow: "#000000",
     }
     for role, col in roles.items():
         p.setColor(role, QColor(col))
     disabled = QPalette.ColorGroup.Disabled
     for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
                  QPalette.ColorRole.ButtonText):
-        p.setColor(disabled, role, QColor("#6c7086"))
-    p.setColor(disabled, QPalette.ColorRole.Button, QColor("#26263a"))
-    p.setColor(disabled, QPalette.ColorRole.Base, QColor(_BASE))
-    p.setColor(disabled, QPalette.ColorRole.Highlight, QColor(_SURFACE1))
-    p.setColor(disabled, QPalette.ColorRole.HighlightedText, QColor(_SUBTEXT0))
+        p.setColor(disabled, role, QColor(_TEXT3))
+    p.setColor(disabled, QPalette.ColorRole.Button, QColor("#303030"))
+    p.setColor(disabled, QPalette.ColorRole.Base, QColor(_WINDOW))
+    p.setColor(disabled, QPalette.ColorRole.Highlight, QColor(_LINE))
+    p.setColor(disabled, QPalette.ColorRole.HighlightedText, QColor(_TEXT2))
     return p
 
 

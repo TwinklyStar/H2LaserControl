@@ -5,7 +5,7 @@
 They are plain widgets now: the tab feeds them the data items (`show_items`) instead of each
 window polling its own queue. Layout and mouse controls are unchanged (left drag = zoom box,
 right drag = pan, wheel = zoom; +/- step the Y range). Colours follow the program's light / dark
-theme (style.C; dark = the old windows' colours) and switch in place (`apply_theme`).
+theme (style.C) and switch in place (`apply_theme`).
 Changes (user 2026-11-18): trigger channels are not shown (the tab passes only the others; the
 files still contain them); the status row shows each scope's trigger rate instead; the monitor
 trend has a selectable time window (10 min ... 14 days) filled from the daily CSV files.

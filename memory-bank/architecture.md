@@ -92,7 +92,7 @@ logs/             operation logs (git-ignored)
   `PANELS` → Control. Group tab dot = most important sub-tab state (error > busy > ok > off).
   QSettings keys `group`, `subtab/<group>`.
 - **Light / dark theme (2026-11-19), all in `gui/style.py`:** `LIGHT` / `DARK` colour sets
-  (dark = Catppuccin Mocha, the old H2LaserDAQ windows), copied into the live object `C` by
+  (dark = neutral macOS-style greys + Apple dark-mode system colours), copied into the live object `C` by
   `apply_theme`, which also sets the app palette (Fusion standard / `dark_palette()`) and the
   style sheet (`style_sheet()`), then emits `theme.changed`. `follow_system(app)` applies the
   Windows setting at start and on `styleHints().colorSchemeChanged`. Rules for code: read

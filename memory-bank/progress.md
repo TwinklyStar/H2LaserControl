@@ -473,6 +473,10 @@
   320 passed.
 - **Window 4:3 at start (user):** as large as fits (90 % of the free screen height or width),
   centred; on this PC's 1920×1200 screen 1440×1080 (was a fixed 1100×780). 321 passed.
+- **Dark colours changed (user: "don't like this purple-blue", wants ordinary mac-like dark):**
+  neutral greys (window #282828, fields/plots #1e1e1e, buttons #3c3c3c, text #e5e5e5) and
+  Apple's dark-mode system colours (green #30d158, orange #ff9f0a, red #ff453a, blue #0a84ff;
+  channels in the same order as the light theme). Light theme unchanged.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
