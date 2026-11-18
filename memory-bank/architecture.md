@@ -87,6 +87,10 @@ logs/             operation logs (git-ignored)
   a new device type = one new `DevicePanel` subclass; another device of a known type = config
   entry only. Tab title from config `label`; tab icon = status dot (green ok, blue busy, grey
   off, red error). Operation history (today, live, filter by device) below the tabs.
+- **Two levels (2026-11-19):** `MainWindow.tabs` holds the groups `GROUPS = ("Control", "DAQ")`;
+  `MainWindow.sub_tabs[group]` holds the device tabs. Group by type: `DAQ_TABS` → DAQ,
+  `PANELS` → Control. Group tab dot = most important sub-tab state (error > busy > ok > off).
+  QSettings keys `group`, `subtab/<group>`.
 - `DevicePanel` base: header (connection, busy text, STOP, Connect/Disconnect), plain error line,
   `build_body()` / `update_view()` / `on_progress()` hooks. Buttons are enabled only when the
   action makes sense (e.g. Retract only from INSERTED), with tooltips saying why not.

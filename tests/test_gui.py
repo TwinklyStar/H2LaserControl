@@ -45,10 +45,25 @@ def panel(w, key):
     return next(p for p in w.panels if p.cfg.key == key)
 
 
-def test_one_tab_per_device(window):
-    labels = [window.tabs.tabText(i) for i in range(window.tabs.count())]
-    assert labels == ["VUV feedthroughs", "Rotation mount", "Flip mounts",
-                      "Scope monitor", "VUV PD snapshot", "Camera"]
+def test_group_tabs_with_one_sub_tab_per_device(window):
+    def texts(tw):
+        return [tw.tabText(i) for i in range(tw.count())]
+
+    assert texts(window.tabs) == ["Control", "DAQ"]  # user 2026-11-19
+    assert texts(window.sub_tabs["Control"]) == ["VUV feedthroughs", "Rotation mount",
+                                                 "Flip mounts"]
+    assert texts(window.sub_tabs["DAQ"]) == ["Scope monitor", "VUV PD snapshot", "Camera"]
+
+
+def test_group_tab_shows_error_of_hidden_device(window):
+    window.tabs.setCurrentIndex(1)  # DAQ shown, Control hidden
+    window._set_sub_state("Control", 1, "error")
+    assert window._sub_states["Control"][1] == "error"
+    icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
+    assert icon.pixelColor(6, 6).name() == "#c62828"  # red dot on the Control tab
+    window._set_sub_state("Control", 1, "ok")
+    icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
+    assert icon.pixelColor(6, 6).name() != "#c62828"
 
 
 def test_flip_mount_retract_and_insert(window, qtbot):

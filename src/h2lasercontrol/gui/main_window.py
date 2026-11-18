@@ -1,4 +1,5 @@
-"""Main window: browser-style tabs (one per device) above the operation history."""
+"""Main window: two group tabs (Control, DAQ), each with one sub-tab per device, above the
+operation history."""
 
 from __future__ import annotations
 
@@ -27,6 +28,8 @@ from .panels import PANELS, DevicePanel
 from .style import TAB_STATES, dot_icon, set_role
 
 log = logging.getLogger(__name__)
+
+GROUPS = ("Control", "DAQ")  # top-level tabs, in this order
 
 
 class TopBar(QWidget):
@@ -69,8 +72,18 @@ class MainWindow(QMainWindow):
         root.addWidget(top_bar)
         self._set_operator()
 
-        self.tabs = QTabWidget()
+        # two levels (user 2026-11-19): "Control" (motor, rotation mount, flip mounts, later
+        # DG645) and "DAQ" (scopes, camera), each with one sub-tab per device
+        self.tabs = QTabWidget()  # top level: the groups
+        self.tabs.setObjectName("groupTabs")
         self.tabs.setDocumentMode(True)
+        self.sub_tabs: dict[str, QTabWidget] = {}
+        self._sub_states: dict[str, dict[int, str]] = {}
+        for group in GROUPS:
+            sub = QTabWidget()
+            sub.setDocumentMode(True)
+            self.sub_tabs[group] = sub
+            self._sub_states[group] = {}
         self.services: list[DeviceService] = []
         self.panels: list[DevicePanel] = []
         self.daq_tabs: list = []  # PicoScope / camera tabs (F8): own Start/Pause/Stop
@@ -81,10 +94,7 @@ class MainWindow(QMainWindow):
                 label = cfg.settings.get("label", key)
                 labels[key] = label
                 tab = daq_cls(cfg, oplog, sim=sim, base_dir=daq_base_dir or PROGRAM_DIR)
-                index = self.tabs.addTab(tab, label)
-                tab.tab_state_changed.connect(
-                    lambda s, i=index: self.tabs.setTabIcon(i, dot_icon(TAB_STATES[s])))
-                self.tabs.setTabIcon(index, dot_icon(TAB_STATES["off"]))
+                self._add_sub_tab("DAQ", tab, label)
                 self.daq_tabs.append(tab)
                 continue
             panel_cls = PANELS.get(cfg.type)
@@ -94,12 +104,14 @@ class MainWindow(QMainWindow):
             labels[key] = label
             service = DeviceService(cfg, oplog, sim=sim, state_dir=state_dir)
             panel = panel_cls(service, cfg)
-            index = self.tabs.addTab(panel, label)
-            panel.tab_state_changed.connect(
-                lambda s, i=index: self.tabs.setTabIcon(i, dot_icon(TAB_STATES[s])))
+            self._add_sub_tab("Control", panel, label)
             panel._emit_tab_state()
             self.services.append(service)
             self.panels.append(panel)
+        for group, sub in self.sub_tabs.items():
+            if sub.count():  # a group without devices gets no tab
+                self.tabs.addTab(sub, group)
+                self._update_group_icon(group)
 
         self.log_panel = LogPanel(oplog, labels)
         split = QSplitter(Qt.Orientation.Vertical)
@@ -110,9 +122,35 @@ class MainWindow(QMainWindow):
         root.addWidget(split, 1)
         self.setCentralWidget(central)
 
-        last = self.settings.value("tab", 0, int)
+        last = self.settings.value("group", 0, int)
         if 0 <= last < self.tabs.count():
             self.tabs.setCurrentIndex(last)
+        for group, sub in self.sub_tabs.items():
+            last = self.settings.value(f"subtab/{group}", 0, int)
+            if 0 <= last < sub.count():
+                sub.setCurrentIndex(last)
+
+    def _add_sub_tab(self, group: str, widget: QWidget, label: str) -> None:
+        sub = self.sub_tabs[group]
+        index = sub.addTab(widget, label)
+        self._set_sub_state(group, index, "off")
+        widget.tab_state_changed.connect(
+            lambda s, g=group, i=index: self._set_sub_state(g, i, s))
+
+    def _set_sub_state(self, group: str, index: int, state: str) -> None:
+        self.sub_tabs[group].setTabIcon(index, dot_icon(TAB_STATES[state]))
+        self._sub_states[group][index] = state
+        self._update_group_icon(group)
+
+    def _update_group_icon(self, group: str) -> None:
+        """The group tab shows its most important device state: an error anywhere in the group
+        is visible while the other group is shown."""
+        i = self.tabs.indexOf(self.sub_tabs[group])
+        if i < 0:
+            return
+        states = self._sub_states[group].values()
+        state = next((s for s in ("error", "busy", "ok") if s in states), "off")
+        self.tabs.setTabIcon(i, dot_icon(TAB_STATES[state]))
 
     def start(self, auto_connect: bool = True) -> None:
         for s in self.services:
@@ -139,7 +177,9 @@ class MainWindow(QMainWindow):
             if box.exec() != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
-        self.settings.setValue("tab", self.tabs.currentIndex())
+        self.settings.setValue("group", self.tabs.currentIndex())
+        for group, sub in self.sub_tabs.items():
+            self.settings.setValue(f"subtab/{group}", sub.currentIndex())
         for s in self.services:
             s.shutdown()
         self.shutdown_daq()

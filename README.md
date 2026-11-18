@@ -2,8 +2,8 @@
 
 One Windows program that replaces the vendor programs (Sigma Koki **SGSample**, Thorlabs **ELLO**,
 Thorlabs **Kinesis**) for the H2 laser room devices, and the two old DAQ programs (**H2LaserDAQ**
-for the PicoScopes, **LaserDAQ / IDS-Camera** for the camera). The GUI has one tab per device and
-is meant for lab members who are not experts. Every action is written to an operation log.
+for the PicoScopes, **LaserDAQ / IDS-Camera** for the camera). The GUI has two tabs, **Control**
+and **DAQ**, with one sub-tab per device in each, and is meant for lab members who are not experts. Every action is written to an operation log.
 
 | Device | What it does here | Connection | Tab | Status |
 |---|---|---|---|---|

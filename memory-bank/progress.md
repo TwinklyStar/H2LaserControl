@@ -451,6 +451,18 @@
   one retry after 0.5 s on "Access is denied". *Hardware:* ELL14 + HIT-MV + flip mounts connected
   in parallel 10×: old code 1 failure, with the lock 0 (with and without retry). 317 passed.
 
+### 2026-11-19
+- **Project moved** from `Desktop\H2LaserControl` to `C:\Users\h2_laserroom_03\H2LaserControl`
+  (user). Editable install re-linked (`pip install -e .`), Desktop shortcut "H2 Laser Control"
+  → `H2LaserControl.bat`. 317 passed in the new folder. The old Desktop copy still exists
+  (identical; user to delete).
+- **Two-level tabs (user):** top tabs **Control** (VUV feedthroughs, rotation mount, flip
+  mounts; DG645 later) and **DAQ** (scope monitor, VUV PD snapshot, camera), each with one
+  sub-tab per device. The group is chosen by device type (DAQ_TABS → DAQ, PANELS → Control),
+  so a DG645 panel lands in Control automatically. The group tab's dot shows the most important
+  state in it (error > busy > ok > off), so an error is visible while the other group is shown.
+  Last group and sub-tabs are remembered. 318 passed.
+
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
   (or set RAM-only) if a DIG IO pin is an input while nothing is wired? Protects against a

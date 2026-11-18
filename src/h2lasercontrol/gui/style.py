@@ -28,6 +28,7 @@ STYLE_SHEET = f"""
 {", ".join(OWN)}, {_scoped("QWidget")}, QTabBar {{ font-size: 10.5pt; }}
 QTabBar::tab {{ padding: 8px 18px; min-width: 150px; }}
 QTabBar::tab:selected {{ font-weight: bold; }}
+QTabWidget#groupTabs > QTabBar::tab {{ font-size: 12pt; padding: 10px 28px; min-width: 120px; }}
 {_scoped("QGroupBox")} {{ font-weight: bold; border: 1px solid #c8c8c8; border-radius: 6px;
              margin-top: 14px; padding: 12px 10px 10px 10px; }}
 {_scoped("QGroupBox::title")} {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}

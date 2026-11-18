@@ -138,6 +138,9 @@ is where every command passes through.
 - Adding a device later = adding a tab (a new device *type* needs one new panel class; another
   device of a known type needs only a config entry).
 - Keep it **clean and easy to use**.
+- **Two levels (user, 2026-11-19):** top tabs **Control** (motor feedthroughs, rotation mount,
+  flip mounts, later DG645) and **DAQ** (scope monitor, snapshot, camera); the device tabs are
+  sub-tabs inside them.
 
 ### Non-functional
 - N1. Runs on the single lab PC (Windows 11) in the `H2LaserControl` conda environment.
