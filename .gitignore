@@ -11,3 +11,6 @@ captures/
 
 # old DAQ programs (reference only for the merge, F8; user 2026-11-18)
 DAQ_oldcode/
+
+# DAQ output (F8)
+data/

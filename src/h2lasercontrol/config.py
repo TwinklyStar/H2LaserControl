@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "devices.toml"
+PROGRAM_DIR = Path(__file__).resolve().parents[2]  # the project folder (data/, config/, logs/)
+DEFAULT_CONFIG = PROGRAM_DIR / "config" / "devices.toml"
+# streaming DAQ devices (F8): opened through vendor SDKs, no COM port / baud rate
+DAQ_TYPES = {"picoscope", "ids_camera"}
 
 
 class ConfigError(Exception):
@@ -37,6 +40,13 @@ def load_config(path: str | os.PathLike[str] = DEFAULT_CONFIG) -> dict[str, Devi
     for key, table in data.get("devices", {}).items():
         # a device with `units` (flip mounts) has one USB connection per unit, set per unit
         multi = "units" in table
+        if table.get("type") in DAQ_TYPES:
+            devices[key] = DeviceConfig(key=key, type=table["type"],
+                                        usb_serial=table.get("usb_serial"), port=None,
+                                        baudrate=0, settings=table)
+            if table["type"] == "picoscope" and not table.get("digitizers"):
+                raise ConfigError(f"[devices.{key}] needs [devices.{key}.digitizers.<name>]")
+            continue
         try:
             devices[key] = DeviceConfig(
                 key=key,

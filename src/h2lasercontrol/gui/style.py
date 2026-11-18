@@ -11,14 +11,26 @@ GREY = "#757575"  # disconnected / unknown
 
 TAB_STATES = {"ok": GREEN, "busy": BLUE, "off": GREY, "error": RED}
 
+# Our own widget classes. The general rules below (font size, group boxes, button padding) are
+# limited to these containers, so they do NOT reach the embedded camera window (laserdaq
+# MainWindow), which must look exactly like the old camera program (F8b). A type selector also
+# matches subclasses (DevicePanel -> HitMvPanel, ...). Role-based rules are safe everywhere.
+OWN = ("DevicePanel", "ScopeTab", "CameraStartPage", "CameraHeader", "LogPanel", "TopBar")
+
+
+def _scoped(selector: str) -> str:
+    """'QPushButton' -> 'DevicePanel QPushButton, ScopeTab QPushButton, ...'."""
+    return ", ".join(f"{c} {selector}" for c in OWN)
+
+
 STYLE_SHEET = f"""
-QWidget {{ font-size: 10.5pt; }}
+{", ".join(OWN)}, {_scoped("QWidget")}, QTabBar {{ font-size: 10.5pt; }}
 QTabBar::tab {{ padding: 8px 18px; min-width: 150px; }}
 QTabBar::tab:selected {{ font-weight: bold; }}
-QGroupBox {{ font-weight: bold; border: 1px solid #c8c8c8; border-radius: 6px;
+{_scoped("QGroupBox")} {{ font-weight: bold; border: 1px solid #c8c8c8; border-radius: 6px;
              margin-top: 14px; padding: 12px 10px 10px 10px; }}
-QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
-QPushButton {{ padding: 6px 14px; }}
+{_scoped("QGroupBox::title")} {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
+{_scoped("QPushButton")} {{ padding: 6px 14px; }}
 QPushButton[role="primary"] {{ font-size: 12pt; font-weight: bold; padding: 10px 22px; }}
 QPushButton[role="stop"] {{ background: {RED}; color: white; font-weight: bold;
                             padding: 8px 22px; border-radius: 4px; }}

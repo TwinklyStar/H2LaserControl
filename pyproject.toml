@@ -34,6 +34,14 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: full-resolution throughput test (camera; deselect with -m \"not slow\")"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint.per-file-ignores]
+# camera package copied unchanged from the old IDS-Camera project (F8b, "exact copy"); it was
+# written for E/F/W/I only, so the extra rule families of this project are not applied to it
+"src/h2lasercontrol/laserdaq/**" = ["BLE001", "S110", "UP035", "RUF046", "SIM115", "RUF100"]
+"tests/camera/**" = ["BLE001", "S110", "UP035", "RUF046", "SIM115", "RUF100", "B023", "SIM118",
+                     "PLW1510", "RUF059", "RUF007"]

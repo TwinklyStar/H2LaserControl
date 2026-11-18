@@ -70,3 +70,83 @@ insert_position = 2        # user 2026-11-18: same as unit 1
 # persisted to the device on 2026-11-18 — see docs/protocols.md § MFF101 Unit 2
 
 # [devices.dg645]          — added when installed (Phase 0 step 0.5)
+
+# ---------------------------------------------------------------------------------------------
+# DAQ devices (F8, merged from the old H2LaserDAQ and IDS-Camera programs).
+# PicoScope digitizer keys are exactly the old DIGITIZER_CONFIGS keys (see the old README):
+# model "3405D" (ps3000a) or "2204A" (ps2000); voltage_range strings as the SDK enum names
+# ("200MV", "2V"); timebase 3405D: 0=1 ns, 1=2 ns, 2=4 ns, n>2: (n-2)*8 ns; 2204A: 10*2^n ns;
+# pre_trigger in %; trigger_level in mV; auto_trigger in ms (0 = wait forever).
+# data_path is relative to the program folder. Output files: <data_path>/root/, csv/, snapshots/.
+
+[devices.scope_monitor]
+type = "picoscope"
+label = "Scope monitor"
+mode = "continuous"        # old config/config_monitor_2026A.py (user 2026-11-18)
+
+[devices.scope_monitor.digitizers.DET10A2]
+model = "3405D"
+serial = "JY926/0005"
+channels = ["B", "C"]
+channel_name = ["212", "820"]
+voltage_range = { B = "200MV", C = "1V" }
+offset = { B = 0, C = 0 }  # V
+timebase = 1               # 2 ns
+sample_number = 1000
+trigger_channel = "Ext"
+trigger_level = 1000       # mV
+pre_trigger = 10           # %
+trigger_edge = "RISING"
+trigger_delay = 0          # samples
+auto_trigger = 0           # ms; 0 = wait forever
+output_name = "FreeSpacePD_2026June"
+data_path = "data/picoscope"
+
+[devices.scope_monitor.digitizers.NOCell]
+model = "2204A"
+serial = "12017/0359"
+channels = ["A", "B"]
+channel_name = ["NO_cell", "Trig"]
+voltage_range = { A = "2V", B = "10V" }
+timebase = 9               # 5.12 us
+sample_number = 1000
+trigger_channel = "B"
+trigger_level = 1000
+pre_trigger = 10
+trigger_edge = "RISING"
+auto_trigger = 1000
+output_name = "NOCell_2026June"
+data_path = "data/picoscope"
+
+[devices.vuv_pd]
+type = "picoscope"
+label = "VUV PD snapshot"
+mode = "snapshot"          # old config/config_H2PD_261103.py (user 2026-11-18)
+
+[devices.vuv_pd.digitizers.H2PD]
+model = "2204A"
+serial = "12017/0366"
+snapshot_channel = "A"     # channel whose peak area is shown (mean ± error)
+refresh_trigger_cnt = 100  # triggers averaged per display update
+channels = ["A", "B"]
+channel_name = ["Sig", "Trig"]
+voltage_range = { A = "200MV", B = "2V" }
+timebase = 1               # 20 ns
+sample_number = 1000
+trigger_channel = "B"
+trigger_level = 1000
+pre_trigger = 10
+trigger_edge = "RISING"
+auto_trigger = 1000
+output_name = "H2PD_2026B"
+data_path = "data/picoscope"
+
+[devices.camera]
+type = "ids_camera"
+label = "Camera"
+model = "IDS U3-327xCP-C"
+usb_serial = "4110039161"  # read 2026-11-18 (USB 2.0 link: max ~19 fps full frame)
+config_dir = "config/camera"      # camera settings files (the old configs/ folder)
+default_config = "default.toml"   # loaded when the camera is opened
+output_dir = "data/camera"        # shown on the start page; the folder used is the camera
+                                  # config's output_dir (all set to data/camera)

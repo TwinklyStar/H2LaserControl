@@ -1,0 +1,139 @@
+"""GUI tests of the DAQ tabs (F8) on simulated PicoScopes and a mock camera. Needs pytest-qt."""
+
+import time
+
+import pytest
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QMessageBox
+
+from h2lasercontrol.config import DEFAULT_CONFIG, load_config
+from h2lasercontrol.daq.picoscope.session import PAUSED, RUNNING, STOPPED
+from h2lasercontrol.daq.picoscope.virtual import VirtualDigitizer
+from h2lasercontrol.gui.daq import CameraTab, ScopeTab
+from h2lasercontrol.gui.main_window import MainWindow
+from h2lasercontrol.oplog import OpLog, read_oplog
+
+pytest.importorskip("pytestqt")
+
+
+@pytest.fixture
+def window(qtbot, tmp_path, monkeypatch, request):
+    monkeypatch.setattr(VirtualDigitizer, "TRIGGER_RATE_HZ", 1000.0)
+    monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.StandardButton.Yes)
+    oplog = OpLog(tmp_path / "logs", user="tester")
+    settings = QSettings(str(tmp_path / "gui.ini"), QSettings.Format.IniFormat)
+    w = MainWindow(load_config(DEFAULT_CONFIG), oplog, sim=True, settings=settings,
+                   state_dir=str(tmp_path), daq_base_dir=str(tmp_path))
+    qtbot.addWidget(w)
+    request.addfinalizer(w.shutdown_daq)
+    request.addfinalizer(lambda: [s.shutdown() for s in w.services])
+    return w
+
+
+def tab(w, key):
+    return next(t for t in w.daq_tabs if t.cfg.key == key)
+
+
+def actions(w):
+    return [(e["device"], e["action"], e["event"]) for e in read_oplog(w.oplog.today_path())]
+
+
+def test_scope_tab_start_pause_stop(window, qtbot):
+    t: ScopeTab = tab(window, "scope_monitor")
+    assert t.session.state == STOPPED  # nothing starts by itself (F8a)
+    assert t.start_btn.isEnabled() and not t.pause_btn.isEnabled() and not t.stop_btn.isEnabled()
+
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == RUNNING, timeout=10000)
+    # keeps running while another tab is shown
+    window.tabs.setCurrentIndex(0)
+    qtbot.waitUntil(lambda: t.view.n_points["212"] >= 2, timeout=10000)
+    assert t.session.state == RUNNING
+
+    t.pause_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == PAUSED, timeout=5000)
+    assert t.pause_btn.text().endswith("Resume") and "Paused" in t.state_label.text()
+    n = t.view.n_points["212"]
+    qtbot.wait(400)  # ~400 triggers at the test rate if it were still running
+    assert t.view.n_points["212"] == n  # display frozen, no data taken
+
+    t.pause_btn.click()  # resume
+    qtbot.waitUntil(lambda: t.view.n_points["212"] > n, timeout=10000)
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+    assert t.start_btn.isEnabled() and not t.stop_btn.isEnabled()
+    assert ("scope_monitor", "stop", "done") in actions(window)
+
+    t.start_btn.click()  # can be started again
+    qtbot.waitUntil(lambda: t.session.state == RUNNING, timeout=10000)
+
+
+def test_scope_tabs_are_independent(window, qtbot):
+    mon, snap = tab(window, "scope_monitor"), tab(window, "vuv_pd")
+    snap.start_btn.click()
+    qtbot.waitUntil(lambda: snap.session.state == RUNNING, timeout=10000)
+    assert mon.session.state == STOPPED
+    mon.start_btn.click()
+    qtbot.waitUntil(lambda: mon.session.state == RUNNING, timeout=10000)
+    snap.stop_btn.click()
+    qtbot.waitUntil(lambda: snap.session.state == STOPPED, timeout=10000)
+    assert mon.session.state == RUNNING
+
+
+def test_snapshot_freeze_and_save(window, qtbot, tmp_path):
+    t: ScopeTab = tab(window, "vuv_pd")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.view._last_item is not None, timeout=10000)
+    assert "Peak area" in t.view._lbl_area.text()
+    t.view._freeze_btn.click()
+    assert t.view._freeze_btn.text() == "Clear"
+    qtbot.waitUntil(lambda: "Math:" in t.view._lbl_math.text()
+                    and "computing" not in t.view._lbl_math.text(), timeout=10000)
+    t.view._save_btn.click()
+    files = list((tmp_path / "data" / "picoscope" / "snapshots").glob("snapshot_H2PD_*_001.csv"))
+    assert len(files) == 1
+    text = files[0].read_text(encoding="utf-8").splitlines()
+    assert text[0] == "# H2LaserDAQ Snapshot" and text[2] == "# Device  : H2PD"
+    assert "time_s,live_V,frozen_V" in text
+    assert ("vuv_pd", "save_snapshot", "done") in actions(window)
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+
+
+def test_camera_tab_start_page_open_capture_close(window, qtbot, tmp_path):
+    t: CameraTab = tab(window, "camera")
+    assert t.stack.currentIndex() == 0 and t.window is None  # start page, camera not open
+    assert "not open" in t.stack.widget(0).findChildren(type(t.start_status))[1].text()
+
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.window is not None, timeout=10000)
+    assert t.stack.currentWidget() is t.open_page
+    w = t.window
+    qtbot.waitUntil(lambda: w._live_view.last_frame is not None, timeout=10000)
+    # the old camera GUI, unchanged: its controls are there
+    for name in ("_config_combo", "_exposure_spin", "_analog_gain_slider", "_autogain_btn",
+                 "_free_radio", "_capture_btn", "_run_btn"):
+        assert hasattr(w, name), name
+    assert w._config_combo.findText("default.toml") >= 0  # config/camera/*.toml listed
+
+    w._capture_btn.click()
+    qtbot.waitUntil(lambda: ("camera", "record", "done") in actions(window), timeout=10000)
+    day = tmp_path / "data" / "camera" / time.strftime("%Y-%m-%d")
+    assert len(list(day.glob("*.bmp"))) == 1 and len(list(day.glob("*_config.toml"))) == 1
+
+    t.close_btn.click()
+    assert t.window is None and t.stack.currentIndex() == 0
+    acts = [a for a in actions(window) if a[0] == "camera"]
+    assert [a[1] for a in acts] == ["open", "record", "close"]
+
+
+def test_close_window_stops_everything(window, qtbot):
+    mon, cam = tab(window, "scope_monitor"), tab(window, "camera")
+    mon.start_btn.click()
+    cam.start_btn.click()
+    qtbot.waitUntil(lambda: mon.session.state == RUNNING and cam.window is not None,
+                    timeout=10000)
+    assert mon.running
+    window.close()  # "still running" question answered Yes by the fixture
+    assert mon.session.state == STOPPED and cam.window is None
+    assert all(not d.is_alive() for d in mon.session.digitizers.values())

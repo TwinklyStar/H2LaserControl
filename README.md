@@ -1,14 +1,18 @@
 # H2 Laser Control
 
 One Windows program that replaces the vendor programs (Sigma Koki **SGSample**, Thorlabs **ELLO**,
-Thorlabs **Kinesis**) for the H2 laser room devices. The GUI has one tab per device and is
-meant for lab members who are not experts. Every action is written to an operation log.
+Thorlabs **Kinesis**) for the H2 laser room devices, and the two old DAQ programs (**H2LaserDAQ**
+for the PicoScopes, **LaserDAQ / IDS-Camera** for the camera). The GUI has one tab per device and
+is meant for lab members who are not experts. Every action is written to an operation log.
 
 | Device | What it does here | Connection | Tab | Status |
 |---|---|---|---|---|
 | Sigma Koki HIT-MV, 2 linear feedthroughs | VUV photodiode (axis 0) and 45° VUV mirror to the profiler (axis 1), both in the VUV diagnostic chamber | RS-232→USB adapter (FTDI, serial `DU0DFFMCA`), 38400 8N1 RTS/CTS | VUV feedthroughs | ✅ in use |
 | Thorlabs ELL14 rotation mount | Half-wave plate before a PBS → 355 nm energy | USB (FTDI COM port, serial `DP06TVEFA`), 9600 8N1 | Rotation mount | ✅ in use |
-| Thorlabs MFF101/M flip mounts (2) | Flip a mirror/optic in or out | USB, FTDI **D2XX** (no COM port), APT protocol | Flip mounts | ✅ unit `37011815`; 2nd unit not added yet |
+| Thorlabs MFF101/M flip mounts (2) | 355 nm blocker (`37011815`), 820 nm blocker (`37006391`) | USB, FTDI **D2XX** (no COM port), APT protocol | Flip mounts | ✅ in use |
+| PicoScope 3405D `JY926/0005` + 2204A `12017/0359` | Continuous monitor: 212 / 820 nm photodiodes, NO cell | USB, PicoSDK | Scope monitor | 🧪 merged, hardware test pending |
+| PicoScope 2204A `12017/0366` | H2 VUV photodiode snapshot | USB, PicoSDK | VUV PD snapshot | 🧪 merged, hardware test pending |
+| IDS U3-327xCP-C camera `4110039161` | Beam spot images | USB (now a USB 2.0 link), IDS peak | Camera | 🧪 merged, hardware test pending |
 | SRS DG645 delay generator | Adjust the delay of one channel | RS-232 (or LAN) | — | ⏳ planned, no code yet |
 
 Devices are found by their **USB serial number**, so it does not matter which COM number Windows
@@ -42,16 +46,25 @@ Needed: Windows 10/11, internet access for the installers.
      `C:\Windows\System32\ftd2xx.dll` exists. This PC has version 3.2.21.1.
    - Vendor software (Kinesis, ELLO, SGSample) is **not** needed to run this program. It is
      useful for comparison and as a fallback.
-4. **Python environment.** In an *Anaconda Prompt*, from the project folder:
+4. **PicoSDK (64-bit)** for the PicoScopes: https://www.picotech.com/downloads (choose
+   "PicoSDK"). It installs `ps2000.dll` / `ps3000a.dll` into
+   `C:\Program Files\Pico Technology\SDK\lib` and puts that folder on the PATH (open a new
+   prompt afterwards). PicoScope 7 alone is not enough: the Python wrapper does not find its
+   copies of the DLLs.
+5. **IDS peak** (runtime + USB3 Vision driver) for the camera: https://ids-imaging.com/ids-peak.
+   The Python parts (`ids-peak`, `ids-peak-ipl`, `ids-peak-common`) come from pip (step 6).
+6. **Python environment.** In an *Anaconda Prompt*, from the project folder:
    ```bat
    conda create -n H2LaserControl python=3.12 pip -y
    conda activate H2LaserControl
    pip install -e ".[dev]"
    ```
-   This installs pyserial, PySide6, pytest, pytest-qt and ruff. Versions tested on 2026-11-17:
-   Python 3.12.16, pyserial 3.5, PySide6 6.12.0, pytest 9.2.0, pytest-qt 4.5.0, ruff 0.17.5.
+   This installs pyserial, PySide6, numpy, pyqtgraph, uproot, awkward, picosdk, ids-peak,
+   opencv-python, imageio, pytest, pytest-qt and ruff. Versions tested on 2026-11-18:
+   Python 3.12.16, pyserial 3.5, PySide6 6.12.0, numpy 2.5.5, pyqtgraph 0.14.0, uproot 5.7.7,
+   picosdk 1.1, ids-peak 1.17.0, pytest 9.2.0, pytest-qt 4.5.0, ruff 0.17.5.
    For reading the PDF manuals in `ref/` an agent may also want `pip install pypdf`.
-5. Optional: put a desktop shortcut to `H2LaserControl.bat`.
+7. Optional: put a desktop shortcut to `H2LaserControl.bat`.
 
 ## 3. Running
 
@@ -64,8 +77,29 @@ Needed: Windows 10/11, internet access for the installers.
 | One action from the command line | `python scripts/ctl.py list` · `python scripts/ctl.py <device> <action> key=value …` (actions that move need `--allow-motion`) |
 | List COM ports with USB serials | `python tools/list_ports.py` |
 
-Only one program can use a device at a time: **close SGSample / ELLO / Kinesis first.** Only one
-copy of this program can run at a time (lock file).
+Only one program can use a device at a time: **close SGSample / ELLO / Kinesis, PicoScope 7,
+IDS peak Cockpit and the old DAQ programs first.** Only one copy of this program can run at a
+time (lock file).
+
+**DAQ tabs** (Scope monitor, VUV PD snapshot, Camera): nothing starts by itself. Each tab has its
+own **Start** (and **Pause** / **Stop** for the scopes, **Close camera** for the camera). Once
+started, an acquisition keeps running while you look at other tabs, until you stop it or close
+the program. Pause = no data is taken or saved and the display freezes; Resume continues in the
+same files.
+
+**Data files** (formats unchanged from the old programs):
+- `data/picoscope/root/<output_name>_<YYMMDD>_<NNNN>.root`: tree `rawWave`, every waveform,
+  a new file every 10000 triggers.
+- `data/picoscope/csv/<output_name>_<YYMMDD>.csv`: continuous monitor, summed pulse area per
+  channel (nV·s), one row per 100 triggers.
+- `data/picoscope/snapshots/snapshot_<device>_<YYYYMMDD>_<NNN>.csv`: Save in the snapshot tab.
+- `data/camera/YYYY-MM-DD/NNN_HHMMSS.bmp` (+ `_config.toml`) for Capture, `NNN_HHMMSS/` folders
+  (BMPs + `frames.csv` + `run_config.toml`) for Multi-shot run. BMP → ROOT:
+  `python tools/bmp_to_root.py <file or folder> [--recursive] [--workers 4]`.
+- In simulation everything goes to `logs/sim/data/...` instead.
+
+**Debug logs:** `logs/h2lasercontrol.log` (previous run: `.prev.log`) and `logs/fault.log`
+(crash traces; stack dump if the window freezes for more than 3 s).
 
 **Operation log:** `logs/oplog-YYYY-MM-DD.jsonl`, one JSON line per action. A line holds the time,
 the operator, the device, the action, start/done/failed, the arguments and result, and the exact
@@ -76,13 +110,18 @@ the top right.
 
 Run these in order, with the env active (`conda activate H2LaserControl`), from the project folder:
 
-1. **Tests** (no hardware needed). Expected: all pass (86 on 2026-11-17).
+1. **Tests** (no hardware needed). Expected: 292 passed, 21 skipped on 2026-11-18. The skipped
+   ones are 18 real-camera tests and 3 that need the old 12 MB reference BMP. The real-camera
+   tests open and close the camera many times, which the old notes say kills this camera's
+   USB 2.0 link, so they run only with `$env:H2_CAMERA_HW = "1"`.
    ```powershell
    $env:QT_QPA_PLATFORM = "offscreen"; python -m pytest -q
    ```
-2. **Simulation GUI:** `H2LaserControl-simulation.bat`. Three tabs appear and all of them connect.
+2. **Simulation GUI:** `H2LaserControl-simulation.bat`. Six tabs appear; the first three connect;
+   the DAQ tabs start with their Start buttons (simulated scopes / camera).
 3. **Read-only hardware check** (nothing moves): `python scripts/status.py`. Each device should
-   report its identity and position. If a device is "not found", see §7.
+   report its identity and position. If a device is "not found", see §7. DAQ devices:
+   `python tools/daq_probe.py` (opens and closes each scope; camera: one short stream).
 4. **Real GUI:** `H2LaserControl.bat`. Check that the states match reality (normally both
    feedthroughs RETRACTED). Do not move anything unless the beamline situation allows it.
 
@@ -130,6 +169,11 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
 | Flip mount: `ftd2xx.dll` not found | Install the FTDI CDM driver or Kinesis (§2.3). |
 | Launcher closes at once / "Conda not found" | Conda is installed somewhere else: edit the folder list at the top of the `.bat` file. |
 | HIT-MV position looks wrong after a power cut | Retract/insert once with the user watching (homing resets the counter). |
+| "PicoSDK (ps2000) not found" | Install the PicoSDK (§2.4) and open a new prompt / restart the program. |
+| PicoScope "not found" when starting a scope tab | Close PicoScope 7 and the old H2LaserDAQ; check the serial in `devices.toml`; re-plug the scope. |
+| "No trigger for 10 s" in a scope tab | No trigger signal arrives (laser off, cable, trigger level). The acquisition keeps waiting. |
+| Camera does not open / "not responding" | Close IDS peak Cockpit and the old LaserDAQ, then unplug and re-plug the camera's USB cable. |
+| Camera status bar: "SLOW USB LINK … USB 2.0" | The camera is on a USB 2 link (max ~19 fps full frame). Use a USB 3 port and cable, directly on the PC. |
 
 ---
 
@@ -144,9 +188,10 @@ Read in this order (≈15 min):
 4. `memory-bank/architecture.md`: layers, source layout, key mechanisms, pitfalls found.
 5. `memory-bank/implementation-plan.md`: phases 0–4 and the steps in each.
 6. `memory-bank/tech-stack.md`: libraries and why.
-7. `docs/protocols.md`: every device's command set, byte by byte. Each fact is marked as from
+7. `memory-bank/merge-plan.md`: the DAQ merge (PicoScope + camera, F8): steps and status.
+8. `docs/protocols.md`: every device's command set, byte by byte. Each fact is marked as from
    the manual, a capture, or a hardware test. `docs/captures/` holds compact capture logs.
-8. `ref/`: vendor manuals (HIT-MV in Japanese, ELLx, APT protocol, DG645) and the system paper.
+9. `ref/`: vendor manuals (HIT-MV in Japanese, ELLx, APT protocol, DG645) and the system paper.
 
 Architecture in one picture:
 
@@ -158,10 +203,16 @@ DeviceService (one QThread per device)                 services/device_service.p
 Driver (protocol logic, safety checks)                 drivers/hitmv.py, ell14.py, mff.py
   │ bytes
 Transport (Serial / FTDI D2XX / Fake for tests)        transport/
+
+DAQ tabs (streaming, F8), next to the above:
+ScopeTab (Start/Pause/Stop) → PicoSession → Digitizer threads (one per scope)   daq/picoscope/
+CameraTab (start page ↔ old camera window, unchanged)                          laserdaq/
 ```
 
 Phases: 0 capture vendor traffic ✅ · 1 drivers + scripts ✅ (DG645 pending) · 2 GUI ✅ (in use;
-finishing touches) · 3 interlock/ordering rules across devices · 4 user macros.
+finishing touches) · DAQ merge (F8) in code, hardware test pending · 3 interlock/ordering rules
+across devices · 4 user macros.
 
-Tests run against simulators (`sim.py`) that reproduce the real devices' replies. Lint:
-`ruff check .`
+Tests run against simulators (`sim.py`, `daq/picoscope/virtual.py`, the camera's `MockCamera`)
+that reproduce the real devices. Lint: `ruff check .` (the copied camera package and its tests
+keep their original, smaller rule set: see `pyproject.toml`).

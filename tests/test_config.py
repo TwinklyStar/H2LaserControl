@@ -9,7 +9,9 @@ from h2lasercontrol.transport import D2xxTransport, FakeTransport
 
 def test_real_config_loads():
     cfg = load_config(DEFAULT_CONFIG)
-    assert set(cfg) == {"hitmv", "ell14", "flipmounts"}
+    assert set(cfg) == {"hitmv", "ell14", "flipmounts", "scope_monitor", "vuv_pd", "camera"}
+    assert {k: c.type for k, c in cfg.items() if k in ("scope_monitor", "vuv_pd", "camera")} == {
+        "scope_monitor": "picoscope", "vuv_pd": "picoscope", "camera": "ids_camera"}
     assert cfg["hitmv"].baudrate == 38400 and cfg["hitmv"].rtscts
     assert cfg["ell14"].baudrate == 9600 and not cfg["ell14"].rtscts
     # flip mounts: one D2XX connection per unit, APT settings 115200 + RTS/CTS by default

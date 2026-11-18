@@ -15,6 +15,10 @@ Read `README.md` §8 first, then `memory-bank/progress.md` (status, open questio
      tests.
    - Never send: MFF EEPROM save (0x04B9), ELL14 `clean_and_optimize` (rewrites motor tuning)
      unless asked, DG645 `*RST`.
+   - PicoScopes and the IDS camera are passive (nothing moves), but they may be in use for
+     data taking: check with the user before opening them. Camera: keep open/close cycles few
+     (its USB 2.0 link dies after a few; replug needed). The real-camera tests run only with
+     `H2_CAMERA_HW=1`.
 2. **Record before code.** While investigating a device (manuals, probes, captures), only
    write findings to `docs/protocols.md` and `memory-bank/progress.md`, each marked as from the
    manual, a capture, or a hardware test. Driver code and `config/devices.toml` change later, in

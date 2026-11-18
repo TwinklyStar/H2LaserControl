@@ -287,6 +287,19 @@
   default 20 fps the first buffer came back incomplete. Probe bug on the way: numpy view of a
   freed IPL image → access violation while streaming; camera survived. Details in
   `docs/protocols.md` § DAQ devices.
+- **User decisions:** Pause = acquisition pauses and display freezes (no separate display
+  freeze); camera tab shows only a start page until Start, Close returns to it.
+- **M2–M6 done in simulation** (merge-plan.md): `daq/picoscope/` (digitizer port, ROOT writer
+  copied, virtual digitizer, `PicoSession`), `gui/daq/` (ScopeTab + ported plot views,
+  CameraTab), `laserdaq/` camera package copied (3 files changed: config/output folders, mock
+  fallback), `config/camera/*.toml` (output_dir data/camera), devices.toml DAQ entries,
+  `tools/bmp_to_root.py`, app-wide debug log + fault log + hang watchdog.
+  Bugs found on the way: own `_stop` attribute shadowed `Thread._stop` (join failed); old
+  snapshot "Saved" timer touched a deleted label after closing; the close question used the
+  static QMessageBox (blocked tests); our app style sheet made the camera sidebar overflow its
+  fixed 276 px → general rules scoped to our widget classes (`style.OWN`).
+  Tests: 292 passed, 21 skipped (18 real-camera tests gated by `H2_CAMERA_HW=1`, 3 need the
+  old reference BMP); ruff clean. Nothing was run on the real scopes/camera in this step.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
@@ -310,8 +323,10 @@
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
-- **Merge with the DAQ program (F8)**, plan in `memory-bank/merge-plan.md`: settle the open
-  points (Pause meaning, camera Start/Stop, USB 3 for the camera), then M2 PicoScope core.
+- **DAQ merge (F8): user checks the simulated GUI** (`H2LaserControl-simulation.bat`), then
+  M7 hardware test with the user: each scope tab on the real scopes (files compared with old
+  program files), both 2204A tabs together, camera open / capture / multi-shot / close.
+  Open: output names, camera USB 3 (merge-plan.md).
 - DG645: answer the open questions → write driver + simulator + GUI tab (1.6b, can be done
   before installation against `Dg645Sim`) → hardware checks in `docs/protocols.md` once installed.
 - MFF101 second unit (expected 2026-11-18): read serial (Windows device list), short flip test,

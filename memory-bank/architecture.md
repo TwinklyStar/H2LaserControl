@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **Phase 1 code in place** (transport, oplog, config, ELL14 + HIT-MV drivers, simulators).
+Status: Phases 1-2 in use; DAQ merge (F8) in code, hardware test pending.
 Update this file whenever a structural decision is made.
 
 ## Layers
@@ -101,6 +101,52 @@ logs/             operation logs (git-ignored)
 - Operator name field (top right) → `oplog.user` (remembered in QSettings). `--sim` mode: yellow
   banner, logs to `logs/sim/`. Single-instance lock (two programs can't share ports).
 - Launchers: `H2LaserControl.bat`, `H2LaserControl-simulation.bat`.
+
+## DAQ devices (F8, merged 2026-11-18)
+Streaming devices (25 Hz waveforms / frames) do not fit `Driver.execute` (command → reply), so
+they have their own path next to DeviceService. Start / pause / stop / errors / saves go to the
+op log; the data goes straight to files and plots.
+
+```
+src/h2lasercontrol/
+  daq/picoscope/  assistant.py  RootManager + ADC helpers (copied, ROOT format unchanged)
+                  digitizer.py  Digitizer(threading.Thread) = old H2LaserDigitizer: opens the
+                                scope in its own thread, block-capture loop, ROOT/CSV, queue items
+                  virtual.py    VirtualDigitizer (simulation; real loop, fake hardware hooks)
+                  session.py    PicoSession: the digitizers of one tab; start/pause/resume/stop,
+                                poll() -> plot items, op log; plain Python (no Qt)
+  laserdaq/       old IDS-Camera package, copied unchanged except: configs_dir/base_dir
+                  parameters of its MainWindow, output_dir default data/camera, mock without
+                  the 12 MB Ref BMP -> synthetic spot. cli/ (TUI) and camera/select.py dropped.
+  gui/daq/        scope_views.py  ContinuousView / SnapshotView (ported pyqtgraph windows)
+                  scope_tab.py    ScopeTab: Start / Pause-Resume / Stop + per-scope status line
+                  camera_tab.py   CameraTab: start page <-> embedded laserdaq MainWindow
+                  DAQ_TABS registry by type ("picoscope", "ids_camera")
+config/devices.toml  [devices.scope_monitor|vuv_pd] type "picoscope", digitizers.<name> with the
+                     old DIGITIZER_CONFIGS keys; [devices.camera] type "ids_camera"
+config/camera/       camera settings TOMLs (old configs/, output_dir = data/camera)
+data/picoscope/      root/, csv/, snapshots/ (git-ignored);  data/camera/YYYY-MM-DD/... 
+```
+- **Threads**: one thread per scope; it opens, uses and closes its own scope (open takes 3-4 s,
+  never on the GUI thread). Each digitizer has its own stop flag: a failing scope stops alone
+  (red in its tab, `failed` in the op log). The GUI polls the session queue at 10 Hz.
+- **Pause** = no trigger armed, nothing written, files and scope stay open; an armed block is
+  aborted (`ps*Stop`) and *not* written. Resume continues in the same files.
+- ⚠ `threading.Thread` has an internal `_stop()`: never name an attribute `_stop` in a Thread
+  subclass (it broke `join()`; flag is `_stop_evt`).
+- **SDK locks**: every ps2000 / ps3000a call holds a per-DLL lock (driver thread safety is not
+  documented). `ps2000_open_unit` has no serial argument: open all free units, keep ours,
+  close the rest, under the lock, so two tabs starting together cannot grab each other's unit.
+  Cost: while a 2204A is being opened (~3.7 s per unit) the other 2204A misses triggers.
+- **Camera**: the camera window keeps its own threading (acquisition thread owns the SDK). The
+  tab creates it on Start and deletes it on Close (each open = a fresh window, like restarting
+  the old program). `recording_finished` -> op-log `record` entry.
+- **Style**: the app style sheet's general rules are limited to our classes (`style.OWN`:
+  DevicePanel, ScopeTab, CameraStartPage, CameraHeader, LogPanel, TopBar) so the embedded
+  camera window looks like the old program (its sidebar has a fixed 276 px width).
+- **Sim**: `--sim` uses VirtualDigitizer / MockCamera and writes data to `logs/sim/data/...`.
+- Diagnostics from the camera program are now app-wide: `logs/h2lasercontrol.log` (+ `.prev`),
+  `logs/fault.log` (native crashes, GUI-freeze stack dumps by HangWatchdog after 3 s).
 
 ## Insights / decisions log
 - Thorlabs MFF101 normally uses the FTDI D2XX driver (Kinesis), not a COM port → its traffic

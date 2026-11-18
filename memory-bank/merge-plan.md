@@ -20,11 +20,11 @@ Survey of the old code: `progress.md`, 2026-11-18.
 |---|---|---|
 | M0 | **Environment.** DAQ packages in `pyproject.toml` and the `H2LaserControl` env. PicoSDK DLLs findable. | ✅ 2026-11-18 (picosdk 1.1, ids-peak 1.17, uproot 5.7.7, pyqtgraph 0.14, numpy 2.5.5, opencv 5.1; PicoSDK installed by the user). |
 | M1 | **Read-only hardware check.** Open each scope by serial, read unit info, close; IDS camera: open, 3 frames, close, read link speed (USB 2 vs 3). Record in `docs/protocols.md`. | ✅ 2026-11-18: 3 scopes match the configs; camera OK but on a **USB 2.0** link |
-| M2 | **PicoScope core.** `daq/picoscope/`: digitizer worker (from `H2LaserDigitizer`), `RootManager`, ADC conversion copied; virtual digitizer for tests. Configs from the old Python files → TOML with the **same keys**. Tests: ROOT branches/types, CSV header/rows and snapshot CSV equal to the old code's output for the same synthetic input. | tests pass, outputs byte-compatible |
-| M3 | **Streaming service.** Start / stop / status / error per acquisition, op-log entries, clean shutdown (flush ROOT, close scopes). One scope failing does not silently stop the others (shown in red in its tab). | sim tests |
-| M4 | **PicoScope tabs.** "Scope monitor" (continuous: trends + averaged waveforms, port of `H2MonitorApp`) and "VUV PD snapshot" (port of `H2SnapshotApp`: Pause / Freeze / Save, ± range). Start/Stop buttons; keep running in the background. | sim GUI tests; user check on hardware |
-| M5 | **Camera tab.** `laserdaq` package moved in (kept as a sub-package), its `MainWindow` embedded as the tab unchanged (sidebar, live view, histogram, auto gain, capture, multi-shot run, config selector). Its tests ported. Its logging / fault log / hang watchdog wired into our app. BMP→ROOT script kept. | camera tests pass; user check on hardware |
-| M6 | **Integration.** Shutdown order, single instance lock, launcher, README §, CLAUDE.md, `architecture.md`. | full suite + ruff clean |
+| M2 | **PicoScope core.** `daq/picoscope/`: digitizer worker (from `H2LaserDigitizer`), `RootManager`, ADC conversion copied; virtual digitizer for tests. Configs from the old Python files → TOML with the **same keys**. Tests: ROOT branches/types, CSV header/rows and snapshot CSV equal to the old code's output for the same synthetic input. | ✅ 2026-11-18 (sim): `tests/test_picoscope.py` |
+| M3 | **Streaming service.** Start / stop / status / error per acquisition, op-log entries, clean shutdown (flush ROOT, close scopes). One scope failing does not silently stop the others (shown in red in its tab). | ✅ 2026-11-18 (sim): `PicoSession` |
+| M4 | **PicoScope tabs.** "Scope monitor" (continuous: trends + averaged waveforms, port of `H2MonitorApp`) and "VUV PD snapshot" (port of `H2SnapshotApp`: Freeze / Save, ± range; its display-only Pause removed). Start / Pause / Stop; keep running in the background. | ✅ sim (`tests/test_gui_daq.py`); ⏳ user check on hardware |
+| M5 | **Camera tab.** `laserdaq` package moved in (kept as a sub-package), its `MainWindow` embedded as the tab unchanged (sidebar, live view, histogram, auto gain, capture, multi-shot run, config selector). Its tests ported. Its logging / fault log / hang watchdog wired into our app. BMP→ROOT script kept. | ✅ sim (191 ported camera tests pass; real-camera tests only with `H2_CAMERA_HW=1`); ⏳ hardware |
+| M6 | **Integration.** Shutdown order, single instance lock, launcher, README §, CLAUDE.md, `architecture.md`. | ✅ 2026-11-18: 292 passed, 21 skipped, ruff clean |
 | M7 | **Acceptance with the user** on hardware: long continuous run, snapshot save, camera capture / run; compare files with old-program files. | user OK |
 
 ## Decided (user, 2026-11-18)
@@ -38,13 +38,25 @@ Survey of the old code: `progress.md`, 2026-11-18.
    `data/camera/` (old `output/` content: `YYYY-MM-DD/…`). Names/formats inside unchanged.
 5. History viewer: dropped for now.
 
+6. Pause = no triggers taken, nothing written, display freezes; scope and files stay open;
+   Resume continues in the same files. The old snapshot "Pause" (display only) is removed.
+7. Camera tab: start page only (camera not opened) until Start; Close camera returns to it.
+
+## Changes vs. the old programs (deliberate)
+- Each scope stops alone on an error (old: one crash stopped all).
+- A trigger wait interrupted by Stop / Pause is not written (old: wrote one partial waveform).
+- 3405D opened by serial; SDK calls behind a per-DLL lock (see architecture.md).
+- Trigger rate shown in the tab every 5 s (old: printed every 1000 triggers); "No trigger for
+  10 s" shown in the tab (old: printed).
+- Data folders: `data/picoscope` (was `data/`), `data/camera` (was `output/`); camera configs
+  in `config/camera` (was `configs/`).
+
 ## Open points
-- **Pause meaning** (proposal): Pause = no new triggers are taken and nothing is written, the
-  scope stays open and the files stay open; Resume continues in the same ROOT/CSV file.
-  Stop = close files and release the scope. The old snapshot window's own "Pause" button
-  (freezes only the display while data keeps coming) would clash in name.
-- **Camera tab start:** the old camera GUI opens the camera at launch. Same Start / Stop rule
-  as the scope tabs (camera not opened until Start)?
 - **Camera on USB 2.0** (`DeviceLinkSpeed` 60 MB/s, M1): 25 Hz full-frame recording impossible;
   USB 3 port/cable needed if 25 Hz is wanted.
-- Camera: old docs say `signal_stop()` must not call `KillWait()`, the code does. Check on M5.
+- Camera: old docs say `signal_stop()` must not call `KillWait()`, the code does (copied as
+  is). Watch for "Apply needs two clicks" / stale aborts in the hardware test.
+- Output names in `devices.toml` are the old ones (`FreeSpacePD_2026June`, `NOCell_2026June`,
+  `H2PD_2026B`): new names for the merged program's data?
+- Whether the ps2000 driver is thread-safe (would allow dropping the lock); M7 hardware test
+  with both 2204A tabs running.

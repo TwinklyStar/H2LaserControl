@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
@@ -16,17 +18,25 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..config import DeviceConfig
+from ..config import PROGRAM_DIR, DeviceConfig
 from ..oplog import OpLog
 from ..services import DeviceService
+from .daq import DAQ_TABS
 from .log_panel import LogPanel
 from .panels import PANELS, DevicePanel
 from .style import TAB_STATES, dot_icon, set_role
 
+log = logging.getLogger(__name__)
+
+
+class TopBar(QWidget):
+    """Operator row (a named class so the style sheet can address it, see style.OWN)."""
+
 
 class MainWindow(QMainWindow):
     def __init__(self, config: dict[str, DeviceConfig], oplog: OpLog, *, sim: bool = False,
-                 settings: QSettings | None = None, state_dir: str | None = None):
+                 settings: QSettings | None = None, state_dir: str | None = None,
+                 daq_base_dir: str | None = None):
         super().__init__()
         self.oplog = oplog
         self.sim = sim
@@ -39,14 +49,15 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
         if sim:
-            banner = QLabel("SIMULATION — no real device is controlled. Logs and saved angles "
-                            "go to logs/sim/.")
+            banner = QLabel("SIMULATION — no real device is controlled. Logs, saved angles and "
+                            "simulated scope / camera data go to logs/sim/.")
             banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
             set_role(banner, "sim")
             root.addWidget(banner)
 
         # operator (who is operating: written into every log entry)
-        top = QHBoxLayout()
+        top_bar = TopBar()  # named class: the app style sheet is scoped to our widgets
+        top = QHBoxLayout(top_bar)
         top.setContentsMargins(16, 8, 16, 0)
         top.addStretch(1)
         top.addWidget(QLabel("Operator:"))
@@ -55,15 +66,27 @@ class MainWindow(QMainWindow):
         self.operator.setPlaceholderText("your name")
         self.operator.editingFinished.connect(self._set_operator)
         top.addWidget(self.operator)
-        root.addLayout(top)
+        root.addWidget(top_bar)
         self._set_operator()
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
         self.services: list[DeviceService] = []
         self.panels: list[DevicePanel] = []
+        self.daq_tabs: list = []  # PicoScope / camera tabs (F8): own Start/Pause/Stop
         labels = {}
         for key, cfg in config.items():
+            daq_cls = DAQ_TABS.get(cfg.type)
+            if daq_cls is not None:
+                label = cfg.settings.get("label", key)
+                labels[key] = label
+                tab = daq_cls(cfg, oplog, sim=sim, base_dir=daq_base_dir or PROGRAM_DIR)
+                index = self.tabs.addTab(tab, label)
+                tab.tab_state_changed.connect(
+                    lambda s, i=index: self.tabs.setTabIcon(i, dot_icon(TAB_STATES[s])))
+                self.tabs.setTabIcon(index, dot_icon(TAB_STATES["off"]))
+                self.daq_tabs.append(tab)
+                continue
             panel_cls = PANELS.get(cfg.type)
             if panel_cls is None:
                 continue  # device type without a GUI panel yet
@@ -105,17 +128,27 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         busy = [p.cfg.settings.get("label", p.cfg.key) for p in self.panels if p.busy]
+        busy += [t.cfg.settings.get("label", t.cfg.key) for t in self.daq_tabs if t.running]
         if busy:
-            answer = QMessageBox.warning(
-                self, "Device moving",
-                "Still running: " + ", ".join(busy) + "\n\nStop it and quit?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Cancel,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
+            box = QMessageBox(
+                QMessageBox.Icon.Warning, "Still running",
+                "Still running: " + ", ".join(busy) + "\n\nStop it and quit? "
+                "(The data taken so far is saved.)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel, self)
+            box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            if box.exec() != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
         self.settings.setValue("tab", self.tabs.currentIndex())
         for s in self.services:
             s.shutdown()
+        self.shutdown_daq()
         event.accept()
+
+    def shutdown_daq(self) -> None:
+        """Stop all acquisitions and close the camera (files are closed cleanly)."""
+        for t in self.daq_tabs:
+            try:
+                t.shutdown()
+            except Exception:
+                log.exception("closing %s failed", t.cfg.key)

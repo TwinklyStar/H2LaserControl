@@ -1,0 +1,18 @@
+output_dir = "data/camera"
+save_root = true
+save_rgb_png = true
+exposure_us = 200000.0
+exposure_max = false
+analog_gain = 4.68
+digital_gain = 1.0
+gain_roi_enabled = true
+autogain_free_run_min_exposure_us = 40000.0
+autogain_n_avg = 5
+autogain_target = 127.5
+timestamp = ""
+
+[gain_roi]
+xmin = 539
+xmax = 634
+ymin = 290
+ymax = 542

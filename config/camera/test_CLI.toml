@@ -1,0 +1,35 @@
+analysis_enabled = false
+subtract_background = true
+use_calibration = false
+channel = "B"
+background_path = "Ref/ROOT_BMPConv/background.bmp"
+mm_per_px = 0.0
+output_dir = "data/camera"
+save_root = true
+save_rgb_png = true
+save_blue_png = true
+save_overlay_png = true
+save_csv = true
+exposure_us = 200000.0
+gain = 1.5
+dev_signal_path = "Ref/ROOT_BMPConv/VUV_blue1_1.bmp"
+
+[roi]
+xmin = 1028
+xmax = 1225
+ymin = 796
+ymax = 1033
+
+[cal_roi]
+xmin = 1352
+xmax = 1883
+ymin = 563
+ymax = 1162
+
+[seed]
+A = 40.0
+x0 = 1150.0
+sx = 30.0
+y0 = 600.0
+sy = 60.0
+offset = 0.0

@@ -1,0 +1,37 @@
+analysis_enabled = true
+subtract_background = true
+use_calibration = false
+channel = "B"
+background_path = "output\\backgrounds\\20260611_205407_background.png"
+mm_per_px = 0.030075668409736123
+output_dir = "data/camera"
+save_root = true
+save_rgb_png = true
+save_blue_png = true
+save_overlay_png = true
+save_csv = true
+exposure_us = 200000.0
+exposure_max = true
+analog_gain = 22.74
+digital_gain = 1.0
+dev_signal_path = ""
+
+[roi]
+xmin = 620
+xmax = 1020
+ymin = 416
+ymax = 816
+
+[cal_roi]
+xmin = 1124
+xmax = 1380
+ymin = 588
+ymax = 886
+
+[seed]
+A = 40.0
+x0 = 1150.0
+sx = 30.0
+y0 = 600.0
+sy = 60.0
+offset = 0.0

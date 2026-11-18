@@ -1,0 +1,7 @@
+output_dir = "data/camera"
+save_root = true
+save_rgb_png = true
+exposure_us = 10000.0
+exposure_max = false
+analog_gain = 1.0
+digital_gain = 1.0

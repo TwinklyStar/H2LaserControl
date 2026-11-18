@@ -30,10 +30,11 @@ def window(qtbot, tmp_path, monkeypatch, request):
     oplog = OpLog(tmp_path / "logs", user="tester")
     settings = QSettings(str(tmp_path / "gui.ini"), QSettings.Format.IniFormat)
     w = MainWindow(load_config(DEFAULT_CONFIG), oplog, sim=True, settings=settings,
-                   state_dir=str(tmp_path))
+                   state_dir=str(tmp_path), daq_base_dir=str(tmp_path))
     qtbot.addWidget(w)
     # shut the device threads down even if the test fails (otherwise the run hangs at exit)
     request.addfinalizer(lambda: [s.shutdown() for s in w.services])
+    request.addfinalizer(w.shutdown_daq)
     w.start()
     for p in w.panels:
         qtbot.waitUntil(lambda p=p: bool(p.connected and p.state), timeout=5000)
@@ -46,7 +47,8 @@ def panel(w, key):
 
 def test_one_tab_per_device(window):
     labels = [window.tabs.tabText(i) for i in range(window.tabs.count())]
-    assert labels == ["VUV feedthroughs", "Rotation mount", "Flip mounts"]
+    assert labels == ["VUV feedthroughs", "Rotation mount", "Flip mounts",
+                      "Scope monitor", "VUV PD snapshot", "Camera"]
 
 
 def test_flip_mount_retract_and_insert(window, qtbot):
