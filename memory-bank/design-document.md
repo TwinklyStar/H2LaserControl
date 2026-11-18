@@ -104,6 +104,13 @@ is where every command passes through.
   runs PicoScope waveform acquisition and camera operation; these become part of this program
   (e.g. their own tabs), not a separate program beside it. The merged program runs on the DAQ
   PC. Details (language/toolkit of the DAQ program, structure) still to be studied → merge plan.
+  Decisions (user, 2026-11-18), plan in `memory-bank/merge-plan.md`:
+  - F8a. PicoScope: **one tab for continuous DAQ** and **one tab for the H2 VUV PD snapshot**.
+    Once started they **keep running** (also while another tab is shown) until explicitly stopped.
+  - F8b. Camera: its own tab, an **exact copy of the current camera GUI**. No terminal menu (TUI).
+  - F8c. **Output formats stay exactly the same** (PicoScope ROOT `rawWave` + CSV + snapshot CSV;
+    camera BMP / frames.csv / config TOML / BMP→ROOT).
+  - The merged program runs on this PC (scopes and camera are connected here).
 
 ### GUI structure (user, 2026-11-17)
 - **One tab per device**, like browser (Chrome) tabs; the user switches between tabs. Devices are

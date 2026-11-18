@@ -21,6 +21,11 @@ small; we implement our own thin drivers and use existing libraries as reference
 | Testing | **pytest** + fake/simulated serial devices; **pytest-qt** for the GUI | Test drivers, GUI and rules without hardware (GUI tests: `QT_QPA_PLATFORM=offscreen`) |
 | Lint/format | **ruff** | Single fast tool |
 | VCS | **git** | |
+| DAQ (F8) plots | **pyqtgraph** 0.14 | Used by both old DAQ programs; fast live plots, works with PySide6 |
+| PicoScope | **picosdk** 1.1 (ctypes wrappers) | Old DAQ code; needs `ps2000.dll` / `ps3000a.dll` (PicoSDK or PicoScope 7 folder) |
+| IDS camera | **ids-peak** 1.17, ids-peak-ipl, ids-peak-common | Old camera code; needs the IDS peak runtime (installed) |
+| ROOT output | **uproot** 5.7 + **awkward** | Old DAQ formats (`rawWave` tree, camera `TH2D`) |
+| Numerics / images | **numpy** 2.5, **opencv-python** (BMP), **imageio** | Old camera code |
 
 ## Protocol references (primary sources)
 | Device | Protocol | Reference |

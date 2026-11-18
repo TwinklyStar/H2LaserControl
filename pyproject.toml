@@ -7,7 +7,21 @@ name = "h2lasercontrol"
 version = "0.0.1"
 description = "Unified control of H2 laser room devices (Sigma Koki HIT-MV, Thorlabs ELL14, MFF101)"
 requires-python = ">=3.12"
-dependencies = ["pyserial>=3.5", "PySide6>=6.6"]
+dependencies = [
+    "pyserial>=3.5",
+    "PySide6>=6.6",
+    # DAQ merge (F8): PicoScope + IDS camera
+    "numpy",
+    "pyqtgraph",
+    "uproot",          # ROOT output (PicoScope rawWave tree, camera BMP -> ROOT)
+    "awkward",
+    "picosdk",         # PicoScope ctypes wrappers; needs PicoSDK DLLs (ps2000, ps3000a)
+    "ids-peak",        # IDS camera; needs the IDS peak runtime installed
+    "ids-peak-ipl",
+    "ids-peak-common",
+    "opencv-python",   # camera BMP writing
+    "imageio",
+]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-qt", "ruff"]

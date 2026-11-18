@@ -266,6 +266,16 @@
     U3-327xCP-C ser. **4110039161**; also a Newport "Picomotor Controller" (not in scope).
     `ps2000.dll`/`ps3000a.dll` only inside PicoScope 7 (not on PATH); IDS peak runtime installed
     (Python bindings come from PyPI). The `H2LaserControl` env has none of the DAQ packages.
+- **Merge decisions (user):** PicoScope continuous tab + H2 VUV PD snapshot tab, keep running
+  until explicitly stopped; camera tab = exact copy of the current GUI, no TUI; output formats
+  unchanged; `DAQ_oldcode/` git-ignored. → design F8a–c, plan `memory-bank/merge-plan.md`.
+- **M0 environment:** DAQ packages added to `pyproject.toml` and installed (picosdk 1.1,
+  ids-peak 1.17 / ipl 1.18 / common 2.1, uproot 5.7.7, awkward 2.15, pyqtgraph 0.14,
+  numpy 2.5.5, opencv 5.1, imageio 2.38). IDS SDK loads and lists the camera
+  (4110039161, U3-327xCP-C, openable; not opened). picosdk fails "PicoSDK not found": the DLLs
+  exist only in `C:\Program Files\Pico Technology\PicoScope 7 T&M Stable` (ps2000 3.0.146,
+  ps3000a 2.1.150); with that folder on PATH both load (no scope opened). PicoSDK itself is
+  not installed → user to choose (merge-plan open point 1).
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
@@ -289,9 +299,8 @@
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
-- **Merge with the DAQ program (F8, one program)** on the DAQ PC (PicoScope + camera). First
-  study the DAQ program's code (language, GUI toolkit, threading, data/log locations) and write
-  `memory-bank/merge-plan.md`; then merge on the DAQ PC, where it can be tested with hardware.
+- **Merge with the DAQ program (F8)**, plan in `memory-bank/merge-plan.md`: finish M0 (PicoSDK
+  DLL choice), settle the plan's open points, then M1 read-only hardware check.
 - DG645: answer the open questions → write driver + simulator + GUI tab (1.6b, can be done
   before installation against `Dg645Sim`) → hardware checks in `docs/protocols.md` once installed.
 - MFF101 second unit (expected 2026-11-18): read serial (Windows device list), short flip test,
