@@ -35,6 +35,10 @@ Read `README.md` §8 first, then `memory-bank/progress.md` (status, open questio
   `C:\Program Files\Git\cmd\git.exe`. Commit as the repo-local author (already in `.git/config`,
   do not change it). One commit per finished step, with a short summary line. To pass a
   multi-line message, write it to a file and use `git commit -F <file>`.
+- **Never edit text files with PowerShell 5.1 `Get-Content`/`Set-Content`**: this PC's ANSI
+  codepage is 932 (Shift-JIS), so the docs' UTF-8 symbols (✅ 📖 → ≈) get corrupted and a BOM is
+  added. Use the editor tools. Likewise, a `git show … > file` inside PowerShell re-encodes the
+  output; use `cmd /c` for byte-exact output.
 - Close vendor software (SGSample, ELLO, Kinesis) before touching hardware. Vendor tools
   installed on the original PC: `C:\Program Files\Thorlabs\Elliptec` (ELLO, including its driver
   source code) and `C:\Program Files\Thorlabs\Kinesis`.
