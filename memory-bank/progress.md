@@ -232,11 +232,20 @@
   output); nothing is wired (user). With DigIO2 set like unit 1 (RAM only, user-approved):
   20/20 flips OK. Original setting restored after the test → **unit 2 still bounces** until a
   permanent fix is chosen. Details in protocols.md § MFF101 Unit 2.
+- First Kinesis change did not reach the device: Kinesis saved it as a PC-side override
+  (`C:\ProgramData\Thorlabs\MotionControl\ThorlabsSettingsOverrides.xml`). **User then set DIG IO 2
+  = output-at-position/level with "Persist Settings to the Device", re-plugged → stored in the
+  device ✅**; flip test 20/20 OK (0.40 s).
+- **Config: flip2 = "820 nm blocker" (37006391), flip1 renamed "355 nm blocker"**, both insert =
+  position 2. Tests updated (86 pass). `scripts/ctl.py` now knows the `mff` type (was missing).
+  **On hardware via our driver (13:36):** unit 2 retract 0.44 s, insert 0.44 s, insert again =
+  "already there". Unit 1 found at **retract** — left there by the user's GUI on 2026-11-17
+  19:15 (op-log); not touched.
 
 ## Open questions
-- **Unit 2 DIG IO fix (decide):** (a) save DigIO2 = output once with Kinesis (Settings → persist
-  to device), or (b) our driver checks MFF_OPERPARAMS at connect and sets DIG IO inputs it does
-  not expect (RAM only, logged), or both. Config for unit 2 is added after this.
+- Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
+  (or set RAM-only) if a DIG IO pin is an input while nothing is wired? Protects against a
+  replacement unit with the same factory setting.
 - MFF101 second unit: serial and position ↔ name (tomorrow). What does each flip mount do in
   the beam path (for Phase 3 interlock rules with the feedthroughs)?
 - DG645 (before coding): which channel (A–H), and its reference (T0 or another channel)? Typical

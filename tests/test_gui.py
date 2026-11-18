@@ -51,6 +51,8 @@ def test_one_tab_per_device(window):
 
 def test_flip_mount_retract_and_insert(window, qtbot):
     flip = panel(window, "flipmounts")
+    assert list(flip.cards) == ["flip1", "flip2"]  # 355 nm and 820 nm blockers on one tab
+    assert flip.cards["flip2"].state_label.text() == "INSERTED"
     card = flip.cards["flip1"]
     assert card.state_label.text() == "INSERTED"  # real unit's state on 2026-11-17
     assert card.retract_btn.isEnabled() and not card.insert_btn.isEnabled()

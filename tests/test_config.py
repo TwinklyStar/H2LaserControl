@@ -14,7 +14,9 @@ def test_real_config_loads():
     assert cfg["ell14"].baudrate == 9600 and not cfg["ell14"].rtscts
     # flip mounts: one D2XX connection per unit, APT settings 115200 + RTS/CTS by default
     assert cfg["flipmounts"].baudrate == 115200 and cfg["flipmounts"].rtscts
-    assert cfg["flipmounts"].settings["units"]["flip1"]["usb_serial"] == "37011815"
+    units = cfg["flipmounts"].settings["units"]
+    assert units["flip1"]["usb_serial"] == "37011815" and units["flip1"]["insert_position"] == 2
+    assert units["flip2"]["usb_serial"] == "37006391" and units["flip2"]["insert_position"] == 2
 
 
 def test_resolve_port_by_serial_number():
@@ -44,10 +46,14 @@ def test_create_drivers_from_real_config():
     ell = create_driver(cfg["ell14"], transport=FakeTransport())
     assert isinstance(ell, Ell14)
     assert ell.terminator == b"\x07" and ell.address == "0"
-    mff = create_driver(cfg["flipmounts"], transport={"flip1": FakeTransport()})
+    mff = create_driver(cfg["flipmounts"],
+                        transport={"flip1": FakeTransport(), "flip2": FakeTransport()})
     assert isinstance(mff, Mff)
     u = mff.units["flip1"]
     assert (u.usb_serial, u.insert_position, u.position_number("retract")) == ("37011815", 2, 1)
+    u2 = mff.units["flip2"]
+    assert (u2.label, u2.usb_serial, u2.position_number("retract")) == ("820 nm blocker",
+                                                                         "37006391", 1)
     # without a transport: a D2XX connection by serial number (not opened here)
     real = create_driver(cfg["flipmounts"])
     assert isinstance(real.units["flip1"].transport, D2xxTransport)

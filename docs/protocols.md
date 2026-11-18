@@ -593,6 +593,15 @@ Findings:
   in our scope.)
   → To store it in the device: Kinesis Settings with "Persist settings to the device" (EEPROM),
   or our driver sets it at connect (RAM). ⏳ decide.
+- **Fixed in the device ✅ (13:3x):** user set DIG IO 2 in Kinesis (Settings → Current, "Persist
+  Settings to the Device" ticked) to output-at-position / level like unit 1, closed Kinesis,
+  re-plugged USB. Read-back: `… 03 00 10 00 c8 00 00 00 …` = DigIO2 (3 output-at-position,
+  0x10 level, 200 ms) → **stored in the device**. Flip test 13:34
+  (`captures/mff2_flips_after_fix_2026-11-18.txt`): **20/20 flips arrived, 0.399–0.400 s**,
+  521/521 status replies during flips OK, 500 status + 125 info + 10 reopen all OK. Open time
+  now ≈ 510 ms (was ≈ 120 ms before the re-plug; harmless, not understood). Ended at position 2.
+  (Kinesis shows a Pin 2 choice "Input: Toggle position / Button input" too — not used: an
+  unwired input can be triggered by noise; an output cannot.)
 
 ### USB set-up (p. 33) 📖
 Thorlabs software does, per device: `FT_SetBaudRate 115200` → `FT_SetDataCharacteristics 8N1`

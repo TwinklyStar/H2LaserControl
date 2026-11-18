@@ -4,6 +4,7 @@
     python scripts/ctl.py ell14 get_position
     python scripts/ctl.py ell14 move_abs deg=45 --allow-motion
     python scripts/ctl.py hitmv insert axis=1 --allow-motion
+    python scripts/ctl.py flipmounts retract unit=flip2 --allow-motion
 
 Actions that move hardware are refused unless --allow-motion is given (lab rule: every motion
 needs explicit permission and a person checking it). Ctrl+C during a motion stops the device.
@@ -16,10 +17,10 @@ import sys
 import threading
 
 from h2lasercontrol.config import load_config
-from h2lasercontrol.drivers import Ell14, HitMv, create_driver
+from h2lasercontrol.drivers import Ell14, HitMv, Mff, create_driver
 from h2lasercontrol.oplog import OpLog
 
-DRIVER_CLASSES = {"ell14": Ell14, "hitmv": HitMv}
+DRIVER_CLASSES = {"ell14": Ell14, "hitmv": HitMv, "mff": Mff}
 
 
 def parse_value(text: str):
