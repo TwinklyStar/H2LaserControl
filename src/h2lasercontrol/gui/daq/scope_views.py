@@ -642,11 +642,13 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
                     ("Std", f"{st.std:.3g} nV·s"),
                     ("N", f"{st.n}{target}" if self.averager.n is not None else f"{st.n} (∞)"),
                     ("Stderr", f"{st.stderr:.3g} nV·s")]
-        html = "".join(f"<tr><td>{k}</td><td align='right'>&nbsp;&nbsp;{v}</td></tr>"
+        # large print: read from a distance while aligning (user 2026-11-18)
+        html = "".join(f"<tr><td style='padding:2px 6px'>{k}</td>"
+                       f"<td align='right' style='padding:2px 6px'><b>{v}</b></td></tr>"
                        for k, v in rows)
         self._stats_box.setHtml(
-            f"<div style='color:{_FG}; font-size:10pt'><b style='color:{col}'>"
-            f"{self.channel_labels[self.channels.index(self._signal_ch)]}</b>"
+            f"<div style='color:{_FG}; font-size:16pt'><b style='color:{col}'>"
+            f"&nbsp;{self.channel_labels[self.channels.index(self._signal_ch)]}</b>"
             f"<table cellspacing='0'>{html}</table></div>")
 
     def _redraw(self) -> None:
