@@ -421,6 +421,13 @@
   25 Hz triggers: > 15 fps redraws (≈ one per waveform). Default N = refresh_trigger_cnt
   rounded to a power of 2 (100 → 128); N kept between runs. Snapshot CSV: same layout + one
   `# Offset` comment line; its area is now offset-subtracted. 316 passed.
+- Stats box larger (16 pt, bold values; user).
+- **User: "a few seconds until the waveform appears" in snapshot mode.** From the log
+  (hardware): Start 22:08:00.2 → H2PD open 22:08:11.8 = 11.6 s; the monitor's NOCell also
+  11.6 s (3405D by serial: 3 s). Cause: ps2000 has no open-by-serial; the search opened every
+  free 2204A (~4 s each) plus a final "no more units" call. Change: the search stops as soon as
+  our serial is open (expected NOCell ~4 s, H2PD ~8 s since 0359 enumerates first); each
+  open/close call is now timed in the debug log. ⏳ To verify on hardware at the next start.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

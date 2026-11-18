@@ -526,20 +526,33 @@ class Digitizer(threading.Thread):
         # ps2000_open_unit opens the next *free* unit (no serial argument): open all free
         # units, keep ours, close the rest (as the old code). Under the open lock, so two tabs
         # starting at once cannot grab each other's unit; a running unit's readout goes on.
+        # Each open takes ~4 s and the final "no more units" call ~3.5 s (M7: 11.6 s for two
+        # free units), so the search stops as soon as ours is open (the old code opened all).
         with self._open_lock:
             handles = {}
+            t_start = time.monotonic()
             while True:
+                t0 = time.monotonic()
                 h = ps2000.ps2000_open_unit()
                 if h <= 0:
+                    _log.debug("ps2000_open_unit: no more free units (%.1f s)",
+                               time.monotonic() - t0)
                     break
-                handles[self.getPico2000Serial(h)] = h
+                serial = self.getPico2000Serial(h)
+                handles[serial] = h
+                _log.debug("ps2000_open_unit: %s (%.1f s)", serial, time.monotonic() - t0)
+                if serial == self.serial:
+                    break
             self.chandle = None
             for serial, handle in handles.items():
                 if serial == self.serial:
                     self.chandle = ctypes.c_int16(handle)
                 else:
+                    t0 = time.monotonic()
                     ps2000.ps2000_close_unit(ctypes.c_int16(handle))
-        _log.info("%d free PicoScope 2000 unit(s) found: %s", len(handles), list(handles))
+                    _log.debug("ps2000_close_unit: %s (%.1f s)", serial, time.monotonic() - t0)
+        _log.info("PicoScope 2000 units opened while searching: %s (%.1f s)", list(handles),
+                  time.monotonic() - t_start)
         if self.chandle is None:
             raise DigitizerInitError(
                 f"PicoScope {self.model} {self.serial} not found (free units: "

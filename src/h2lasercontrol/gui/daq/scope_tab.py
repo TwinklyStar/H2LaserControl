@@ -51,7 +51,7 @@ def shown_channel_names(dcfg: dict[str, Any]) -> list[str]:
 
 STATE_TEXT = {
     STOPPED: ("Stopped", GREY),
-    STARTING: ("Starting … (opening the scopes takes a few seconds)", BLUE),
+    STARTING: ("Starting … (opening a scope takes up to about 10 s)", BLUE),
     RUNNING: ("Running", GREEN),
     PAUSED: ("Paused: no data is taken or saved", ORANGE),
     STOPPING: ("Stopping … (closing files)", BLUE),
