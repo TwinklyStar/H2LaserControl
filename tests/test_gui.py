@@ -86,6 +86,17 @@ def test_insert_and_retract_mirror(window, qtbot):
     assert all(e["user"] == "tester" for e in entries)
 
 
+def test_insert_needs_no_confirmation(window, qtbot, monkeypatch):
+    def no_dialog(self):
+        raise AssertionError("Insert must not ask for confirmation (user, 2026-11-18)")
+
+    monkeypatch.setattr(QMessageBox, "exec", no_dialog)
+    hit = panel(window, "hitmv")
+    hit.cards[0].insert_btn.click()
+    qtbot.waitUntil(lambda: hit.cards[0].state_label.text() == "INSERTED" and not hit.busy,
+                    timeout=10000)
+
+
 def test_interlock_locks_other_axis(window, qtbot):
     hit = panel(window, "hitmv")
     pd, mirror = hit.cards[0], hit.cards[1]

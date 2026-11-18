@@ -83,6 +83,8 @@ is where every command passes through.
   retracted* (inserted, partly inserted after a stop, or moving). GUI: while one axis is not
   retracted, the other axis's operation buttons are disabled (with the reason). Also enforced in
   the driver (scripts can't bypass it); unknown position ⇒ blocked.
+- F2b. **No confirmation dialog when inserting the VUV photodiode or mirror** (user,
+  2026-11-18): the Insert button starts the move at once (the interlock F2a still applies).
 - F3. MFF101: flip to position 1 / 2 (named, e.g. "DUMP" / "PASS"), query current position.
 - F3b. DG645: **only adjust the delay of one channel** (user, 2026-11-17): show it, set a new
   value, step it up/down; no other DG645 operations. Transport must allow RS-232 now and LAN

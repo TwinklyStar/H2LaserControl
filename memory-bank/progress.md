@@ -241,6 +241,9 @@
   **On hardware via our driver (13:36):** unit 2 retract 0.44 s, insert 0.44 s, insert again =
   "already there". Unit 1 found at **retract** — left there by the user's GUI on 2026-11-17
   19:15 (op-log); not touched.
+- **HIT-MV Insert: confirmation dialog removed** (user: not needed; design F2b). Insert starts at
+  once; interlock unchanged. New GUI test checks that no dialog opens. ELL14 maintenance
+  confirmations (save max energy, home offset, clean) are kept.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

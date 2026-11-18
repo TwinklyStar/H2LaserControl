@@ -50,20 +50,14 @@ class AxisCard(QGroupBox):
         for b in (self.insert_btn, self.retract_btn):
             set_role(b, "primary")
             buttons.addWidget(b)
-        self.insert_btn.clicked.connect(self._insert)
+        # no confirmation dialog for insert (user, 2026-11-18)
+        self.insert_btn.clicked.connect(lambda: panel.axis_action("insert", self.axis))
         self.retract_btn.clicked.connect(lambda: panel.axis_action("retract", self.axis))
 
         for w in (self.state_label, self.hint_label, self.bar, self.pos_label, self.alarm_label):
             lay.addWidget(w)
         lay.addSpacing(6)
         lay.addLayout(buttons)
-
-    def _insert(self) -> None:
-        if self.panel.confirm(
-            "Insert", f"Insert the {self.label} into the beam?\n\n"
-            "While it is inserted, the 122 nm beam does not reach the target.",
-        ):
-            self.panel.axis_action("insert", self.axis)
 
     def display(self, info: dict[str, Any] | None, *, can_act: bool, moving: str | None,
                 elapsed: float | None, blocked_by: str | None = None) -> None:

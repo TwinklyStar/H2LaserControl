@@ -90,7 +90,7 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
 
 - **HIT-MV:** the two feedthroughs are never inserted at the same time (driver interlock and GUI
   lock). Retract is always allowed. "Insert" = origin return (`H:`) to 0. Retracted = 30000000
-  units (60 mm real; 1 unit = 2 nm). Insert asks for confirmation. STOP stops a move.
+  units (60 mm real; 1 unit = 2 nm). Insert starts at once (no confirmation dialog, user's choice). STOP stops a move.
 - **ELL14:** home offset ≥ 0.7°; continuous jog is not offered. "Go to min energy" =
   max-energy angle + 45°. The max-energy angle is saved in `config/saved_angles.json`
   (30.9877° on 2026-11-17).
