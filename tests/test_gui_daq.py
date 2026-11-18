@@ -41,10 +41,12 @@ def actions(w):
 def test_scope_tab_start_pause_stop(window, qtbot):
     t: ScopeTab = tab(window, "scope_monitor")
     assert t.session.state == STOPPED  # nothing starts by itself (F8a)
-    assert t.start_btn.isEnabled() and not t.pause_btn.isEnabled() and not t.stop_btn.isEnabled()
+    # start page only (no plots) until Start (user 2026-11-18)
+    assert t.stack.currentIndex() == 0 and t.view is None and t.start_btn.isEnabled()
 
     t.start_btn.click()
     qtbot.waitUntil(lambda: t.session.state == RUNNING, timeout=10000)
+    assert t.stack.currentWidget() is t.run_page and t.view is not None
     # keeps running while another tab is shown
     window.tabs.setCurrentIndex(0)
     qtbot.waitUntil(lambda: t.view.n_points["212"] >= 2, timeout=10000)
@@ -61,7 +63,8 @@ def test_scope_tab_start_pause_stop(window, qtbot):
     qtbot.waitUntil(lambda: t.view.n_points["212"] > n, timeout=10000)
     t.stop_btn.click()
     qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
-    assert t.start_btn.isEnabled() and not t.stop_btn.isEnabled()
+    qtbot.waitUntil(lambda: t.stack.currentIndex() == 0, timeout=5000)  # back to start page
+    assert t.start_btn.isEnabled() and t.view is None
     assert ("scope_monitor", "stop", "done") in actions(window)
 
     t.start_btn.click()  # can be started again
@@ -115,6 +118,10 @@ def test_camera_tab_start_page_open_capture_close(window, qtbot, tmp_path):
                  "_free_radio", "_capture_btn", "_run_btn"):
         assert hasattr(w, name), name
     assert w._config_combo.findText("default.toml") >= 0  # config/camera/*.toml listed
+    # the sidebar is wide enough for its content (it was cut off on the right, 2026-11-18)
+    from PySide6.QtWidgets import QScrollArea
+    scroll = w.findChild(QScrollArea)
+    assert scroll.viewport().width() >= scroll.widget().minimumSizeHint().width()
 
     w._capture_btn.click()
     qtbot.waitUntil(lambda: ("camera", "record", "done") in actions(window), timeout=10000)
@@ -137,3 +144,16 @@ def test_close_window_stops_everything(window, qtbot):
     window.close()  # "still running" question answered Yes by the fixture
     assert mon.session.state == STOPPED and cam.window is None
     assert all(not d.is_alive() for d in mon.session.digitizers.values())
+
+
+def test_scope_start_failure_returns_to_start_page(window, qtbot, monkeypatch):
+    def fail(self, config):
+        raise RuntimeError("PicoScope 2204A 12017/0366 not found")
+
+    monkeypatch.setattr(VirtualDigitizer, "_init_hardware", fail)
+    t: ScopeTab = tab(window, "vuv_pd")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED and t.stack.currentIndex() == 0,
+                    timeout=10000)
+    assert t.start_error.isVisibleTo(t) and "not found" in t.start_error.text()
+    assert ("vuv_pd", "acquire", "failed") in actions(window)

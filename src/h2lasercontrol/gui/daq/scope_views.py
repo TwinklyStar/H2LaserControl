@@ -3,8 +3,9 @@
 `ContinuousView` = the old continuous monitor window (signal trends + live averaged waveforms);
 `SnapshotView` = the old snapshot window (averaged waveforms + area statistics, Freeze / Save).
 They are plain widgets now: the tab feeds them the data items (`show_items`) instead of each
-window polling its own queue. Look and mouse controls are unchanged (dark Catppuccin palette,
-left drag = zoom box, right drag = pan, wheel = zoom; +/- step the Y range).
+window polling its own queue. Layout and mouse controls are unchanged (left drag = zoom box,
+right drag = pan, wheel = zoom; +/- step the Y range). Colours: light theme matching the rest
+of the program (user 2026-11-18; the old windows were dark).
 Removed: the snapshot window's own Pause button (the tab's Pause stops the acquisition and the
 display freezes with it, user 2026-11-18) and the Ctrl+C handler (no terminal).
 """
@@ -21,29 +22,32 @@ import numpy as np
 import pyqtgraph as pg
 from PySide6 import QtCore, QtWidgets
 
-_BG = "#1e1e2e"  # window / plot background
-_FG = "#cdd6f4"  # default text
-_SURF = "#313244"  # panel header background
-_GRID = "#45475a"  # grid line colour
-_CH_COLOURS = ["#a6e3a1", "#89b4fa", "#fab387", "#f38ba8", "#cba6f7", "#89dceb", "#f9e2af",
-               "#94e2d5"]
+_BG = "#ffffff"  # plot background
+_FG = "#212121"  # text, axes
+_SURF = "#e6e6e6"  # panel titles / statistics labels
+_GRID = "#c8c8c8"  # separators
+_MATH = "#8d6e00"  # Freeze "Math" value (dark amber, readable on light grey)
+# channel colours readable on white (same family as the program's status colours)
+_CH_COLOURS = ["#1565c0", "#2e7d32", "#e65100", "#c62828", "#6a1b9a", "#00838f", "#6d4c41",
+               "#ad1457"]
 
-DARK_STYLE = f"""
-    QWidget#scopeView, QWidget#scopeView QWidget {{ background: {_BG}; color: {_FG};
-                            font-family: Menlo, Consolas, monospace; font-size: 12px; }}
-    QLabel#panelTitle     {{ font-size: 13px; font-weight: bold; padding: 4px 8px;
+VIEW_STYLE = f"""
+    QLabel#panelTitle     {{ font-weight: bold; padding: 4px 8px;
                             background: {_SURF}; border-radius: 4px; }}
-    QLabel#statsLabel     {{ font-size: 12px; padding: 2px 10px; background: {_SURF};
-                            border-radius: 4px; }}
+    QLabel#statsLabel     {{ padding: 2px 10px; background: {_SURF}; border-radius: 4px; }}
     QWidget#statusRow     {{ background: {_SURF}; border-top: 1px solid {_GRID}; }}
     QSplitter::handle     {{ background: {_GRID}; width: 3px; }}
     QFrame#statsSep       {{ color: {_GRID}; }}
-    QWidget#scopeView QPushButton {{ background: {_SURF}; color: {_FG};
-                            border: 1px solid {_GRID}; border-radius: 4px;
-                            font-size: 15px; font-weight: bold; padding: 0px; }}
-    QWidget#scopeView QPushButton:hover   {{ background: {_GRID}; }}
-    QWidget#scopeView QPushButton:pressed {{ background: #585b70; }}
+    QWidget#scopeView QPushButton {{ font-weight: bold; padding: 0px; }}
 """
+
+
+def _style_plot(p: pg.PlotItem) -> None:
+    """Dark axes and tick labels on the white plot (pyqtgraph defaults are for black)."""
+    for name in ("left", "bottom"):
+        ax = p.getAxis(name)
+        ax.setPen(pg.mkPen(_FG))
+        ax.setTextPen(pg.mkPen(_FG))
 
 
 def _colour(i: int) -> str:
@@ -180,7 +184,7 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
                  parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("scopeView")
-        self.setStyleSheet(DARK_STYLE)
+        self.setStyleSheet(VIEW_STYLE)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         self.channels = channels
         channel_groups = channel_groups or [channels]
@@ -225,6 +229,7 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
             col = _colour(i)
             p = gw.addPlot(row=i, col=0, axisItems={"bottom": pg.DateAxisItem(orientation="bottom")},
                            viewBox=_ZoomPanViewBox())
+            _style_plot(p)
             p.setLabel("left", ch, units="nV·s", color=col, size="10pt")
             p.getAxis("left").enableAutoSIPrefix(False)  # compound unit: no "knV·s"
             p.showGrid(x=True, y=True, alpha=0.20)
@@ -260,6 +265,7 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
             gw = pg.GraphicsLayoutWidget()
             gw.setBackground(_BG)
             p = gw.addPlot(row=0, col=0, viewBox=_ZoomPanViewBox())
+            _style_plot(p)
             p.setLabel("left", ch, units="V", color=col, size="10pt")
             p.showGrid(x=True, y=True, alpha=0.20)
             p.getAxis("left").setWidth(75)
@@ -331,7 +337,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
                  parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("scopeView")
-        self.setStyleSheet(DARK_STYLE)
+        self.setStyleSheet(VIEW_STYLE)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         self.channels = channels
         self.channel_labels = channel_labels
@@ -381,6 +387,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
             gw = pg.GraphicsLayoutWidget()
             gw.setBackground(_BG)
             p = gw.addPlot(row=0, col=0, viewBox=_ZoomPanViewBox())
+            _style_plot(p)
             p.setLabel("left", label, units="V", color=col, size="10pt")
             p.showGrid(x=True, y=True, alpha=0.20)
             p.getAxis("left").setWidth(75)
@@ -411,7 +418,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         self._lbl_area = QtWidgets.QLabel("  Area: —")
         self._lbl_area.setObjectName("statsLabel")
         self._lbl_area.setStyleSheet(
-            f"color: {_colour(0)}; font-weight: bold; font-size: 13px;"
+            f"color: {_colour(0)}; font-weight: bold;"
             f"padding: 2px 10px; background: {_SURF}; border-radius: 4px;")
         self._lbl_n = QtWidgets.QLabel("  N: —")
         self._lbl_n.setObjectName("statsLabel")
@@ -423,7 +430,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         self._lbl_math = QtWidgets.QLabel("")
         self._lbl_math.setObjectName("statsLabel")
         self._lbl_math.setStyleSheet(
-            "color: #f9e2af; font-weight: bold; font-size: 13px;"
+            f"color: {_MATH}; font-weight: bold;"
             f"padding: 2px 10px; background: {_SURF}; border-radius: 4px;")
         self._save_btn = QtWidgets.QPushButton("Save")
         self._save_btn.setFixedSize(60, 28)

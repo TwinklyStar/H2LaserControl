@@ -272,9 +272,24 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidget(sidebar)
         scroll.setWidgetResizable(True)
-        scroll.setFixedWidth(276)  # 260 content + ~16 scrollbar
+        # H2LaserControl merge: was a fixed 276 px (260 content + ~16 scrollbar). Inside the
+        # merged program (Fusion style) the content needs more, so it was cut off on the right:
+        # size it to the content's own minimum width instead (never narrower than before).
+        self._sidebar_scroll = scroll
+        self._fit_sidebar()
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         return scroll
+
+    def _fit_sidebar(self) -> None:
+        """H2LaserControl merge: sidebar width = its content's minimum width (>= old 276 px)."""
+        scroll = self._sidebar_scroll
+        scrollbar = scroll.verticalScrollBar().sizeHint().width()
+        content = scroll.widget().minimumSizeHint().width()
+        scroll.setFixedWidth(max(276, content + scrollbar + 2 * scroll.frameWidth() + 4))
+
+    def showEvent(self, event) -> None:
+        self._fit_sidebar()  # again after the style/fonts are applied
+        super().showEvent(event)
 
     # -------------------------------------------------------------- Camera --
 

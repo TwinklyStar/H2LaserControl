@@ -1,8 +1,10 @@
-"""PicoScope tab: Start / Pause / Stop + the ported plot view (F8a).
+"""PicoScope tab: start page, then Pause / Stop + the ported plot view (F8a).
 
-Nothing starts by itself. Once started, the acquisition keeps running in its own threads while
-other tabs are shown, until Stop is pressed (or the program is closed). Pause: no triggers are
-taken and nothing is written; the display freezes; Resume continues in the same files.
+Nothing starts by itself. Until Start, and again after Stop, the tab shows only a start page
+(which scopes, where the data goes, one Start button; user 2026-11-18). Once started, the
+acquisition keeps running in its own threads while other tabs are shown, until Stop is pressed
+(or the program is closed). Pause: no triggers are taken and nothing is written; the display
+freezes; Resume continues in the same files. Each Start gets a fresh plot view.
 """
 
 from __future__ import annotations
@@ -10,8 +12,16 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...config import DeviceConfig
 from ...daq.picoscope.session import PAUSED, RUNNING, STARTING, STOPPED, STOPPING, PicoSession
@@ -30,6 +40,10 @@ STATE_TEXT = {
 }
 
 
+class ScopeStartPage(QWidget):
+    """Start page (named class for the style sheet, see style.OWN)."""
+
+
 class ScopeTab(QWidget):
     tab_state_changed = Signal(str)  # "ok" | "busy" | "off" | "error" (same as device tabs)
 
@@ -38,57 +52,92 @@ class ScopeTab(QWidget):
         super().__init__(parent)
         self.cfg = cfg
         self.oplog = oplog
+        self.sim = sim
         self.session = PicoSession(cfg.key, cfg.settings, oplog, sim=sim, base_dir=base_dir)
+        self.view: Any = None  # plot view while started
+        s = self.session
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 12, 16, 12)
-        root.setSpacing(8)
+        root.setContentsMargins(0, 0, 0, 0)
+        self.stack = QStackedWidget()
+        root.addWidget(self.stack)
 
+        # --- page 0: start page ---------------------------------------------------------------
+        start = ScopeStartPage()
+        lay = QVBoxLayout(start)
+        lay.setContentsMargins(40, 30, 40, 30)
+        lay.setSpacing(14)
+        title = QLabel(f"<b style='font-size:15pt'>{cfg.settings.get('label', cfg.key)}</b>")
+        scopes = "<br>".join(
+            f"• <b>{name}</b>: PicoScope {d.get('model')} {d.get('serial')}, channels "
+            + ", ".join(f"{c} = {n}" for c, n in zip(d["channels"], d["channel_name"], strict=True))
+            + f"  →  files <b>{d.get('output_name')}_…</b>"
+            for name, d in s.configs.items())
+        mode = ("continuous monitor: trend of the pulse area + averaged waveforms"
+                if s.mode == "continuous" else
+                f"snapshot: averaged waveform and pulse area of channel "
+                f"{next(iter(s.configs.values())).get('snapshot_channel', 'A')}, Freeze / Save")
+        paths = ", ".join(sorted({s.data_path(c) for c in s.configs.values()}))
+        info = QLabel(
+            f"{scopes}<br><br>Mode: {mode}"
+            + ("  —  <b>simulated scopes</b>" if sim else "") + "<br>"
+            f"Data is saved to <b>{paths}</b>.<br><br>"
+            "The scopes are <b>not open</b>. Press <b>Start</b> to open them and start taking "
+            "and saving data. It keeps running while you use other tabs, until you press Stop."
+            "<br>Close PicoScope 7 and the old H2LaserDAQ program first.")
+        info.setWordWrap(True)
+        info.setTextFormat(Qt.TextFormat.RichText)
+        self.start_btn = QPushButton("▶  Start")
+        set_role(self.start_btn, "primary")
+        self.start_btn.setFixedWidth(260)
+        self.start_btn.setToolTip("Open the scope(s) and start taking and saving data")
+        self.start_btn.clicked.connect(self.start)
+        self.start_error = QLabel()
+        self.start_error.setWordWrap(True)
+        set_role(self.start_error, "error")
+        self.start_error.hide()
+        for w in (title, info, self.start_btn, self.start_error):
+            lay.addWidget(w)
+        lay.addStretch(1)
+        self.stack.addWidget(start)
+
+        # --- page 1: running ------------------------------------------------------------------
+        run = QWidget()
+        rlay = QVBoxLayout(run)
+        rlay.setContentsMargins(16, 12, 16, 12)
+        rlay.setSpacing(8)
         header = QHBoxLayout()
         self.state_label = QLabel()
-        self.start_btn = QPushButton("▶  Start")
         self.pause_btn = QPushButton("⏸  Pause")
         self.stop_btn = QPushButton("■  Stop")
-        set_role(self.start_btn, "primary")
         set_role(self.pause_btn, "primary")
         set_role(self.stop_btn, "stop")
-        self.start_btn.setToolTip("Open the scope(s) and start taking and saving data")
         self.pause_btn.setToolTip("Pause: stop taking data (files stay open); press again to resume")
         self.stop_btn.setToolTip("Stop taking data, close the files and release the scope(s)")
-        self.start_btn.clicked.connect(self.start)
         self.pause_btn.clicked.connect(self.toggle_pause)
         self.stop_btn.clicked.connect(self.stop)
         header.addWidget(self.state_label)
         header.addStretch(1)
-        for b in (self.start_btn, self.pause_btn, self.stop_btn):
-            header.addWidget(b)
-        root.addLayout(header)
-
+        header.addWidget(self.pause_btn)
+        header.addWidget(self.stop_btn)
+        rlay.addLayout(header)
         self.detail_label = QLabel()
         self.detail_label.setWordWrap(True)
         set_role(self.detail_label, "muted")
-        root.addWidget(self.detail_label)
+        rlay.addWidget(self.detail_label)
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setStyleSheet("color: #dddddd;")
-        root.addWidget(line)
+        rlay.addWidget(line)
         self.error_label = QLabel()
         self.error_label.setWordWrap(True)
         set_role(self.error_label, "error")
         self.error_label.hide()
-        root.addWidget(self.error_label)
-
-        s = self.session
-        if s.mode == "snapshot":
-            name, dcfg = next(iter(s.configs.items()))
-            self.view: Any = SnapshotView(
-                dcfg["channels"], dcfg["channel_name"], device=name,
-                signal_channel=dcfg.get("snapshot_channel", dcfg["channels"][0]),
-                snapshot_dir=os.path.join(s.data_path(dcfg), "snapshots"))
-            self.view.saved.connect(self._on_snapshot_saved)
-        else:
-            self.view = ContinuousView(s.channel_names(), s.channel_groups())
-        root.addWidget(self.view, 1)
+        rlay.addWidget(self.error_label)
+        self.view_holder = QVBoxLayout()
+        rlay.addLayout(self.view_holder, 1)
+        self.run_page = run
+        self.stack.addWidget(run)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
@@ -98,8 +147,13 @@ class ScopeTab(QWidget):
 
     # --- actions ------------------------------------------------------------------------------
     def start(self) -> None:
+        if self.session.state != STOPPED:
+            return
+        self.start_error.hide()
         self.error_label.hide()
+        self._make_view()
         self.session.start()
+        self.stack.setCurrentWidget(self.run_page)
         self._refresh()
 
     def toggle_pause(self) -> None:
@@ -121,18 +175,50 @@ class ScopeTab(QWidget):
         self.timer.stop()
         self.session.shutdown()
 
+    def _make_view(self) -> None:
+        s = self.session
+        if s.mode == "snapshot":
+            name, dcfg = next(iter(s.configs.items()))
+            view: Any = SnapshotView(
+                dcfg["channels"], dcfg["channel_name"], device=name,
+                signal_channel=dcfg.get("snapshot_channel", dcfg["channels"][0]),
+                snapshot_dir=os.path.join(s.data_path(dcfg), "snapshots"))
+            view.saved.connect(self._on_snapshot_saved)
+        else:
+            view = ContinuousView(s.channel_names(), s.channel_groups())
+        self.view = view
+        self.view_holder.addWidget(view, 1)
+
+    def _drop_view(self) -> None:
+        if self.view is not None:
+            self.view_holder.removeWidget(self.view)
+            self.view.deleteLater()
+            self.view = None
+
     def _on_snapshot_saved(self, path: str) -> None:
         self.oplog.write(device=self.cfg.key, action="save_snapshot", result={"file": path})
 
     # --- polling ------------------------------------------------------------------------------
     def poll(self) -> None:
         items = self.session.poll()
-        if items:
+        if items and self.view is not None:
             self.view.show_items(items)
         self._refresh()
 
+    def _errors_html(self) -> str:
+        return "<br>".join(f"{name} stopped with an error: {msg}"
+                           for name, msg in self.session.errors.items())
+
     def _refresh(self) -> None:
         s = self.session
+        if s.state == STOPPED and self.stack.currentWidget() is self.run_page:
+            # stopped (by Stop, or every scope failed): back to the start page
+            self._drop_view()
+            self.stack.setCurrentIndex(0)
+            if s.errors:
+                self.start_error.setText(self._errors_html())
+                self.start_error.show()
+
         text, color = STATE_TEXT[s.state]
         self.state_label.setText(f"<b style='color:{color}; font-size:13pt'>●</b> "
                                  f"<b style='font-size:13pt'>{text}</b>")
@@ -155,14 +241,13 @@ class ScopeTab(QWidget):
         lines.append("Data: " + ", ".join(paths))
         self.detail_label.setText("<br>".join(lines))
 
-        if s.errors:
-            self.error_label.setText("<br>".join(
-                f"{name} stopped with an error: {msg}" for name, msg in s.errors.items()))
+        if s.errors and s.state != STOPPED:
+            self.error_label.setText(self._errors_html())
             self.error_label.show()
 
         if s.errors:
             tab = "error"
-        elif s.state in (RUNNING,):
+        elif s.state == RUNNING:
             tab = "ok"
         elif s.state in (STARTING, STOPPING, PAUSED):
             tab = "busy"

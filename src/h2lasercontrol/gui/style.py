@@ -15,7 +15,8 @@ TAB_STATES = {"ok": GREEN, "busy": BLUE, "off": GREY, "error": RED}
 # limited to these containers, so they do NOT reach the embedded camera window (laserdaq
 # MainWindow), which must look exactly like the old camera program (F8b). A type selector also
 # matches subclasses (DevicePanel -> HitMvPanel, ...). Role-based rules are safe everywhere.
-OWN = ("DevicePanel", "ScopeTab", "CameraStartPage", "CameraHeader", "LogPanel", "TopBar")
+OWN = ("DevicePanel", "ScopeTab", "ScopeStartPage", "CameraStartPage", "CameraHeader",
+       "LogPanel", "TopBar")
 
 
 def _scoped(selector: str) -> str:

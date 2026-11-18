@@ -119,7 +119,8 @@ src/h2lasercontrol/
                   parameters of its MainWindow, output_dir default data/camera, mock without
                   the 12 MB Ref BMP -> synthetic spot. cli/ (TUI) and camera/select.py dropped.
   gui/daq/        scope_views.py  ContinuousView / SnapshotView (ported pyqtgraph windows)
-                  scope_tab.py    ScopeTab: Start / Pause-Resume / Stop + per-scope status line
+                  scope_tab.py    ScopeTab: start page <-> running page (Pause-Resume / Stop,
+                                  per-scope status line, plot view made on each Start)
                   camera_tab.py   CameraTab: start page <-> embedded laserdaq MainWindow
                   DAQ_TABS registry by type ("picoscope", "ids_camera")
 config/devices.toml  [devices.scope_monitor|vuv_pd] type "picoscope", digitizers.<name> with the

@@ -50,6 +50,10 @@ Survey of the old code: `progress.md`, 2026-11-18.
   10 s" shown in the tab (old: printed).
 - Data folders: `data/picoscope` (was `data/`), `data/camera` (was `output/`); camera configs
   in `config/camera` (was `configs/`).
+- Scope tabs: start page until Start / after Stop, fresh plots on each Start; light colours
+  instead of the dark Catppuccin theme (user 2026-11-18).
+- Camera sidebar width = its content's minimum width (was a fixed 276 px, cut off in the
+  merged program's Fusion style; user 2026-11-18). Otherwise the camera window is unchanged.
 
 ## Open points
 - **Camera on USB 2.0** (`DeviceLinkSpeed` 60 MB/s, M1): 25 Hz full-frame recording impossible;

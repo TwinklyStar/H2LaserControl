@@ -300,6 +300,11 @@
   fixed 276 px → general rules scoped to our widget classes (`style.OWN`).
   Tests: 292 passed, 21 skipped (18 real-camera tests gated by `H2_CAMERA_HW=1`, 3 need the
   old reference BMP); ruff clean. Nothing was run on the real scopes/camera in this step.
+- **User feedback on the sim GUI (fixed):** camera sidebar cut off on the right (old fixed
+  276 px too narrow for the Fusion style) → sized to its content's minimum width (also on
+  show); scope tabs now show only a start page (scopes, data folder, Start) until Start and
+  again after Stop / when every scope failed (error shown there); waveform views in a light
+  theme matching the GUI (white plots, dark axes, darker channel colours). 293 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
