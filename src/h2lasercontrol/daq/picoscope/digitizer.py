@@ -15,7 +15,10 @@ Changes for the merged program:
 - a wait interrupted by Stop / Pause is aborted and NOT written (the old code wrote it);
 - the 3405D is opened by its serial number (the old code opened the first 3000-series unit);
 - every SDK call holds a per-DLL lock (thread safety of the drivers is not documented);
-- status / warning / error / rate items for the tab header are put on the same queue.
+- status / warning / error / rate items for the tab header are put on the same queue;
+- a failed readout (e.g. PICO_TIMEOUT: the 3405D once stalled 5 s on its USB link, M7) skips
+  that one waveform and re-arms; only MAX_READOUT_FAILS failures in a row end the run (the old
+  code ended the run at the first one, and stopped all scopes with it).
 """
 
 from __future__ import annotations
@@ -40,11 +43,25 @@ _log = logging.getLogger(__name__)
 
 TRIGGERS_PER_FILE = 10000  # ~400 s at 25 Hz
 NO_TRIGGER_WARN_S = 10
+MAX_READOUT_FAILS = 3  # failed readouts in a row before the scope is given up (error)
 _LOCKS = {"3405D": threading.RLock(), "2204A": threading.RLock()}
 
 
 class DigitizerInitError(Exception):
     pass
+
+
+class ReadoutError(Exception):
+    """One block could not be armed or read out. The block is skipped and re-armed."""
+
+
+def _status_name(status: int) -> str:
+    try:
+        from picosdk.constants import PICO_STATUS_LOOKUP
+
+        return PICO_STATUS_LOOKUP.get(status, str(status))
+    except ImportError:
+        return str(status)
 
 
 class Digitizer(threading.Thread):
@@ -74,6 +91,7 @@ class Digitizer(threading.Thread):
         self.csv_pointer = None
         self.root_pointer = None
         self.files: list[str] = []  # output files opened so far (for the op log)
+        self.skipped = 0  # waveforms lost to failed readouts (for the op log)
         self._lock = _LOCKS.get(self.model, threading.RLock())
         self._hw_open = False
 
@@ -221,12 +239,27 @@ class Digitizer(threading.Thread):
             trigger_cnt = 0
             time_start = time.time()
             rate_cnt = 0
+            fails = 0  # failed readouts in a row
             while trigger_cnt < self.trigger_per_file and not self._stop_evt.is_set():
                 if self._paused.is_set():
                     self._wait_while_paused()
                     time_start, rate_cnt = time.time(), 0
                     continue
-                if not self._capture_block():  # interrupted: nothing captured, nothing written
+                try:
+                    captured = self._capture_block()
+                except ReadoutError as e:
+                    fails += 1
+                    self.skipped += 1
+                    _log.warning("%s %s %s: %s (%d in a row, %d skipped in this run)",
+                                 self.device, self.model, self.serial, e, fails, self.skipped)
+                    if fails >= MAX_READOUT_FAILS:
+                        raise ReadoutError(f"{e} ({fails} times in a row)") from e
+                    self._post("warning", message=(
+                        f"{time.strftime('%H:%M:%S')} readout failed ({e}): waveform skipped,"
+                        f" {self.skipped} skipped so far"))
+                    continue
+                fails = 0
+                if not captured:  # interrupted: nothing captured, nothing written
                     continue
                 trigger_cnt += 1
                 rate_cnt += 1
@@ -418,14 +451,19 @@ class Digitizer(threading.Thread):
         _log.info("[INIT] %s: %d samples at %s ns", self.device, maxsamples, self.delta_t)
 
     def pico3000BlockCapture(self) -> bool:
-        from picosdk.functions import assert_pico_ok
         from picosdk.ps3000a import ps3000a
+
+        def failed(what: str, status: int) -> ReadoutError:
+            with self._lock:
+                ps3000a.ps3000aStop(self.chandle)  # drop the block, ready to re-arm
+            return ReadoutError(f"{what} returned {_status_name(status)}")
 
         with self._lock:
             self.status["runblock"] = ps3000a.ps3000aRunBlock(
                 self.chandle, self.preTriggerSamples, self.postTriggerSamples, self.timebase,
                 1, None, 0, None, None)
-        assert_pico_ok(self.status["runblock"])
+        if self.status["runblock"] != 0:
+            raise failed("RunBlock", self.status["runblock"])
         ready = ctypes.c_int16(0)
 
         def is_ready() -> bool:
@@ -441,7 +479,8 @@ class Digitizer(threading.Thread):
             self.status["GetValues"] = ps3000a.ps3000aGetValues(
                 self.chandle, 0, ctypes.byref(self.cmaxSamples), 0, 0, 0,
                 ctypes.byref(self.overflow))
-        assert_pico_ok(self.status["GetValues"])
+        if self.status["GetValues"] != 0:
+            raise failed("GetValues", self.status["GetValues"])
         return True
 
     # ------------------------------------------------------------------------------------------
@@ -537,15 +576,21 @@ class Digitizer(threading.Thread):
         return buf.value.decode(errors="ignore")
 
     def pico2000BlockCapture(self) -> bool:
-        from picosdk.functions import assert_pico2000_ok
         from picosdk.ps2000 import ps2000
+
+        # ps2000 returns <= 0 for failure (no status codes)
+        def failed(what: str) -> ReadoutError:
+            with self._lock:
+                ps2000.ps2000_stop(self.chandle)
+            return ReadoutError(f"{what} failed")
 
         oversample = ctypes.c_int16(1)
         with self._lock:
             self.status["runBlock"] = ps2000.ps2000_run_block(
                 self.chandle, self.sample_number, self.timebase, oversample,
                 ctypes.byref(self.pico2000_timeIndisposedms))
-        assert_pico2000_ok(self.status["runBlock"])
+        if self.status["runBlock"] <= 0:  # as picosdk's assert_pico2000_ok
+            raise failed("run_block")
 
         def is_ready() -> bool:
             with self._lock:
@@ -561,7 +606,8 @@ class Digitizer(threading.Thread):
                 self.bufferMax["A"].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
                 self.bufferMax["B"].ctypes.data_as(ctypes.POINTER(ctypes.c_int16)),
                 None, None, ctypes.byref(oversample), self.cmaxSamples)
-        assert_pico2000_ok(self.status["getValues"])
+        if self.status["getValues"] <= 0:
+            raise failed("get_values")
         return True
 
 

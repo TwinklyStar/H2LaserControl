@@ -11,6 +11,7 @@ import uproot
 
 from h2lasercontrol.config import DEFAULT_CONFIG, PROGRAM_DIR, load_config
 from h2lasercontrol.daq.picoscope import assistant
+from h2lasercontrol.daq.picoscope import digitizer as digitizer_mod
 from h2lasercontrol.daq.picoscope import session as session_mod
 from h2lasercontrol.daq.picoscope.configs import (
     ScopeConfigError,
@@ -176,6 +177,50 @@ def test_one_failing_scope_does_not_stop_the_other(cfg, tmp_path, monkeypatch):
     assert s.state == RUNNING
     failed = [e for e in read_oplog(oplog.today_path()) if e["event"] == "failed"]
     assert failed and failed[0]["args"] == {"scope": "NOCell"}
+    s.stop()
+    wait(lambda: s.state == STOPPED, session=s)
+
+
+def test_failed_readout_skips_one_waveform(cfg, tmp_path, monkeypatch):
+    """M7: the 3405D once returned PICO_TIMEOUT from GetValues after a 5 s USB stall. One
+    failed readout skips that waveform and the run goes on (the old code ended the run)."""
+    real = VirtualDigitizer._capture_block
+    calls = {"n": 0}
+
+    def capture(self):
+        if self.device == "DET10A2":
+            calls["n"] += 1
+            if calls["n"] in (20, 40, 41):  # one failure, then two in a row
+                raise digitizer_mod.ReadoutError("GetValues returned PICO_TIMEOUT")
+        return real(self)
+
+    monkeypatch.setattr(VirtualDigitizer, "_capture_block", capture)
+    s, oplog = make(cfg, "scope_monitor", tmp_path)
+    s.start()
+    d = s.digitizers["DET10A2"]
+    wait(lambda: calls["n"] > 60 and d.root_pointer._wave_n > 50, session=s)
+    assert s.states["DET10A2"] == RUNNING and "PICO_TIMEOUT" in s.warnings["DET10A2"]
+    assert d.skipped == 3
+    s.stop()
+    wait(lambda: s.state == STOPPED, session=s)
+    stop = read_oplog(oplog.today_path())[-1]
+    assert stop["result"]["skipped_waveforms"] == {"DET10A2": 3}
+
+
+def test_repeated_readout_failures_end_that_scope(cfg, tmp_path, monkeypatch):
+    real = VirtualDigitizer._capture_block
+
+    def capture(self):
+        if self.device == "DET10A2":
+            raise digitizer_mod.ReadoutError("GetValues returned PICO_NOT_RESPONDING")
+        return real(self)
+
+    monkeypatch.setattr(VirtualDigitizer, "_capture_block", capture)
+    s, _ = make(cfg, "scope_monitor", tmp_path)
+    s.start()
+    wait(lambda: s.states.get("DET10A2") == "error", session=s)
+    assert f"{digitizer_mod.MAX_READOUT_FAILS} times in a row" in s.errors["DET10A2"]
+    assert s.state == RUNNING  # NOCell goes on
     s.stop()
     wait(lambda: s.state == STOPPED, session=s)
 

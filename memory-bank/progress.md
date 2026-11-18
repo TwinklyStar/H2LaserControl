@@ -310,6 +310,19 @@
   files of its mode (default from devices.toml), describes the chosen one, ↺ re-reads the
   folder, invalid files are listed with the reason; locked while running; the op-log start
   entry names the config. 296 passed, ruff clean.
+- **M7 hardware test, scope monitor tab (user clicks, real `H2LaserControl.bat`; triggers
+  present, no laser):** both scopes open (3405D by serial; ps2000 enumeration found
+  12017/0359 + 0366, opening took ~9 s), 25.0 Hz on all scopes, ROOT/CSV written in the old
+  format (CSV one row per 100 triggers). VUV PD snapshot tab ran 16 s at 25 Hz.
+  *Hardware test finding:* in the first monitor run the 3405D (DET10A2) returned
+  `PICO_TIMEOUT` from `ps3000aGetValues` 21 s after Start: last good trigger 17:21:30.36,
+  error 17:21:35.43, i.e. one readout stalled ~5 s on USB while triggers continued (NOCell
+  recorded them) and nothing else in the program was busy. Second run (47 s) clean. Cause
+  unknown (USB link/hub/power); the old code has the same call and would have crashed too
+  (and stopped all scopes). **Fix:** a failed arm/readout (3405D status ≠ 0, ps2000 ≤ 0) now
+  skips that waveform, re-arms, shows a ⚠ warning in the tab and counts it
+  (`skipped_waveforms` in the op-log stop entry); 3 failures in a row → that scope ends with
+  an error. 298 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

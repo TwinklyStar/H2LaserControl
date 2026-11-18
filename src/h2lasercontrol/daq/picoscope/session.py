@@ -161,9 +161,12 @@ class PicoSession:
         if not alive:
             if self.state != STOPPED:
                 files = [f for d in self.digitizers.values() for f in d.files]
+                result: dict[str, Any] = {"files": files}
+                skipped = {n: d.skipped for n, d in self.digitizers.items() if d.skipped}
+                if skipped:  # waveforms lost to failed readouts (gaps in the data)
+                    result["skipped_waveforms"] = skipped
                 if self._stop_requested:
-                    self.oplog.write(device=self.key, action="stop",
-                                     result={"files": files})
+                    self.oplog.write(device=self.key, action="stop", result=result)
                 self.state = STOPPED
             return
         if self._stop_requested:
