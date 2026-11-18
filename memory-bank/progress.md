@@ -323,6 +323,22 @@
   skips that waveform, re-arms, shows a ⚠ warning in the tab and counts it
   (`skipped_waveforms` in the op-log stop entry); 3 failures in a row → that scope ends with
   an error. 298 passed.
+- **Hardware test: 3405D readout stalls, cause isolated (scripts, scratch output, GUI closed
+  during B/C/old):**
+  | run | scopes | driver DLLs | result |
+  |---|---|---|---|
+  | 2 | 3405D + 2204A (monitor_2026A), our code | SDK 2.2.160 | stalls 57 s after start, then every ~30 s (5 s each, PICO_TIMEOUT); NOT_RESPONDING after 2.7 min |
+  | A | 3405D alone, our code | SDK | **clean**, 3 min, 4522 waveforms, no gap |
+  | B | both, our code | PicoScope 7 (2.1.150) | NOT_RESPONDING 6 s after the 2204A started |
+  | C | both, our code, one lock for both drivers | SDK | stalls every 30–50 s, then NOT_RESPONDING |
+  | old | both, **old H2LaserDAQ code** unchanged | SDK | NOT_RESPONDING after ~1 min; old code then stops all scopes |
+  The 2204A never missed a trigger. 3405D open status PICO_OK (own power supply, USB 3);
+  after NOT_RESPONDING a fresh open works. Topology: 3405D behind a Genesys USB 3 hub
+  (05E3:0626) on one xHCI root hub; both 2204A behind two cascaded Genesys USB 2 hubs
+  (05E3:0610) on another root hub. **Conclusion: not our code, not the driver version, not
+  concurrent SDK calls; the 3405D drops out on this PC's USB setup when a 2204A acquires at
+  the same time.** Next: user to try other USB ports (3405D directly on the PC, 2204As
+  elsewhere); where/how the old program ran without this.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
