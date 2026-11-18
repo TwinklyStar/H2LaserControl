@@ -154,10 +154,11 @@ def test_snapshot_items(cfg, tmp_path):
     wait(lambda: got.extend(s.poll()) or got, timeout=10)
     s.stop()
     wait(lambda: s.state == STOPPED, session=s)
+    # every waveform goes to the display (user 2026-11-18: scope-style averaging there)
     item = got[0]
-    assert set(item) == {"device", "t", "area_avg", "area_std", "trigger_cnt", "ChA", "ChB"}
-    assert item["device"] == "H2PD" and item["trigger_cnt"] == 100
-    assert item["area_avg"] < 0 < item["area_std"]
+    assert set(item) == {"device", "t", "dt", "ChA", "ChB"}
+    assert item["device"] == "H2PD" and item["dt"] == 20.0 and len(item["ChA"]) == 1000
+    assert item["ChA"].min() < -50  # negative simulated pulse, in mV
 
 
 def test_one_failing_scope_does_not_stop_the_other(cfg, tmp_path, monkeypatch):

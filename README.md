@@ -95,6 +95,12 @@ time span of the trend plots (10 min … 14 days, default 5 hr); older points ar
 daily CSV files in `data/picoscope/csv` (copy old CSV files there to see them). The plot follows
 the newest data; after zooming or panning, press **Latest** to follow again.
 
+The **VUV PD snapshot** works like an oscilloscope's averaging: the plot is the average of the
+last N waveforms and is redrawn with every trigger (25 Hz). Set N with **▲ / ▼** (1, 2, 4 …
+1024, ∞ = everything since Clear); **Clear** restarts the average. The box on the signal plot
+shows the offset (mean of the first 5 % of the points), the area with the offset subtracted,
+its standard deviation, N and the standard error.
+
 **Data files** (formats unchanged from the old programs):
 - `data/picoscope/root/<output_name>_<YYMMDD>_<NNNN>.root`: tree `rawWave`, every waveform,
   a new file every 10000 triggers.

@@ -411,6 +411,16 @@
   cached by mtime/size). Plots use peak downsampling + clip-to-view. Timing (synthetic 14 days,
   one row / 4 s, 302k rows/channel): first load 1.3 s, cached 0.02 s, redraw 0.25 s, live update
   ~0.1 s. 307 passed. Next: user checks in the simulation; then change 3 (snapshot).
+- **Snapshot change 3 (F8g), sim-tested:** the digitizer now posts every waveform in snapshot
+  mode (`{device, t, dt, Ch*}`; ROOT unchanged; the old 100-trigger averaging in the digitizer
+  is gone). New `daq/picoscope/averaging.py` (`WaveAverager`: running sums over the last N or
+  all since Clear (∞), Welford for ∞, re-sum every 4096 adds; per-waveform offset = mean of
+  the first 5 % of the points, area = Σ(w − offset)·dt·1e-3 nV·s; sample std, stderr =
+  std/√N). View: ▼ N ▲ (1…1024, ∞; a change restarts), Clear, statistics box (pg.TextItem in
+  the signal plot's top-right), Freeze/Unfreeze + Math, Save. Tab poll 100 → 40 ms; GUI test at
+  25 Hz triggers: > 15 fps redraws (≈ one per waveform). Default N = refresh_trigger_cnt
+  rounded to a power of 2 (100 → 128); N kept between runs. Snapshot CSV: same layout + one
+  `# Offset` comment line; its area is now offset-subtracted. 316 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

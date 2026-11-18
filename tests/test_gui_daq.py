@@ -130,8 +130,9 @@ def test_monitor_hides_trigger_shows_rate_and_reads_history(window, qtbot, tmp_p
 def test_snapshot_hides_trigger_channel(window, qtbot):
     t: ScopeTab = tab(window, "vuv_pd")
     t.start_btn.click()
-    qtbot.waitUntil(lambda: t.view is not None and t.view._last_item is not None, timeout=10000)
+    qtbot.waitUntil(lambda: t.view is not None and t.view.averager.count > 0, timeout=10000)
     assert t.view.channels == ["A"] and t.view.channel_labels == ["Sig"]
+    assert set(t.view.averager.mean_waves()) == {"A"}  # the trigger (B) is not even averaged
     qtbot.waitUntil(lambda: "H2PD" in t.view._lbl_rate.text() and "Hz" in t.view._lbl_rate.text(),
                     timeout=15000)
     t.stop_btn.click()
@@ -141,21 +142,59 @@ def test_snapshot_hides_trigger_channel(window, qtbot):
 def test_snapshot_freeze_and_save(window, qtbot, tmp_path):
     t: ScopeTab = tab(window, "vuv_pd")
     t.start_btn.click()
-    qtbot.waitUntil(lambda: t.view._last_item is not None, timeout=10000)
-    assert "Peak area" in t.view._lbl_area.text()
+    qtbot.waitUntil(lambda: t.view is not None and t.view.averager.count > 0, timeout=10000)
     t.view._freeze_btn.click()
-    assert t.view._freeze_btn.text() == "Clear"
-    qtbot.waitUntil(lambda: "Math:" in t.view._lbl_math.text()
-                    and "computing" not in t.view._lbl_math.text(), timeout=10000)
+    assert t.view._freeze_btn.text() == "Unfreeze" and "Math:" in t.view._lbl_math.text()
     t.view._save_btn.click()
     files = list((tmp_path / "data" / "picoscope" / "snapshots").glob("snapshot_H2PD_*_001.csv"))
     assert len(files) == 1
     text = files[0].read_text(encoding="utf-8").splitlines()
     assert text[0] == "# H2LaserDAQ Snapshot" and text[2] == "# Device  : H2PD"
+    assert text[4].startswith("# Area (live)  :") and text[5].startswith("# Offset       :")
     assert "time_s,live_V,frozen_V" in text
     assert ("vuv_pd", "save_snapshot", "done") in actions(window)
     t.stop_btn.click()
     qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+
+
+def test_snapshot_scope_style_averaging(window, qtbot, monkeypatch):
+    monkeypatch.setattr(VirtualDigitizer, "TRIGGER_RATE_HZ", 25.0)  # the real trigger rate
+    t: ScopeTab = tab(window, "vuv_pd")
+    t.start_btn.click()
+    qtbot.waitUntil(lambda: t.view is not None and t.view.averager.count > 0, timeout=10000)
+    v = t.view
+    assert v.n_avg == 128 and v._lbl_navg.text() == "128"  # from refresh_trigger_cnt = 100
+    # redrawn with every new waveform: ~25 fps at 25 Hz triggers (user: 10-25 fps)
+    f0, t0 = v.frames, time.monotonic()
+    qtbot.wait(2000)
+    fps = (v.frames - f0) / (time.monotonic() - t0)
+    assert fps > 15, fps
+    # statistics box: offset, area, std, N, stderr
+    html = v._stats_box.textItem.toHtml()
+    for key in ("Offset", "Area", "Std", "N", "Stderr", "mV", "nV·s"):
+        assert key in html
+    # arrows: 128 -> 256 ... -> 1024 -> ∞ (and back); a change restarts the average
+    v._n_up.click()
+    assert v.n_avg == 256 and v.averager.count <= 1
+    for _ in range(3):
+        v._n_up.click()
+    assert v._lbl_navg.text() == "∞" and not v._n_up.isEnabled()
+    qtbot.waitUntil(lambda: v.averager.count >= 3, timeout=5000)
+    assert "(∞)" in v._stats_box.textItem.toHtml()
+    v.set_n(4)
+    qtbot.waitUntil(lambda: v.averager.count == 4, timeout=5000)
+    qtbot.wait(300)
+    assert v.averager.count == 4  # never more than N
+    v._clear_btn.click()
+    assert v.averager.count <= 1
+    for _ in range(12):
+        v._n_down.click()
+    assert v.n_avg == 1 and not v._n_down.isEnabled()
+    t.stop_btn.click()
+    qtbot.waitUntil(lambda: t.session.state == STOPPED, timeout=10000)
+    t.start_btn.click()  # the chosen N is kept for the next run
+    qtbot.waitUntil(lambda: t.view is not None, timeout=10000)
+    assert t.view.n_avg == 1
 
 
 def test_camera_tab_start_page_open_capture_close(window, qtbot, tmp_path):

@@ -317,27 +317,14 @@ class Digitizer(threading.Thread):
                         self.csv_pointer.flush()
 
                 elif self.run_mode == "snapshot":
-                    self.peak_area_buffer.append(
-                        np.sum(wave[f"Ch{self.snapshot_channel}"]) * self.delta_t * 1e-3
-                    )  # mV*ns -> nV*s
+                    # every waveform goes to the display, which averages the last N itself
+                    # like an oscilloscope (user 2026-11-18; the old code sent one average of
+                    # refresh_trigger_cnt waveforms every 4 s). Arrays are new per trigger.
+                    item: dict[str, Any] = {"device": self.device, "t": self.t,
+                                            "dt": self.delta_t}
                     for ch_idx in self.channels:
-                        self.avg_wave_buffer[ch_idx] += (
-                            wave[f"Ch{ch_idx}"] / self.refresh_trigger_cnt
-                        )
-                    if trigger_cnt % self.refresh_trigger_cnt == 0:
-                        queue_dic = {
-                            "device": self.device,
-                            "t": self.t,
-                            "area_avg": np.mean(self.peak_area_buffer),
-                            "area_std": np.std(self.peak_area_buffer),
-                            "trigger_cnt": self.refresh_trigger_cnt,
-                        }
-                        for ch_idx in self.channels:
-                            queue_dic[f"Ch{ch_idx}"] = self.avg_wave_buffer[ch_idx].copy()
-                        self.update_queue.put(queue_dic)
-                        for ch_idx in self.channels:
-                            self.avg_wave_buffer[ch_idx].fill(0)
-                        self.peak_area_buffer.clear()
+                        item[f"Ch{ch_idx}"] = wave[f"Ch{ch_idx}"]
+                    self.update_queue.put(item)
 
                 # -- trigger rate (the old program printed it every 1000 triggers) --------------
                 elapsed = time.time() - time_start
@@ -375,11 +362,10 @@ class Digitizer(threading.Thread):
         if self.run_mode == "continuous":
             self.peak_area_buffer = {ch: 0 for ch in self.channels}
             self.avg_wave_buffer = {ch: np.zeros(self.sample_number) for ch in self.channels}
-        elif self.run_mode == "snapshot":
+        elif self.run_mode == "snapshot":  # averaging is done by the display
             self.snapshot_channel = self.config.get("snapshot_channel")
-            self.refresh_trigger_cnt = self.config.get("refresh_trigger_cnt")
             self.peak_area_buffer = []
-            self.avg_wave_buffer = {ch: np.zeros(self.sample_number) for ch in self.channels}
+            self.avg_wave_buffer = {}
         else:
             raise DigitizerInitError(f"{self.device}: unknown run_mode {self.run_mode!r}")
 

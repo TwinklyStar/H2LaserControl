@@ -126,7 +126,11 @@ is where every command passes through.
   - F8f. Monitor trend **time window selectable**: last 10 min, 30 min, 1 hr, 3 hr, 5 hr, 12 hr,
     1 day, 3 days, 7 days, 14 days (old: fixed 4000 points ≈ 5 h); the history is read
     automatically from the old daily CSV files.
-  - F8g. Snapshot-mode changes: to be specified by the user (next).
+  - F8g. Snapshot works **like an oscilloscope** (user, 2026-11-18): refresh ~10 fps, ideally
+    25 fps; the plot is the average of the **latest N** waveforms, N set with up/down arrows:
+    1, 2, 4 … 1024 (and ∞ = all since Clear, our reading of "or infinite"). **Statistics box**:
+    offset (mean of the first 5 % of the points), integrated area with the offset subtracted,
+    std, N, stderr. **Clear** button empties the average and the statistics and restarts.
 
 ### GUI structure (user, 2026-11-17)
 - **One tab per device**, like browser (Chrome) tabs; the user switches between tabs. Devices are

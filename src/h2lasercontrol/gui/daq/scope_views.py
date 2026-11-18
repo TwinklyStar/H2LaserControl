@@ -9,13 +9,15 @@ of the program (user 2026-11-18; the old windows were dark).
 Changes (user 2026-11-18): trigger channels are not shown (the tab passes only the others; the
 files still contain them); the status row shows each scope's trigger rate instead; the monitor
 trend has a selectable time window (10 min ... 14 days) filled from the daily CSV files.
+The snapshot view averages like an oscilloscope: every waveform arrives, the last N (1 … 1024,
+∞) are averaged and redrawn at up to the trigger rate; statistics box with offset, area
+(offset subtracted), std, N, stderr; Clear restarts the average.
 Removed: the snapshot window's own Pause button (the tab's Pause stops the acquisition and the
 display freezes with it, user 2026-11-18) and the Ctrl+C handler (no terminal).
 """
 
 from __future__ import annotations
 
-import math
 import os
 import time
 from datetime import datetime
@@ -25,6 +27,7 @@ import numpy as np
 import pyqtgraph as pg
 from PySide6 import QtCore, QtWidgets
 
+from ...daq.picoscope.averaging import N_CHOICES, WaveAverager, n_label
 from ...daq.picoscope.history import DEFAULT_WINDOW, WINDOWS, TrendSource, load_history
 
 _BG = "#ffffff"  # plot background
@@ -441,11 +444,20 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin):
 # Snapshot monitor
 # ----------------------------------------------------------------------------------------------
 class SnapshotView(QtWidgets.QWidget, _RangeMixin):
-    """Averaged waveform of each channel + area of the signal channel (mean ± error)."""
+    """Averaged waveforms like an oscilloscope (user 2026-11-18).
+
+    The scope sends every waveform; the plot shows the average of the last N (▲ / ▼: 1, 2, 4 …
+    1024, ∞ = all since Clear) and is redrawn whenever new waveforms arrived (the tab polls every
+    40 ms: up to 25 fps at 25 Hz triggers). A statistics box on the signal plot shows offset
+    (first 5 % of the points), area (offset subtracted), std, N and stderr of the waveforms in
+    the average. Clear restarts the average. Freeze keeps the current average as a dashed
+    reference (Math = area difference); Save writes the old snapshot CSV."""
+
+    saved = QtCore.Signal(str)
 
     def __init__(self, channels: list[str], channel_labels: list[str], device: str,
                  signal_channel: str, snapshot_dir: str,
-                 parent: QtWidgets.QWidget | None = None) -> None:
+                 parent: QtWidgets.QWidget | None = None, *, n_avg: int | None = 128) -> None:
         super().__init__(parent)
         self.setObjectName("scopeView")
         self.setStyleSheet(VIEW_STYLE)
@@ -454,8 +466,10 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         self.channel_labels = channel_labels
         self.device = device
         self.snapshot_dir = snapshot_dir
-        self._signal_ch = signal_channel or channels[0]
-        self._last_item: dict[str, Any] | None = None
+        self._signal_ch = signal_channel if signal_channel in channels else channels[0]
+        self.averager = WaveAverager(n_avg if n_avg in N_CHOICES else 128, self._signal_ch)
+        self._t: np.ndarray | None = None
+        self.frames = 0  # redraws (for tests)
         self._frozen_area: float | None = None
         self._range_idx: dict[str, int | None] = {}
         self._range_labels: dict[str, QtWidgets.QLabel] = {}
@@ -478,6 +492,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         slay.addStretch()
         slay.addWidget(self._lbl_time)
         vlay.addWidget(status)
+        self._update_stats_box()
 
     def set_rates(self, rates: dict[str, float | None]) -> None:
         self._lbl_rate.setText(_rate_text(rates))
@@ -520,24 +535,50 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
             curves[ch] = p.plot(pen=pg.mkPen(col, width=2))
             self._frozen_curves[ch] = p.plot(
                 pen=pg.mkPen(col, width=1.5, style=QtCore.Qt.PenStyle.DashLine))
+            if ch == self._signal_ch:
+                self._make_stats_box(p)
             prev = p
         return panel, curves, plots
+
+    def _make_stats_box(self, p: pg.PlotItem) -> None:
+        """Statistics 'legend' in the top-right corner of the signal plot (fixed on screen)."""
+        vb = p.getViewBox()
+        self._stats_box = pg.TextItem(anchor=(1, 0), fill=pg.mkBrush(255, 255, 255, 225),
+                                      border=pg.mkPen(_GRID))
+        self._stats_box.setParentItem(vb)
+
+        def place() -> None:
+            self._stats_box.setPos(vb.width() - 8, 8)
+
+        vb.sigResized.connect(place)
+        place()
 
     def _make_stats_bar(self) -> QtWidgets.QWidget:
         bar = QtWidgets.QWidget()
         bar.setFixedHeight(40)
         lay = QtWidgets.QHBoxLayout(bar)
         lay.setContentsMargins(6, 2, 6, 2)
-        lay.setSpacing(0)
+        lay.setSpacing(4)
         self._lbl_device = QtWidgets.QLabel(f"  Device: {self.device}")
         self._lbl_device.setObjectName("statsLabel")
-        self._lbl_area = QtWidgets.QLabel("  Area: —")
-        self._lbl_area.setObjectName("statsLabel")
-        self._lbl_area.setStyleSheet(
-            f"color: {_colour(0)}; font-weight: bold;"
-            f"padding: 2px 10px; background: {_SURF}; border-radius: 4px;")
-        self._lbl_n = QtWidgets.QLabel("  N: —")
-        self._lbl_n.setObjectName("statsLabel")
+        avg_lbl = QtWidgets.QLabel("  Average:")
+        self._n_down = QtWidgets.QToolButton()
+        self._n_down.setArrowType(QtCore.Qt.ArrowType.DownArrow)
+        self._n_down.setToolTip("Average fewer waveforms")
+        self._n_down.clicked.connect(lambda: self.step_n(-1))
+        self._lbl_navg = QtWidgets.QLabel()
+        self._lbl_navg.setObjectName("statsLabel")
+        self._lbl_navg.setMinimumWidth(56)
+        self._lbl_navg.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._n_up = QtWidgets.QToolButton()
+        self._n_up.setArrowType(QtCore.Qt.ArrowType.UpArrow)
+        self._n_up.setToolTip("Average more waveforms (… 1024, then ∞ = all since Clear)")
+        self._n_up.clicked.connect(lambda: self.step_n(+1))
+        self._clear_btn = QtWidgets.QPushButton("Clear")
+        self._clear_btn.setFixedSize(60, 28)
+        self._clear_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self._clear_btn.setToolTip("Clear the averaged waveform and the statistics; restart")
+        self._clear_btn.clicked.connect(self.clear)
         self._freeze_btn = QtWidgets.QPushButton("Freeze")
         self._freeze_btn.setFixedSize(72, 28)
         self._freeze_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
@@ -553,27 +594,87 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         self._save_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self._save_btn.setToolTip("Save the signal waveform to data/picoscope/snapshots")
         self._save_btn.clicked.connect(self._on_save)
-        for w in (self._lbl_device, _vline(), self._lbl_area, _vline(), self._lbl_n, _vline(),
-                  self._freeze_btn, _vline(), self._lbl_math):
+        for w in (self._lbl_device, _vline(), avg_lbl, self._n_down, self._lbl_navg, self._n_up,
+                  self._clear_btn, _vline(), self._freeze_btn, self._lbl_math):
             lay.addWidget(w)
         lay.addStretch()
         lay.addWidget(self._save_btn)
+        self._update_n_label()
         return bar
+
+    # --- averaging ----------------------------------------------------------------------------
+    @property
+    def n_avg(self) -> int | None:
+        return self.averager.n
+
+    def set_n(self, n: int | None) -> None:
+        if n not in N_CHOICES:
+            return
+        self.averager.set_n(n)  # restarts the average
+        self._update_n_label()
+        self._redraw()
+
+    def step_n(self, direction: int) -> None:
+        i = N_CHOICES.index(self.averager.n) + direction
+        if 0 <= i < len(N_CHOICES):
+            self.set_n(N_CHOICES[i])
+
+    def clear(self) -> None:
+        self.averager.clear()
+        self._redraw()
+
+    def _update_n_label(self) -> None:
+        n = self.averager.n
+        self._lbl_navg.setText(n_label(n))
+        self._n_down.setEnabled(N_CHOICES.index(n) > 0)
+        self._n_up.setEnabled(N_CHOICES.index(n) < len(N_CHOICES) - 1)
+
+    def _update_stats_box(self) -> None:
+        if not hasattr(self, "_stats_box"):
+            return
+        st = self.averager.stats()
+        col = _colour(self.channels.index(self._signal_ch))
+        if st is None:
+            rows = [("Offset", "—"), ("Area", "—"), ("Std", "—"), ("N", "0"), ("Stderr", "—")]
+        else:
+            target = "" if self.averager.n is None else f" / {self.averager.n}"
+            rows = [("Offset", f"{st.offset_mv:.4g} mV"), ("Area", f"{st.area:.4g} nV·s"),
+                    ("Std", f"{st.std:.3g} nV·s"),
+                    ("N", f"{st.n}{target}" if self.averager.n is not None else f"{st.n} (∞)"),
+                    ("Stderr", f"{st.stderr:.3g} nV·s")]
+        html = "".join(f"<tr><td>{k}</td><td align='right'>&nbsp;&nbsp;{v}</td></tr>"
+                       for k, v in rows)
+        self._stats_box.setHtml(
+            f"<div style='color:{_FG}; font-size:10pt'><b style='color:{col}'>"
+            f"{self.channel_labels[self.channels.index(self._signal_ch)]}</b>"
+            f"<table cellspacing='0'>{html}</table></div>")
+
+    def _redraw(self) -> None:
+        means = self.averager.mean_waves()
+        for ch in self.channels:
+            if ch in means and self._t is not None:
+                wfm_v = means[ch] * 1e-3  # mV -> V
+                self._wfm_curves[ch].setData(self._t, wfm_v)
+                self._auto_range(ch, wfm_v)
+            else:
+                self._wfm_curves[ch].setData([], [])
+        self._update_stats_box()
+        st = self.averager.stats()
+        if self._frozen_area is not None and st is not None:
+            self._lbl_math.setText(f"  Math: {st.area - self._frozen_area:+.4g}  nV·s")
+        self.frames += 1
 
     # --- freeze / math / save -----------------------------------------------------------------
     def _on_freeze(self) -> None:
         if self._frozen_area is None:
-            if self._last_item is None:
+            st = self.averager.stats()
+            wfm = self.averager.mean_waves().get(self._signal_ch)
+            if st is None or wfm is None or self._t is None:
                 return
-            item = self._last_item
-            t = item.get("t")
-            wfm = item.get(f"Ch{self._signal_ch}")
-            if wfm is not None and t is not None:
-                self._frozen_curves[self._signal_ch].setData(np.asarray(t) * 1e-9,
-                                                             np.asarray(wfm) * 1e-3)
-            self._frozen_area = item.get("area_avg", 0.0)
-            self._freeze_btn.setText("Clear")
-            self._lbl_math.setText("  Math: computing…")
+            self._frozen_curves[self._signal_ch].setData(self._t, wfm * 1e-3)
+            self._frozen_area = st.area
+            self._freeze_btn.setText("Unfreeze")
+            self._lbl_math.setText(f"  Math: {0.0:+.4g}  nV·s")
         else:
             self._frozen_curves[self._signal_ch].setData([], [])
             self._frozen_area = None
@@ -581,21 +682,15 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
             self._lbl_math.setText("")
 
     def save_snapshot(self) -> str | None:
-        """Write the signal waveform (+ frozen reference) as the old snapshot CSV. Returns path."""
-        if self._last_item is None:
+        """Write the averaged signal waveform (+ frozen reference) as the old snapshot CSV, with
+        one extra comment line for the offset. Returns the path."""
+        st = self.averager.stats()
+        wfm = self.averager.mean_waves().get(self._signal_ch)
+        if st is None or wfm is None or self._t is None:
             return None
-        item = self._last_item
         ch = self._signal_ch
-        t_raw, wfm = item.get("t"), item.get(f"Ch{ch}")
-        if t_raw is None or wfm is None:
-            return None
-        t_s = np.asarray(t_raw) * 1e-9
-        live_v = np.asarray(wfm) * 1e-3
-        area_avg = item.get("area_avg", 0.0)
-        area_std = item.get("area_std", 0.0)
-        n = item.get("trigger_cnt", 1)
-        device = item.get("device", "—")
-        stderr = area_std / math.sqrt(max(n, 1))
+        t_s = self._t
+        live_v = wfm * 1e-3
         try:
             ch_label = self.channel_labels[self.channels.index(ch)]
         except ValueError:
@@ -604,7 +699,7 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         has_frozen = frozen_t is not None and len(frozen_t) > 0
 
         os.makedirs(self.snapshot_dir, exist_ok=True)
-        dev_tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in device).strip("_")
+        dev_tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in self.device).strip("_")
         dev_tag = dev_tag or "unknown"
         prefix = f"snapshot_{dev_tag}_{datetime.now().strftime('%Y%m%d')}_"
         nums = []
@@ -619,18 +714,21 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         with open(fname, "w", encoding="utf-8", newline="") as fp:
             fp.write("# H2LaserDAQ Snapshot\n")
             fp.write(f"# Saved   : {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}\n")
-            fp.write(f"# Device  : {device}\n")
+            fp.write(f"# Device  : {self.device}\n")
             fp.write(f"# Channel : {ch} ({ch_label})\n")
-            fp.write(f"# Area (live)  : {area_avg:.6g} ± {stderr:.4g}  nV·s"
-                     f"  (N = {n} triggers)\n")
+            fp.write(f"# Area (live)  : {st.area:.6g} ± {st.stderr:.4g}  nV·s"
+                     f"  (N = {st.n} triggers)\n")
+            fp.write(f"# Offset       : {st.offset_mv:.6g}  mV  (mean of the first 5 % of the "
+                     f"points, subtracted from the area; std {st.std:.4g} nV·s)\n")
             if has_frozen:
                 fp.write(f"# Area (frozen): {self._frozen_area:.6g}  nV·s\n")
-                fp.write(f"# Area (Math)  : {area_avg - self._frozen_area:+.6g}  nV·s\n")
+                fp.write(f"# Area (Math)  : {st.area - self._frozen_area:+.6g}  nV·s\n")
             fp.write("#\n")
             if has_frozen:
                 fp.write("time_s,live_V,frozen_V\n")
                 frozen_i = np.interp(t_s, frozen_t, frozen_v, left=np.nan, right=np.nan)
-                fp.writelines(f"{ts:.6e},{lv:.6e},{fv:.6e}\n" for ts, lv, fv in zip(t_s, live_v, frozen_i, strict=True))
+                fp.writelines(f"{ts:.6e},{lv:.6e},{fv:.6e}\n"
+                              for ts, lv, fv in zip(t_s, live_v, frozen_i, strict=True))
             else:
                 fp.write("time_s,live_V\n")
                 fp.writelines(f"{ts:.6e},{lv:.6e}\n" for ts, lv in zip(t_s, live_v, strict=True))
@@ -646,26 +744,19 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin):
         QtCore.QTimer.singleShot(3000, self._lbl_time, lambda: self._lbl_time.setText(orig))
         self.saved.emit(fname)
 
-    saved = QtCore.Signal(str)
-
     # --- data ---------------------------------------------------------------------------------
     def show_items(self, items: list[dict[str, Any]]) -> None:
-        if not items:
-            return
-        item = items[-1]  # keep only the latest packet
-        self._last_item = item
-        t = item.get("t")
-        for ch in self.channels:
-            wfm = item.get(f"Ch{ch}")
-            if wfm is not None and t is not None:
-                wfm_v = np.asarray(wfm) * 1e-3
-                self._wfm_curves[ch].setData(np.asarray(t) * 1e-9, wfm_v)
-                self._auto_range(ch, wfm_v)
-        area_avg = item.get("area_avg", 0.0)
-        n = item.get("trigger_cnt", 1)
-        stderr = item.get("area_std", 0.0) / math.sqrt(max(n, 1))
-        self._lbl_area.setText(f"  Peak area: {area_avg:.4g} ± {stderr:.3g}  nV·s")
-        self._lbl_n.setText(f"  N = {n} triggers")
-        self._lbl_time.setText(f"  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}  ")
-        if self._frozen_area is not None:
-            self._lbl_math.setText(f"  Math: {area_avg - self._frozen_area:+.4g}  nV·s")
+        """Every item = one waveform: {'t': ns, 'dt': ns, 'Ch<x>': mV, ...}. All are averaged;
+        the plot is redrawn once per call (one call per tab poll)."""
+        got = False
+        for item in items:
+            t = item.get("t")
+            waves = {ch: item[f"Ch{ch}"] for ch in self.channels if f"Ch{ch}" in item}
+            if t is None or self._signal_ch not in waves:
+                continue
+            self._t = np.asarray(t) * 1e-9  # ns -> s
+            self.averager.add(waves, float(item.get("dt") or (t[1] - t[0])))
+            got = True
+        if got:
+            self._redraw()
+            self._lbl_time.setText(f"  {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}  ")

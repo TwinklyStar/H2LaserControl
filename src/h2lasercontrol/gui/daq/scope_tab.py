@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...config import PROGRAM_DIR, DeviceConfig
+from ...daq.picoscope.averaging import default_n
 from ...daq.picoscope.configs import ScopeConfig, list_scope_configs
 from ...daq.picoscope.history import DEFAULT_WINDOW, TrendSource
 from ...daq.picoscope.session import PAUSED, RUNNING, STARTING, STOPPED, STOPPING, PicoSession
@@ -33,7 +34,7 @@ from ...oplog import OpLog
 from ..style import BLUE, GREEN, GREY, ORANGE, set_role
 from .scope_views import ContinuousView, SnapshotView
 
-POLL_MS = 100  # 10 Hz, as the old monitor windows
+POLL_MS = 40  # 25 Hz: the snapshot plot is redrawn per poll with new waveforms (user: 10-25 fps)
 
 
 def shown_channels(dcfg: dict[str, Any]) -> list[str]:
@@ -80,6 +81,7 @@ class ScopeTab(QWidget):
         self.session: PicoSession | None = None
         self.view: Any = None  # plot view while started
         self.trend_window = DEFAULT_WINDOW  # monitor trend span, kept between runs
+        self.snapshot_n: int | None | str = "config"  # averaged waveforms, kept between runs
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -272,12 +274,16 @@ class ScopeTab(QWidget):
         if s.mode == "snapshot":
             name, dcfg = next(iter(s.configs.items()))
             shown = shown_channels(dcfg)
+            n_avg = (default_n(dcfg.get("refresh_trigger_cnt")) if self.snapshot_n == "config"
+                     else self.snapshot_n)
             view: Any = SnapshotView(
                 shown, [dict(zip(dcfg["channels"], dcfg["channel_name"], strict=True))[c]
                         for c in shown], device=name,
                 signal_channel=dcfg.get("snapshot_channel", dcfg["channels"][0]),
-                snapshot_dir=os.path.join(s.data_path(dcfg), "snapshots"))
+                snapshot_dir=os.path.join(s.data_path(dcfg), "snapshots"), n_avg=n_avg)
             view.saved.connect(self._on_snapshot_saved)
+            for b in (view._n_up, view._n_down):
+                b.clicked.connect(lambda _=False, v=view: setattr(self, "snapshot_n", v.n_avg))
         else:
             groups = [shown_channel_names(c) for c in s.configs.values()]
             sources = [TrendSource(os.path.join(s.data_path(c), "csv"), c["output_name"],
