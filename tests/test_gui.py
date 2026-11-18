@@ -55,6 +55,11 @@ def test_group_tabs_with_one_sub_tab_per_device(window):
     assert texts(window.sub_tabs["DAQ"]) == ["Scope monitor", "VUV PD snapshot", "Camera"]
 
 
+def test_initial_window_is_4_to_3(window):
+    w, h = window.width(), window.height()
+    assert abs(w / h - 4 / 3) < 0.01  # user 2026-11-19
+
+
 def test_dark_theme_switch_while_connected(window, themes):
     from PySide6.QtGui import QPalette
 

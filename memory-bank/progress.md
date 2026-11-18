@@ -471,6 +471,8 @@
   style sheet), because the camera sidebar test relies on it (test windows are never shown, so
   the sidebar is not re-fitted after a style-sheet change; in the program it fits, 548 ≥ 530 px).
   320 passed.
+- **Window 4:3 at start (user):** as large as fits (90 % of the free screen height or width),
+  centred; on this PC's 1920×1200 screen 1440×1080 (was a fixed 1100×780). 321 passed.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn

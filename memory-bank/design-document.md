@@ -143,6 +143,7 @@ is where every command passes through.
   sub-tabs inside them.
 - **Dark theme (user, 2026-11-19):** the whole program follows the Windows light/dark setting,
   also when it is switched while the program runs. Dark colours as in the old Digitizer DAQ.
+- **Window opens at 4:3** (user, 2026-11-19), as large as fits the screen.
 
 ### Non-functional
 - N1. Runs on the single lab PC (Windows 11) in the `H2LaserControl` conda environment.

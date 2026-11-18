@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         self.oplog = oplog
         self.sim = sim
         self.setWindowTitle("H2 Laser Control" + ("  —  SIMULATION" if sim else ""))
-        self.resize(1100, 780)
+        self._initial_size()
         self.settings = settings or QSettings("H2LaserControl", "gui")
 
         central = QWidget()
@@ -131,6 +131,19 @@ class MainWindow(QMainWindow):
             last = self.settings.value(f"subtab/{group}", 0, int)
             if 0 <= last < sub.count():
                 sub.setCurrentIndex(last)
+
+    def _initial_size(self) -> None:
+        """4:3 window (user 2026-11-19), as large as fits: 90 % of the screen's free height (or
+        width), centred."""
+        screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(1200, 900)
+            return
+        free = screen.availableGeometry()
+        h = int(min(free.height() * 0.9, free.width() * 0.9 * 3 / 4))
+        w = h * 4 // 3
+        self.setGeometry(free.x() + (free.width() - w) // 2, free.y() + (free.height() - h) // 2,
+                         w, h)
 
     def _add_sub_tab(self, group: str, widget: QWidget, label: str) -> None:
         sub = self.sub_tabs[group]
