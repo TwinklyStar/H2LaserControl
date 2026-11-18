@@ -107,6 +107,11 @@ is where every command passes through.
   Decisions (user, 2026-11-18), plan in `memory-bank/merge-plan.md`:
   - F8a. PicoScope: **one tab for continuous DAQ** and **one tab for the H2 VUV PD snapshot**.
     Once started they **keep running** (also while another tab is shown) until explicitly stopped.
+    Each tab has its own **Start / Pause / Stop** buttons; nothing starts by itself when the
+    program starts. Configs: continuous = old `config_monitor_2026A`, snapshot = old
+    `config_H2PD_261103`. History viewer dropped for now.
+  - F8d. Data location: **`data/picoscope`** and **`data/camera`** (in the program folder);
+    the file formats and names inside stay as before.
   - F8b. Camera: its own tab, an **exact copy of the current camera GUI**. No terminal menu (TUI).
   - F8c. **Output formats stay exactly the same** (PicoScope ROOT `rawWave` + CSV + snapshot CSV;
     camera BMP / frames.csv / config TOML / BMP→ROOT).

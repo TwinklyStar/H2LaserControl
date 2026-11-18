@@ -276,6 +276,17 @@
   exist only in `C:\Program Files\Pico Technology\PicoScope 7 T&M Stable` (ps2000 3.0.146,
   ps3000a 2.1.150); with that folder on PATH both load (no scope opened). PicoSDK itself is
   not installed → user to choose (merge-plan open point 1).
+- **User decisions:** PicoSDK installed; configs confirmed (continuous = monitor_2026A,
+  snapshot = H2PD_261103); Start / Pause / Stop per tab, nothing starts at launch; data in
+  `data/picoscope` and `data/camera`; history viewer dropped (design F8a, F8d).
+- **M0 done:** picosdk loads `ps2000.dll` 3.0.152 / `ps3000a.dll` 2.2.160 from the PicoSDK
+  `lib` folder (machine PATH; shells started earlier must re-read PATH).
+- **M1 done (`tools/daq_probe.py`, read-only):** 3405D JY926/0005 (USB 3.0), 2204A 12017/0359 and
+  12017/0366 (USB 2.0) all open/close fine, match the old configs. Camera 4110039161 fw
+  3.80.26143 streams 5/5 frames at 5 fps, but **runs on a USB 2.0 link (60 MB/s)**: at the
+  default 20 fps the first buffer came back incomplete. Probe bug on the way: numpy view of a
+  freed IPL image → access violation while streaming; camera survived. Details in
+  `docs/protocols.md` § DAQ devices.
 
 ## Open questions
 - Flip mounts DIG IO (optional): should our driver also check MFF_OPERPARAMS at connect and warn
@@ -299,8 +310,8 @@
 - ELL14 GUI: allow "Set Home Offset" for normal users? (factory value 3.214°, must be > 0.7°)
 
 ## Next step
-- **Merge with the DAQ program (F8)**, plan in `memory-bank/merge-plan.md`: finish M0 (PicoSDK
-  DLL choice), settle the plan's open points, then M1 read-only hardware check.
+- **Merge with the DAQ program (F8)**, plan in `memory-bank/merge-plan.md`: settle the open
+  points (Pause meaning, camera Start/Stop, USB 3 for the camera), then M2 PicoScope core.
 - DG645: answer the open questions → write driver + simulator + GUI tab (1.6b, can be done
   before installation against `Dg645Sim`) → hardware checks in `docs/protocols.md` once installed.
 - MFF101 second unit (expected 2026-11-18): read serial (Windows device list), short flip test,

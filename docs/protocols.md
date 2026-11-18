@@ -658,3 +658,42 @@ _discard_input` (same Transport ABC).
 1. ~~Info, status bits, jog ↔ position, timing, MOVE_COMPLETED~~ ✅ done above (unit 37011815).
 2. ~~Second unit: serial, position ↔ name~~ ✅ 37006391, 820 nm blocker, position 2 = insert.
 3. Behaviour when a flip is blocked mechanically (expect: no limit bit → timeout → error).
+
+---
+
+## DAQ devices (F8): PicoScopes + IDS camera
+
+Accessed through vendor SDKs (no byte protocol of our own): PicoSDK via `picosdk` ctypes wrappers,
+IDS peak via `ids_peak`. Probe tool: `tools/daq_probe.py` (read-only; camera: one short stream).
+
+### SDK installation ✅ (2026-11-18)
+- PicoSDK (64-bit) installed by the user: `C:\Program Files\Pico Technology\SDK\lib` (on the
+  machine PATH), `ps2000.dll` 3.0.152.6217, `ps3000a.dll` 2.2.160.7569. PicoScope 7 has its own
+  older copies; not used. Shells started before the install need the PATH re-read.
+- IDS peak runtime (installed) + PyPI `ids-peak` 1.17.0 / `ids-peak-ipl` 1.18.0.
+
+### PicoScopes ✅ (2026-11-18, open → unit info → close, nothing configured)
+| Model | Serial | USB | Cal. date | Old-config role |
+|---|---|---|---|---|
+| 3405D (ps3000a) | JY926/0005 | 3.0 | 24Jul23 | continuous: ch B "212", ch C "820" (DET10A2), Ext trigger |
+| 2204A (ps2000) | 12017/0359 | 2.0 | 29Apr25 | continuous: ch A "NO_cell", ch B "Trig" |
+| 2204A (ps2000) | 12017/0366 | 2.0 | 29Apr25 | snapshot: H2 VUV PD, ch A "Sig", ch B "Trig" |
+- `ps3000aOpenUnit` returned 0 directly (no power-source status 282/286 on this PC). Open takes
+  ~3.0 s (3405D) and ~3.7 s per 2204A.
+- `ps2000_open_unit` opens the *next free* unit (no serial argument): to get one unit by serial,
+  open all, keep the match, close the rest (as the old code does). Not usable while another
+  program holds the others → open each 2204A once and keep it.
+
+### IDS camera ✅ (2026-11-18)
+- U3-327xCP-C, serial **4110039161**, firmware 3.80.26143, 2048×1536, PixelFormat BayerRG8
+  (converted to RGB8), default exposure 15.0 ms, frame rate 20 fps, TriggerMode Off.
+- **`DeviceLinkSpeed` = 60 000 000 B/s = USB 2.0 link** (USB 3 would be 400 MB/s). One frame is
+  3.1 MB on the link → at most ~19 fps in theory (the old camera notes measured ~10.6 fps
+  delivered on the old PC, with frame-ID gaps); at the default 20 fps the first buffer was
+  *incomplete* ("Buffer is not large enough"). At 5 fps: 5/5 frames complete, consecutive IDs,
+  200 ms apart. → 25 Hz recording (old camera F10) is impossible on this link; needs a USB 3
+  port/cable (open question).
+- Pitfall (our probe bug): `ipl.ConvertTo(...).get_numpy_3D()` is a *view*; if the converted
+  image is not kept, reading the array crashes the process (access violation). Keep the image
+  and `.copy()` (the old camera code does this).
+- 4 open cycles today (one ended in that crash while streaming); the camera kept working.

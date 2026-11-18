@@ -18,8 +18,8 @@ Survey of the old code: `progress.md`, 2026-11-18.
 
 | Step | What | Done when |
 |---|---|---|
-| M0 | **Environment.** DAQ packages in `pyproject.toml` and the `H2LaserControl` env. PicoSDK DLLs findable. | ✅ packages installed 2026-11-18 (picosdk 1.1, ids-peak 1.17, uproot 5.7.7, pyqtgraph 0.14, numpy 2.5.5, opencv 5.1). ⏳ PicoSDK DLL location (see below). |
-| M1 | **Read-only hardware check.** Open each scope by serial, read unit info, close; IDS camera: open, 3 frames, close, read link speed (USB 2 vs 3). Record in `docs/protocols.md`. | serials ↔ scopes ↔ signals confirmed |
+| M0 | **Environment.** DAQ packages in `pyproject.toml` and the `H2LaserControl` env. PicoSDK DLLs findable. | ✅ 2026-11-18 (picosdk 1.1, ids-peak 1.17, uproot 5.7.7, pyqtgraph 0.14, numpy 2.5.5, opencv 5.1; PicoSDK installed by the user). |
+| M1 | **Read-only hardware check.** Open each scope by serial, read unit info, close; IDS camera: open, 3 frames, close, read link speed (USB 2 vs 3). Record in `docs/protocols.md`. | ✅ 2026-11-18: 3 scopes match the configs; camera OK but on a **USB 2.0** link |
 | M2 | **PicoScope core.** `daq/picoscope/`: digitizer worker (from `H2LaserDigitizer`), `RootManager`, ADC conversion copied; virtual digitizer for tests. Configs from the old Python files → TOML with the **same keys**. Tests: ROOT branches/types, CSV header/rows and snapshot CSV equal to the old code's output for the same synthetic input. | tests pass, outputs byte-compatible |
 | M3 | **Streaming service.** Start / stop / status / error per acquisition, op-log entries, clean shutdown (flush ROOT, close scopes). One scope failing does not silently stop the others (shown in red in its tab). | sim tests |
 | M4 | **PicoScope tabs.** "Scope monitor" (continuous: trends + averaged waveforms, port of `H2MonitorApp`) and "VUV PD snapshot" (port of `H2SnapshotApp`: Pause / Freeze / Save, ± range). Start/Stop buttons; keep running in the background. | sim GUI tests; user check on hardware |
@@ -27,16 +27,24 @@ Survey of the old code: `progress.md`, 2026-11-18.
 | M6 | **Integration.** Shutdown order, single instance lock, launcher, README §, CLAUDE.md, `architecture.md`. | full suite + ruff clean |
 | M7 | **Acceptance with the user** on hardware: long continuous run, snapshot save, camera capture / run; compare files with old-program files. | user OK |
 
-## Open points (to settle before / during M2–M5)
-1. **PicoSDK DLLs:** install the official PicoSDK (64-bit), or load the DLLs from the PicoScope 7
-   folder (works now, verified by loading both DLLs only)?
-2. Which old configs are current? Proposed: continuous = `config_monitor_2026A.py` (3405D
-   JY926/0005 "212"/"820" + 2204A 12017/0359 "NO_cell"/"Trig"); snapshot =
-   `config_H2PD_261103.py` (2204A 12017/0366, output `H2PD_2026B`). Each scope can be used by
-   only one tab at a time.
-3. Start automatically at program start, or only on a Start button? On program close: stop.
-4. Data folder: old code wrote relative to the start folder (`data/…`, camera `output/…`).
-   Proposed: the same sub-folders under one configurable base folder (e.g. the project folder),
-   names unchanged.
-5. History viewer (CSV trend over a date range, matplotlib): not requested → left out for now.
-6. Camera: old docs say `signal_stop()` must not call `KillWait()`, the code does. Check on M5.
+## Decided (user, 2026-11-18)
+1. PicoSDK (64-bit) installed → `C:\Program Files\Pico Technology\SDK\lib` on PATH. ✅
+2. Configs: continuous = `config_monitor_2026A.py` (3405D JY926/0005 "212"/"820" + 2204A
+   12017/0359 "NO_cell"/"Trig"); snapshot = `config_H2PD_261103.py` (2204A 12017/0366, output
+   `H2PD_2026B`). Each scope belongs to one tab.
+3. Each PicoScope tab: **Start / Pause / Stop**, independent; nothing starts at program start.
+   On program close: stop (files closed cleanly).
+4. Data: `data/picoscope/` (old `data/` content: `root/`, `csv/`, `snapshots/`) and
+   `data/camera/` (old `output/` content: `YYYY-MM-DD/…`). Names/formats inside unchanged.
+5. History viewer: dropped for now.
+
+## Open points
+- **Pause meaning** (proposal): Pause = no new triggers are taken and nothing is written, the
+  scope stays open and the files stay open; Resume continues in the same ROOT/CSV file.
+  Stop = close files and release the scope. The old snapshot window's own "Pause" button
+  (freezes only the display while data keeps coming) would clash in name.
+- **Camera tab start:** the old camera GUI opens the camera at launch. Same Start / Stop rule
+  as the scope tabs (camera not opened until Start)?
+- **Camera on USB 2.0** (`DeviceLinkSpeed` 60 MB/s, M1): 25 Hz full-frame recording impossible;
+  USB 3 port/cable needed if 25 Hz is wanted.
+- Camera: old docs say `signal_stop()` must not call `KillWait()`, the code does. Check on M5.
