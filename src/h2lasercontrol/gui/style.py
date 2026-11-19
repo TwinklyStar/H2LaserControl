@@ -116,11 +116,11 @@ class _Theme(QObject):
 
 theme = _Theme()
 
-# Our own widget classes. The general rules below (font size, group boxes, button padding) are
-# limited to these containers, so they do NOT reach the embedded camera window (laserdaq
-# MainWindow), which must look exactly like the old camera program (F8b). A type selector also
-# matches subclasses (DevicePanel -> HitMvPanel, ...). Role-based rules are safe everywhere.
-# The camera window does follow the light / dark palette (whole program, user 2026-11-19).
+# Our own widget classes. Font size and padding rules are limited to these containers, so the
+# embedded camera window (laserdaq MainWindow) keeps its old layout and sizes (F8b). Colours,
+# button and box shapes apply everywhere, the camera window included (user 2026-11-19: one
+# button style in the whole program). A type selector also matches subclasses
+# (DevicePanel -> HitMvPanel, ...).
 OWN = ("DevicePanel", "ScopeTab", "ScopeStartPage", "CameraStartPage", "CameraHeader",
        "LogPanel", "TopBar")
 
@@ -134,23 +134,24 @@ def style_sheet(c: Colors | None = None) -> str:
     c = c or C
     return f"""
 {", ".join(OWN)}, {_scoped("QWidget")}, QTabBar {{ font-size: 10.5pt; }}
-QTabBar::tab {{ padding: 8px 18px; min-width: 150px; }}
-QTabBar::tab:selected {{ font-weight: bold; }}
+QTabBar::tab {{ padding: 8px 18px; min-width: 150px; margin: 3px 2px; border: none;
+                border-radius: 6px; background: {c.CONTROL}; color: {c.TEXT}; }}
+QTabBar::tab:hover {{ background: {c.CONTROL_HOVER}; }}
+QTabBar::tab:selected {{ font-weight: bold; background: {c.ACCENT}; color: #ffffff; }}
 QTabWidget#groupTabs > QTabBar::tab {{ font-size: 12pt; padding: 10px 28px; min-width: 120px; }}
-{_scoped("QGroupBox")} {{ font-weight: bold; background: {c.BOX}; border: 1px solid {c.BORDER};
-             border-radius: 8px; margin-top: 14px; padding: 12px 10px 10px 10px; }}
-{_scoped("QGroupBox::title")} {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
-{_scoped("QPushButton")} {{ padding: 6px 14px; background: {c.CONTROL}; color: {c.TEXT};
-             border: none; border-radius: 6px; }}
-{_scoped("QPushButton:hover")} {{ background: {c.CONTROL_HOVER}; }}
-{_scoped("QPushButton:pressed")} {{ background: {c.CONTROL_DOWN}; }}
-{_scoped("QPushButton:disabled")} {{ color: {c.TEXT_OFF}; }}
-{_scoped("QPushButton:flat")} {{ background: transparent; }}
-QPushButton[role="primary"] {{ font-size: 12pt; font-weight: bold; padding: 10px 22px;
-                               background: {c.ACCENT}; color: #ffffff; border-radius: 6px; }}
-QPushButton[role="primary"]:hover {{ background: {c.ACCENT}; }}
-QPushButton[role="primary"]:pressed {{ background: {c.ACCENT_DOWN}; }}
-QPushButton[role="primary"]:disabled {{ background: {c.CONTROL}; color: {c.TEXT_OFF}; }}
+QTabWidget::pane {{ border: none; border-top: 1px solid {c.SEP}; }}
+QGroupBox {{ background: {c.BOX}; border: 1px solid {c.BORDER}; border-radius: 8px;
+             margin-top: 14px; padding-top: 6px; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
+{_scoped("QGroupBox")} {{ font-weight: bold; padding: 12px 10px 10px 10px; }}
+QPushButton, QToolButton {{ padding: 4px 10px; background: {c.CONTROL}; color: {c.TEXT};
+                            border: none; border-radius: 6px; }}
+QPushButton:hover, QToolButton:hover {{ background: {c.CONTROL_HOVER}; }}
+QPushButton:pressed, QToolButton:pressed {{ background: {c.CONTROL_DOWN}; }}
+QPushButton:disabled, QToolButton:disabled {{ color: {c.TEXT_OFF}; }}
+QPushButton:flat {{ background: transparent; }}
+{_scoped("QPushButton")} {{ padding: 6px 14px; }}
+QPushButton[role="primary"] {{ font-size: 12pt; font-weight: bold; padding: 10px 22px; }}
 QPushButton[role="stop"] {{ background: {c.RED}; color: {c.ON_RED}; font-weight: bold;
                             padding: 8px 22px; border-radius: 4px; }}
 QPushButton[role="stop"]:hover {{ background: {c.RED}; }}

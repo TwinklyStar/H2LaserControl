@@ -164,7 +164,7 @@ class Ell14Panel(DevicePanel):
         self.maint_toggle.setCheckable(True)
         self.maint_toggle.setArrowType(Qt.ArrowType.RightArrow)
         self.maint_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.maint_toggle.setStyleSheet("QToolButton { border: none; font-weight: bold; }")
+        self.maint_toggle.setStyleSheet("QToolButton { border: none; background: transparent; font-weight: bold; }")
         self.maint_toggle.toggled.connect(self._toggle_maintenance)
         self.body.addWidget(self.maint_toggle)
 
