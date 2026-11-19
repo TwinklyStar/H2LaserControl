@@ -1,256 +1,113 @@
 # H2 Laser Control
 
-One Windows program that replaces the vendor programs (Sigma Koki **SGSample**, Thorlabs **ELLO**,
-Thorlabs **Kinesis**) for the H2 laser room devices, and the two old DAQ programs (**H2LaserDAQ**
-for the PicoScopes, **LaserDAQ / IDS-Camera** for the camera). The GUI has two tabs, **Control**
-and **DAQ**, with one sub-tab per device in each, and is meant for lab members who are not experts. Every action is written to an operation log.
+A Windows desktop program for controlling and monitoring the devices in the H2 laser room from
+one window.
 
-| Device | What it does here | Connection | Tab | Status |
-|---|---|---|---|---|
-| Sigma Koki HIT-MV, 2 linear feedthroughs | VUV photodiode (axis 0) and 45° VUV mirror to the profiler (axis 1), both in the VUV diagnostic chamber | RS-232→USB adapter (FTDI, serial `DU0DFFMCA`), 38400 8N1 RTS/CTS | VUV feedthroughs | ✅ in use |
-| Thorlabs ELL14 rotation mount | Half-wave plate before a PBS → 355 nm energy | USB (FTDI COM port, serial `DP06TVEFA`), 9600 8N1 | Rotation mount | ✅ in use |
-| Thorlabs MFF101/M flip mounts (2) | 355 nm blocker (`37011815`), 820 nm blocker (`37006391`) | USB, FTDI **D2XX** (no COM port), APT protocol | Flip mounts | ✅ in use |
-| PicoScope 3405D `JY926/0005` + 2204A `12017/0359` | Continuous monitor: 212 / 820 nm photodiodes, NO cell | USB, PicoSDK | Scope monitor | 🧪 merged, hardware test pending |
-| PicoScope 2204A `12017/0366` | H2 VUV photodiode snapshot | USB, PicoSDK | VUV PD snapshot | 🧪 merged, hardware test pending |
-| IDS U3-327xCP-C camera `4110039161` | Beam spot images | USB (now a USB 2.0 link), IDS peak | Camera | 🧪 merged, hardware test pending |
-| SRS DG645 delay generator | Adjust the delay of one channel | RS-232 (or LAN) | — | ⏳ planned, no code yet |
+- **Control** tab: VUV feedthroughs (Sigma Koki HIT-MV), rotation mount (Thorlabs ELL14),
+  flip mounts (Thorlabs MFF101).
+- **DAQ** tab: PicoScope photodiode monitor, VUV photodiode snapshot, IDS beam camera.
+- Every action is recorded in an operation log, with the operator's name.
+- A simulation mode lets you try everything without hardware.
+- Light and dark theme, following the Windows setting.
 
-Devices are found by their **USB serial number**, so it does not matter which COM number Windows
-gives them on a new PC.
+## Requirements
 
----
+- Windows 10 or 11
+- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (or Anaconda)
+- Device drivers, depending on what you use:
+  - Flip mounts: FTDI D2XX driver ([FTDI](https://ftdichip.com/drivers/d2xx-drivers/), also
+    installed with Thorlabs Kinesis)
+  - PicoScopes: [PicoSDK, 64-bit](https://www.picotech.com/downloads)
+  - Camera: [IDS peak](https://ids-imaging.com/ids-peak)
 
-## 1. Moving to another PC
+## Installation
 
-1. **Copy the whole folder** (e.g. as a zip), including the hidden `.git` folder. The git-ignored
-   folders `logs/` (operation history) and `captures/` (raw serial captures) are only in the
-   folder copy, not in git. Keep them if you want the history.
-2. On the new PC, follow **§2 Setup**. Even if you copied a conda env, run
-   `pip install -e ".[dev]"` again: the install points to the folder's old path.
-3. Plug in the devices and close SGSample, ELLO and Kinesis (also from the system tray).
-4. Run the checks in **§4 Check that it works**.
-5. If a device has been replaced, put its new USB serial into `config/devices.toml` (see §6).
+Open an **Anaconda Prompt** in the project folder and run:
 
-## 2. Setup (new PC)
+```bat
+conda create -n H2LaserControl python=3.12 pip -y
+conda activate H2LaserControl
+pip install -e ".[dev]"
+```
 
-Needed: Windows 10/11, internet access for the installers.
+Optionally, put a desktop shortcut to `H2LaserControl.bat`.
 
-1. **Miniconda** (or Anaconda): https://docs.conda.io/en/latest/miniconda.html.
-   The launchers look for it in `%USERPROFILE%\miniconda3`, `%USERPROFILE%\anaconda3`,
-   `%LOCALAPPDATA%\miniconda3`, `%ProgramData%\miniconda3` and `%ProgramData%\anaconda3`.
-2. **Git for Windows** (for development only): https://git-scm.com/download/win.
-3. **FTDI drivers.** All devices use FTDI USB chips.
-   - COM-port devices (ELL14, HIT-MV adapter): Windows normally installs the driver by itself.
-   - Flip mounts need `ftd2xx.dll` (FTDI D2XX). It comes with the FTDI "CDM" driver
-     (https://ftdichip.com/drivers/d2xx-drivers/) and with Thorlabs Kinesis. Check that
-     `C:\Windows\System32\ftd2xx.dll` exists. This PC has version 3.2.21.1.
-   - Vendor software (Kinesis, ELLO, SGSample) is **not** needed to run this program. It is
-     useful for comparison and as a fallback.
-4. **PicoSDK (64-bit)** for the PicoScopes: https://www.picotech.com/downloads (choose
-   "PicoSDK"). It installs `ps2000.dll` / `ps3000a.dll` into
-   `C:\Program Files\Pico Technology\SDK\lib` and puts that folder on the PATH (open a new
-   prompt afterwards). PicoScope 7 alone is not enough: the Python wrapper does not find its
-   copies of the DLLs.
-5. **IDS peak** (runtime + USB3 Vision driver) for the camera: https://ids-imaging.com/ids-peak.
-   The Python parts (`ids-peak`, `ids-peak-ipl`, `ids-peak-common`) come from pip (step 6).
-6. **Python environment.** In an *Anaconda Prompt*, from the project folder:
-   ```bat
-   conda create -n H2LaserControl python=3.12 pip -y
-   conda activate H2LaserControl
-   pip install -e ".[dev]"
-   ```
-   This installs pyserial, PySide6, numpy, pyqtgraph, uproot, awkward, picosdk, ids-peak,
-   opencv-python, imageio, pytest, pytest-qt and ruff. Versions tested on 2026-11-18:
-   Python 3.12.16, pyserial 3.5, PySide6 6.12.0, numpy 2.5.5, pyqtgraph 0.14.0, uproot 5.7.7,
-   picosdk 1.1, ids-peak 1.17.0, pytest 9.2.0, pytest-qt 4.5.0, ruff 0.17.5.
-7. Optional: put a desktop shortcut to `H2LaserControl.bat`.
+## Usage
 
-## 3. Running
-
-| What | How |
+| To start | Do this |
 |---|---|
-| GUI, real devices | double-click **`H2LaserControl.bat`** |
-| GUI, simulated devices (safe; nothing moves) | double-click **`H2LaserControl-simulation.bat`** (yellow banner; logs go to `logs/sim/`) |
-| GUI from a prompt | `python -m h2lasercontrol.gui [--sim] [--no-connect] [--config path]` |
-| Read-only status of all devices | `python scripts/status.py [--debug]` |
-| One action from the command line | `python scripts/ctl.py list` · `python scripts/ctl.py <device> <action> key=value …` (actions that move need `--allow-motion`) |
-| List COM ports with USB serials | `python tools/list_ports.py` |
+| The program with real devices | Double-click `H2LaserControl.bat` |
+| A safe simulation (nothing moves) | Double-click `H2LaserControl-simulation.bat` |
 
-Only one program can use a device at a time: **close SGSample / ELLO / Kinesis, PicoScope 7,
-IDS peak Cockpit and the old DAQ programs first.** Only one copy of this program can run at a
-time (lock file).
+Before starting, close other programs that use the same devices (SGSample, ELLO, Kinesis,
+PicoScope 7, IDS peak Cockpit).
 
-**DAQ tabs** (Scope monitor, VUV PD snapshot, Camera): nothing starts by itself. On a scope tab's
-start page, choose the acquisition setup in the **Config** drop-down (files in
-`config/picoscope/*.toml` of that tab's mode, converted from the old H2LaserDAQ configs; add a
-file there and press ↺ to see it). Each tab has its own **Start** (and **Pause** / **Stop** for the scopes, **Close camera** for the camera). Once
-started, an acquisition keeps running while you look at other tabs, until you stop it or close
-the program. Pause = no data is taken or saved and the display freezes; Resume continues in the
-same files.
+- Enter your name at the top right; it is written to the operation log.
+- **Control devices** connect by themselves. Their current state is shown on each sub-tab.
+- **DAQ devices** start only when you press **Start**. Choose the setup in the **Config** list
+  first. A running acquisition continues while you look at other tabs.
+- The history of today's actions is shown under the tabs.
 
-The plots do not show the trigger channel (it is still saved in the files); the trigger rate of
-each scope is in the status bar under the plots. In the **Scope monitor**, **Show last** sets the
-time span of the trend plots (10 min … 14 days, default 5 hr); older points are read from the
-daily CSV files in `data/picoscope/csv` (copy old CSV files there to see them). The plot follows
-the newest data; after zooming or panning, press **Latest** to follow again.
+> The feedthroughs sit on a live beamline. **Insert** puts them into the beam. Only insert when
+> the beamline situation allows it. The two feedthroughs can never be inserted at the same time.
 
-The **VUV PD snapshot** works like an oscilloscope's averaging: the plot is the average of the
-last N waveforms and is redrawn with every trigger (25 Hz). Set N with **▲ / ▼** (1, 2, 4 …
-1024, ∞ = everything since Clear); **Clear** restarts the average. The box on the signal plot
-shows the offset (mean of the first 5 % of the points), the area with the offset subtracted,
-its standard deviation, N and the standard error.
+### Where files are saved
 
-**Data files** (formats unchanged from the old programs):
-- `data/picoscope/root/<output_name>_<YYMMDD>_<NNNN>.root`: tree `rawWave`, every waveform,
-  a new file every 10000 triggers.
-- `data/picoscope/csv/<output_name>_<YYMMDD>.csv`: continuous monitor, summed pulse area per
-  channel (nV·s), one row per 100 triggers.
-- `data/picoscope/snapshots/snapshot_<device>_<YYYYMMDD>_<NNN>.csv`: Save in the snapshot tab.
-- `data/camera/YYYY-MM-DD/NNN_HHMMSS.bmp` (+ `_config.toml`) for Capture, `NNN_HHMMSS/` folders
-  (BMPs + `frames.csv` + `run_config.toml`) for Multi-shot run. BMP → ROOT:
-  `python tools/bmp_to_root.py <file or folder> [--recursive] [--workers 4]`.
-- In simulation everything goes to `logs/sim/data/...` instead.
+| What | Where |
+|---|---|
+| PicoScope waveforms (ROOT) and trend data (CSV) | `data/picoscope/` |
+| Snapshots | `data/picoscope/snapshots/` |
+| Camera images | `data/camera/<date>/` |
+| Operation log | `logs/oplog-<date>.jsonl` |
+| Simulation output | `logs/sim/` (never mixed with real data) |
 
-**Debug logs:** `logs/h2lasercontrol.log` (previous run: `.prev.log`) and `logs/fault.log`
-(crash traces; stack dump if the window freezes for more than 3 s).
+### Command line
 
-**Operation log:** `logs/oplog-YYYY-MM-DD.jsonl`, one JSON line per action. A line holds the time,
-the operator, the device, the action, start/done/failed, the arguments and result, and the exact
-bytes sent and received. The GUI shows today's history under the tabs. Set the operator name at
-the top right.
+With the environment active (`conda activate H2LaserControl`):
 
-## 4. Check that it works (after setup)
+```bat
+python -m h2lasercontrol.gui [--sim] [--no-connect]   :: start the program
+python scripts/status.py                             :: read-only status of all devices
+python tools/list_ports.py                           :: list COM ports and USB serials
+python tools/bmp_to_root.py <file or folder>         :: convert camera BMPs to ROOT
+```
 
-Run these in order, with the env active (`conda activate H2LaserControl`), from the project folder:
+## Configuration
 
-1. **Tests** (no hardware needed). Expected: 323 passed, 21 skipped on 2026-11-19. The skipped
-   ones are 18 real-camera tests and 3 that need the old 12 MB reference BMP. The real-camera
-   tests open and close the camera many times, which the old notes say kills this camera's
-   USB 2.0 link, so they run only with `$env:H2_CAMERA_HW = "1"`.
-   ```powershell
-   $env:QT_QPA_PLATFORM = "offscreen"; python -m pytest -q
-   ```
-2. **Simulation GUI:** `H2LaserControl-simulation.bat`. The **Control** tab's devices connect by
-   themselves; the **DAQ** tab's scopes and camera start with their Start buttons (simulated).
-3. **Read-only hardware check** (nothing moves): `python scripts/status.py`. Each device should
-   report its identity and position. If a device is "not found", see §7. DAQ devices:
-   `python tools/daq_probe.py` (opens and closes each scope; camera: one short stream).
-4. **Real GUI:** `H2LaserControl.bat`. Check that the states match reality (normally both
-   feedthroughs RETRACTED). Do not move anything unless the beamline situation allows it.
+Devices are listed in `config/devices.toml` and are found by their **USB serial number**, so the
+COM port number does not matter. If a device is replaced, enter its new serial there.
 
-## 5. Safety rules built into the program
+- PicoScope setups: `config/picoscope/*.toml`
+- Camera settings: `config/camera/*.toml`
 
-- **HIT-MV:** the two feedthroughs are never inserted at the same time (driver interlock and GUI
-  lock). Retract is always allowed. "Insert" = origin return (`H:`) to 0. Retracted = 30000000
-  units (60 mm real; 1 unit = 2 nm). Insert starts at once (no confirmation dialog, user's choice). STOP stops a move.
-- **ELL14:** home offset ≥ 0.7°; continuous jog is not offered. "Go to min energy" =
-  max-energy angle + 45°. The max-energy angle is saved in `config/saved_angles.json`
-  (30.9877° on 2026-11-17).
-- **Flip mounts:** the position is read from the hardware limit bits on every poll, never from
-  memory. A flip takes ~0.4 s and has no STOP. A unplugged unit is shown offline and retried
-  every 5 s.
-- **Position after a power cycle:** HIT-MV and ELL14 positions are counters inside the
-  controller. They survive a program reconnect, but they may be wrong after the *controller* is
-  switched off and on. Homing (HIT-MV Insert; ELL14 Home) makes them correct again. Whether the
-  HIT-MV counter survives a power cycle has not been checked yet.
-
-## 6. Configuration: `config/devices.toml`
-
-- Each device has a `type` (`hitmv`, `ell14`, `mff`, `picoscope`, `ids_camera`), a tab `label`
-  and its USB serial. PicoScope tabs instead name a `mode`, a `config_dir` and a
-  `default_config`; the scope setups themselves are in `config/picoscope/*.toml` (keys as in
-  the old H2LaserDAQ `DIGITIZER_CONFIGS`). Camera settings: `config/camera/*.toml`.
-- If the serial is not found, connecting **fails**. It never falls back to a COM number, which
-  could belong to another device.
-- To find serials: COM-port devices with `python tools/list_ports.py`. Flip mounts: the serial
-  is printed on the unit, or see Kinesis or Device Manager → "APT USB Device" → Details →
-  Device instance path.
-- **Second flip mount:** add a block like this:
-  ```toml
-  [devices.flipmounts.units.flip2]
-  label = "Flip mount 2"
-  usb_serial = "<serial>"
-  insert_position = 2   # which of the two positions (1 or 2) is "insert"
-  ```
-- Another device of a known type = a new config entry only. A new device type = a driver, a
-  simulator and a GUI panel (see §8).
-
-## 7. Troubleshooting
+## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| "not found" for a COM device | Check the cable; run `tools/list_ports.py` and compare the serial with `devices.toml`. |
-| Port busy / access denied | Close SGSample / ELLO, or another copy of this program. |
-| Flip mount "in use by another program" (FT_STATUS 3) | Close Kinesis, also from the system tray. If that does not help, unplug and re-plug its USB cable. |
-| Flip mount: `ftd2xx.dll` not found | Install the FTDI CDM driver or Kinesis (§2.3). |
-| Launcher closes at once / "Conda not found" | Conda is installed somewhere else: edit the folder list at the top of the `.bat` file. |
-| Feedthroughs show "POSITION UNKNOWN" (both read 0) | The HIT-MV controller was switched off or restarted and lost its positions; Insert/Retract are locked. Check both feedthroughs by eye, home them with HIT Sample (ORG) and retract them there, close HIT Sample, then reconnect. |
-| "PicoSDK (ps2000) not found" | Install the PicoSDK (§2.4) and open a new prompt / restart the program. |
-| PicoScope "not found" when starting a scope tab | Close PicoScope 7 and the old H2LaserDAQ; check the serial in `devices.toml`; re-plug the scope. |
-| "No trigger for 10 s" in a scope tab | No trigger signal arrives (laser off, cable, trigger level). The acquisition keeps waiting. |
-| "readout failed … waveform skipped" / "scope not responding: reconnecting" | The scope's USB link dropped out; the tab skips the waveform or reopens the scope and goes on (counts in the operation log). If it happens often: keep the 3405D on a different USB hub from the 2204A scopes (on this PC: 3405D on the control-device hub). |
-| Camera does not open / "not responding" | Close IDS peak Cockpit and the old LaserDAQ, then unplug and re-plug the camera's USB cable. |
-| Camera status bar: "SLOW USB LINK … USB 2.0" | The camera is on a USB 2 link (max ~19 fps full frame). Use a USB 3 port and cable, directly on the PC. |
+| A device shows "not found" | Check the cable. Run `python tools/list_ports.py` and compare the serial with `config/devices.toml`. |
+| "Port busy" / "in use by another program" | Close SGSample, ELLO, Kinesis (also from the system tray), or another copy of this program. If that does not help, unplug and re-plug the device. |
+| The launcher closes at once / "Conda not found" | Conda is installed in an unusual place. Edit the folder list at the top of the `.bat` file. |
+| Feedthroughs show "POSITION UNKNOWN" | The controller was switched off and lost its position. Check both feedthroughs by eye and home them with the vendor software, then reconnect. |
+| PicoScope or camera does not open | Close PicoScope 7 / IDS peak Cockpit and the old DAQ programs, then re-plug the USB cable. |
+| "No trigger for 10 s" | No trigger signal arrives (laser off, cable, trigger level). The acquisition keeps waiting. |
 
----
+Debug logs are in `logs/h2lasercontrol.log` and `logs/fault.log`.
 
-## 8. Project structure (for developers)
+## Project layout
 
 ```
-H2LaserControl.bat, H2LaserControl-simulation.bat   launchers (real / simulated devices)
-pyproject.toml          package, dependencies, ruff settings
-config/
-  devices.toml          which devices exist, their USB serials and tab labels (§6)
-  saved_angles.json     ELL14 max-energy angle
-  picoscope/*.toml      PicoScope acquisition setups (Config drop-down)
-  camera/*.toml         camera settings
-src/h2lasercontrol/
-  gui/                  PySide6 GUI
-    app.py              start-up (python -m h2lasercontrol.gui)
-    main_window.py      Control / DAQ tabs with one sub-tab per device, operator name
-    panels/             Control tab: one panel per device type (HIT-MV, ELL14, flip mounts)
-    daq/                DAQ tab: scope monitor / snapshot tabs, camera tab
-    log_panel.py        operation history under the tabs
-    style.py            light / dark theme (follows Windows)
-  services/             DeviceService: one worker thread per device
-  drivers/              protocol logic and safety checks: hitmv.py, ell14.py, mff.py
-  transport/            serial port, FTDI D2XX, and a fake transport for tests
-  daq/picoscope/        PicoScope acquisition, averaging, history, simulated scope
-  laserdaq/             camera program (IDS camera, analysis, storage, its window)
-  sim.py                simulated HIT-MV / ELL14 / flip mounts
-  oplog.py              operation log (logs/oplog-*.jsonl)
-  config.py             reads config/devices.toml
-scripts/                status.py (read-only status), ctl.py (one action from the command line)
-tools/                  list_ports.py, daq_probe.py, bmp_to_root.py, read-only probes
-tests/                  pytest suite (runs on simulators, no hardware needed)
-docs/protocols.md       every device's command set, byte by byte (manual / capture / hardware test)
-ref/                    vendor manuals (HIT-MV in Japanese, ELLx, APT protocol, DG645)
+config/      device list and acquisition settings
+src/         the program (package h2lasercontrol)
+scripts/     command-line status and control
+tools/       helper tools (port list, probes, file conversion)
+tests/       automated tests (run without hardware)
+docs/        device command reference
+ref/         vendor manuals
 ```
 
-How the parts connect:
+## Running the tests
 
+```powershell
+$env:QT_QPA_PLATFORM = "offscreen"; python -m pytest -q
+ruff check .
 ```
-GUI (PySide6, one sub-tab per device: gui/panels/*)    never touches ports
-  │ submit(action)            ▲ state/progress signals
-DeviceService (one QThread per device)                 services/device_service.py
-  │ driver.execute(action)    → op-log entry (oplog.py)
-Driver (protocol logic, safety checks)                 drivers/hitmv.py, ell14.py, mff.py
-  │ bytes
-Transport (Serial / FTDI D2XX / Fake for tests)        transport/
-
-DAQ tab (streaming), next to the above:
-ScopeTab (Start/Pause/Stop) → PicoSession → Digitizer threads (one per scope)   daq/picoscope/
-CameraTab (start page ↔ camera window)                                         laserdaq/
-```
-
-**Adding a device:** another unit of a known type needs only a new entry in
-`config/devices.toml`. A new device type needs a driver (`drivers/`), a simulator (`sim.py`),
-a GUI panel (`gui/panels/`) and tests. Every action must go through `Driver.execute` so that
-it is written to the operation log.
-
-**Tests and lint:** tests run against simulators (`sim.py`, `daq/picoscope/virtual.py`, the
-camera's `MockCamera`) that reproduce the real devices. Lint: `ruff check .` (the camera package
-and its tests keep their original, smaller rule set: see `pyproject.toml`).
-
-**Planned:** SRS DG645 delay generator (will appear in the Control tab); interlock / ordering
-rules across devices; user macros.
