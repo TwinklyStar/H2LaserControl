@@ -10,11 +10,20 @@ to `theme.changed` to redraw.
 
 from __future__ import annotations
 
+import tempfile
 from dataclasses import dataclass, fields, replace
+from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPalette, QPixmap
-from PySide6.QtWidgets import QProxyStyle, QStyle, QStyleFactory
+from PySide6.QtWidgets import (
+    QComboBox,
+    QProxyStyle,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleFactory,
+    QWidget,
+)
 
 
 @dataclass
@@ -57,6 +66,7 @@ class Colors:
     TEXT_OFF: str  # disabled text
     ACCENT: str  # selection, links, primary buttons
     ACCENT_DOWN: str
+    POPUP: str  # drop-down list background
 
 
 # Apple light mode (user 2026-11-19). Status colours (text and dots) = Apple's "increased
@@ -76,7 +86,7 @@ LIGHT = Colors(
     WINDOW="#ffffff", BOX="#f5f5f7", FIELD="#ffffff",
     CONTROL="#e5e5ea", CONTROL_HOVER="#dadadf", CONTROL_DOWN="#cdcdd2",
     TEXT="#1d1d1f", TEXT2="#6e6e73", TEXT_OFF="#aeaeb2",
-    ACCENT="#007aff", ACCENT_DOWN="#0062cc",
+    ACCENT="#007aff", ACCENT_DOWN="#0062cc", POPUP="#ffffff",
 )
 
 # macOS dark mode: neutral greys + Apple's dark-mode system colours. Pattern of the macOS
@@ -93,7 +103,7 @@ DARK = Colors(
     WINDOW="#262626", BOX="#2e2e2e", FIELD="#1e1e1e",
     CONTROL="#58585a", CONTROL_HOVER="#646466", CONTROL_DOWN="#727274",
     TEXT="#e5e5e5", TEXT2="#98989d", TEXT_OFF="#6e6e73",
-    ACCENT="#0a84ff", ACCENT_DOWN="#0070e0",
+    ACCENT="#0a84ff", ACCENT_DOWN="#0070e0", POPUP="#333335",
 )
 
 C = replace(LIGHT)  # the current colours (changed in place by apply_theme)
@@ -130,9 +140,80 @@ def _scoped(selector: str) -> str:
     return ", ".join(f"{c} {selector}" for c in OWN)
 
 
+def _updown_icon(color: str) -> str:
+    """Path of a small up/down chevron SVG (macOS pop-up button) in `color`, for the style
+    sheet (which can only load images from files). Written once per colour to the temp dir."""
+    d = Path(tempfile.gettempdir()) / "h2lasercontrol-style"
+    path = d / f"updown-{color.lstrip('#')}.svg"
+    if not path.exists():
+        d.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="14" viewBox="0 0 10 14">'
+            f'<path d="M2 5.2 L5 2.2 L8 5.2 M2 8.8 L5 11.8 L8 8.8" fill="none" stroke="{color}"'
+            ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+            encoding="utf-8")
+    return path.as_posix()
+
+
+def _combo_rules(c: Colors) -> str:
+    """Drop-down lists as macOS pop-up buttons (user 2026-11-19, screenshots): a grey box like
+    the buttons, the value and an up/down chevron on the right; the open list is a rounded
+    panel, the highlighted item a blue rounded bar, the current item ticked."""
+    return f"""
+QComboBox {{ background: {c.CONTROL}; color: {c.TEXT}; border: none; border-radius: 6px;
+             padding: 4px 26px 4px 10px; }}
+QComboBox:hover {{ background: {c.CONTROL_HOVER}; }}
+QComboBox:on {{ background: {c.CONTROL_DOWN}; }}
+QComboBox:disabled {{ color: {c.TEXT_OFF}; }}
+QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right;
+                        width: 22px; border: none; background: transparent; }}
+QComboBox::down-arrow {{ image: url("{_updown_icon(c.TEXT)}"); width: 10px; height: 14px; }}
+QComboBox::down-arrow:disabled {{ image: url("{_updown_icon(c.TEXT_OFF)}"); }}
+QComboBoxPrivateContainer {{ background: transparent; border: none; }}
+QComboBox QAbstractItemView {{ background: {c.POPUP}; color: {c.TEXT};
+                               border: 1px solid {c.BORDER}; border-radius: 10px;
+                               padding: 4px; outline: 0; }}
+"""
+
+
+class ComboItemDelegate(QStyledItemDelegate):
+    """Items of an open drop-down list like macOS: the highlighted item (under the mouse /
+    keyboard) as a rounded accent bar with white text, a tick in front of the current value."""
+
+    def __init__(self, combo) -> None:
+        super().__init__(combo)
+        self._combo = combo
+
+    def sizeHint(self, option, index):
+        fm = option.fontMetrics
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        return QSize(fm.horizontalAdvance(text) + 44, max(26, fm.height() + 10))
+
+    def paint(self, painter, option, index):
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = option.rect.adjusted(2, 1, -2, -1)
+        enabled = bool(index.flags() & Qt.ItemFlag.ItemIsEnabled)
+        hot = enabled and bool(option.state & (QStyle.StateFlag.State_Selected
+                                               | QStyle.StateFlag.State_MouseOver))
+        if hot:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(C.ACCENT))
+            painter.drawRoundedRect(r, 6, 6)
+        painter.setPen(QColor("#ffffff" if hot else (C.TEXT if enabled else C.TEXT_OFF)))
+        painter.setFont(option.font)
+        if index.row() == self._combo.currentIndex():
+            painter.drawText(r.adjusted(8, 0, 0, 0),
+                             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "✓")
+        painter.drawText(r.adjusted(26, 0, -8, 0),
+                         Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+                         index.data(Qt.ItemDataRole.DisplayRole) or "")
+        painter.restore()
+
+
 def style_sheet(c: Colors | None = None) -> str:
     c = c or C
-    return f"""
+    return _combo_rules(c) + f"""
 {", ".join(OWN)}, {_scoped("QWidget")}, QTabBar {{ font-size: 10.5pt; }}
 QTabBar::tab {{ padding: 8px 18px; min-width: 150px; margin: 3px 2px; border: none;
                 border-radius: 6px; background: {c.CONTROL}; color: {c.TEXT}; }}
@@ -232,6 +313,16 @@ class AppStyle(QProxyStyle):
 
     def __init__(self) -> None:
         super().__init__(QStyleFactory.create("Fusion"))
+
+    def polish(self, obj):
+        # the drop-down list's window: transparent, so the list's rounded corners show
+        if (isinstance(obj, QWidget)
+                and obj.metaObject().className() == "QComboBoxPrivateContainer"):
+            obj.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        # every drop-down list gets the macOS item look (once)
+        if isinstance(obj, QComboBox) and not isinstance(obj.itemDelegate(), ComboItemDelegate):
+            obj.setItemDelegate(ComboItemDelegate(obj))
+        return super().polish(obj)
 
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == QStyle.StyleHint.SH_Slider_AbsoluteSetButtons:

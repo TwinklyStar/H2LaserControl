@@ -26,3 +26,27 @@ def test_slider_click_jumps_to_clicked_point(qtbot, themes, dark):
     qtbot.mouseClick(s, Qt.MouseButton.LeftButton, pos=QPoint(300, 15))
     expected = 100 + 0.75 * (1250 - 100)
     assert abs(s.value() - expected) < 0.05 * (1250 - 100)  # not one page step (+10)
+
+
+@pytest.mark.parametrize("dark", [False, True])
+def test_combo_box_is_macos_popup_button(qtbot, themes, dark):
+    """Drop-down lists (user 2026-11-19, macOS screenshots): up/down chevron image exists,
+    and the open list paints items with the macOS delegate (tick, blue bar)."""
+    from pathlib import Path
+
+    from PySide6.QtWidgets import QComboBox
+
+    from h2lasercontrol.gui.style import AppStyle, C, ComboItemDelegate, _updown_icon
+
+    themes(dark)
+    cb = QComboBox()
+    cb.setStyle(AppStyle())
+    cb.addItems(["Standard", "90°"])
+    qtbot.addWidget(cb)
+    cb.show()
+    qtbot.waitExposed(cb)
+    assert isinstance(cb.itemDelegate(), ComboItemDelegate)
+    assert Path(_updown_icon(C.TEXT)).read_text(encoding="utf-8").startswith("<svg")
+    cb.showPopup()
+    assert cb.view().isVisible()
+    cb.hidePopup()
