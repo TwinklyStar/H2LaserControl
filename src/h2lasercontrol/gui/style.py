@@ -44,6 +44,19 @@ class Colors:
     MATH: str  # Freeze "Math" value
     STATS_FILL: tuple[int, int, int, int]  # statistics box background (RGBA)
     CH: tuple[str, ...]  # channel colours, cycled
+    # surfaces, macOS System Settings pattern (user 2026-11-19, screenshots): light = white
+    # window, boxes and buttons a little darker; dark = dark window, controls lighter
+    WINDOW: str  # window background
+    BOX: str  # group box fill ("information box")
+    FIELD: str  # text fields, lists, tables
+    CONTROL: str  # button fill
+    CONTROL_HOVER: str
+    CONTROL_DOWN: str
+    TEXT: str
+    TEXT2: str  # secondary text
+    TEXT_OFF: str  # disabled text
+    ACCENT: str  # selection, links, primary buttons
+    ACCENT_DOWN: str
 
 
 # Apple light mode (user 2026-11-19). Status colours (text and dots) = Apple's "increased
@@ -54,32 +67,33 @@ class Colors:
 LIGHT = Colors(
     GREEN="#248a3d", ORANGE="#c45c00", BLUE="#0040dd", RED="#d70015", GREY="#6e6e73",
     ON_RED="#ffffff", STOP_OFF_BG="#f0b3b8", STOP_OFF_FG="#fbeff0",
-    BORDER="#d1d1d6", SEP="#e5e5ea", ERROR_BG="#fdecec", ERROR_BORDER="#f6c4c6",
+    BORDER="#e3e3e8", SEP="#e5e5ea", ERROR_BG="#fdecec", ERROR_BORDER="#f6c4c6",
     SIM_BG="#fff4d1", SIM_FG="#7a5600", SIM_BORDER="#ecd58f",
-    PLOT_BG="#ffffff", PLOT_FG="#1d1d1f", SURF="#e8e8ed", GRID="#d1d1d6", MATH="#a05a00",
+    PLOT_BG="#ffffff", PLOT_FG="#1d1d1f", SURF="#ececf0", GRID="#d1d1d6", MATH="#a05a00",
     STATS_FILL=(255, 255, 255, 225),
     # blue, green, orange, red, purple, cyan, brown, pink (same order as DARK)
     CH=("#007aff", "#34c759", "#ff9500", "#ff3b30", "#af52de", "#32ade6", "#a2845e", "#ff2d55"),
+    WINDOW="#ffffff", BOX="#f5f5f7", FIELD="#ffffff",
+    CONTROL="#e5e5ea", CONTROL_HOVER="#dadadf", CONTROL_DOWN="#cdcdd2",
+    TEXT="#1d1d1f", TEXT2="#6e6e73", TEXT_OFF="#aeaeb2",
+    ACCENT="#007aff", ACCENT_DOWN="#0062cc",
 )
 
-# macOS dark mode: neutral greys + Apple's dark-mode system colours
-_WINDOW = "#282828"  # window background
-_FIELD = "#1e1e1e"  # text fields, tables, plot background
-_ALT = "#252525"  # alternating table rows
-_CONTROL = "#3c3c3c"  # buttons
-_LINE = "#3d3d3d"  # borders, separators
-_TEXT, _TEXT2, _TEXT3 = "#e5e5e5", "#98989d", "#6e6e73"  # label, secondary, disabled
-_ACCENT = "#0a84ff"  # systemBlue (selection, links)
-
+# macOS dark mode: neutral greys + Apple's dark-mode system colours. Pattern of the macOS
+# dark settings window: dark background, controls (buttons, pop-ups) clearly lighter.
 DARK = Colors(
-    GREEN="#30d158", ORANGE="#ff9f0a", BLUE=_ACCENT, RED="#ff453a", GREY=_TEXT2,
-    ON_RED="#ffffff", STOP_OFF_BG="#4a2e2c", STOP_OFF_FG=_TEXT3,
-    BORDER=_LINE, SEP=_LINE, ERROR_BG="#3b2220", ERROR_BORDER="#6b2f2a",
+    GREEN="#30d158", ORANGE="#ff9f0a", BLUE="#0a84ff", RED="#ff453a", GREY="#98989d",
+    ON_RED="#ffffff", STOP_OFF_BG="#4a2e2c", STOP_OFF_FG="#6e6e73",
+    BORDER="#3a3a3a", SEP="#3d3d3d", ERROR_BG="#3b2220", ERROR_BORDER="#6b2f2a",
     SIM_BG="#3a3320", SIM_FG="#ffd60a", SIM_BORDER="#6b5a1e",
-    PLOT_BG=_FIELD, PLOT_FG=_TEXT, SURF="#323232", GRID="#464646", MATH="#ffd60a",
+    PLOT_BG="#1e1e1e", PLOT_FG="#e5e5e5", SURF="#323232", GRID="#464646", MATH="#ffd60a",
     STATS_FILL=(30, 30, 30, 225),
     # same order as LIGHT: blue, green, orange, red, purple, cyan, brown, pink
-    CH=(_ACCENT, "#30d158", "#ff9f0a", "#ff453a", "#bf5af2", "#64d2ff", "#ac8e68", "#ff375f"),
+    CH=("#0a84ff", "#30d158", "#ff9f0a", "#ff453a", "#bf5af2", "#64d2ff", "#ac8e68", "#ff375f"),
+    WINDOW="#262626", BOX="#2e2e2e", FIELD="#1e1e1e",
+    CONTROL="#58585a", CONTROL_HOVER="#646466", CONTROL_DOWN="#727274",
+    TEXT="#e5e5e5", TEXT2="#98989d", TEXT_OFF="#6e6e73",
+    ACCENT="#0a84ff", ACCENT_DOWN="#0070e0",
 )
 
 C = replace(LIGHT)  # the current colours (changed in place by apply_theme)
@@ -123,13 +137,24 @@ def style_sheet(c: Colors | None = None) -> str:
 QTabBar::tab {{ padding: 8px 18px; min-width: 150px; }}
 QTabBar::tab:selected {{ font-weight: bold; }}
 QTabWidget#groupTabs > QTabBar::tab {{ font-size: 12pt; padding: 10px 28px; min-width: 120px; }}
-{_scoped("QGroupBox")} {{ font-weight: bold; border: 1px solid {c.BORDER}; border-radius: 6px;
-             margin-top: 14px; padding: 12px 10px 10px 10px; }}
+{_scoped("QGroupBox")} {{ font-weight: bold; background: {c.BOX}; border: 1px solid {c.BORDER};
+             border-radius: 8px; margin-top: 14px; padding: 12px 10px 10px 10px; }}
 {_scoped("QGroupBox::title")} {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
-{_scoped("QPushButton")} {{ padding: 6px 14px; }}
-QPushButton[role="primary"] {{ font-size: 12pt; font-weight: bold; padding: 10px 22px; }}
+{_scoped("QPushButton")} {{ padding: 6px 14px; background: {c.CONTROL}; color: {c.TEXT};
+             border: none; border-radius: 6px; }}
+{_scoped("QPushButton:hover")} {{ background: {c.CONTROL_HOVER}; }}
+{_scoped("QPushButton:pressed")} {{ background: {c.CONTROL_DOWN}; }}
+{_scoped("QPushButton:disabled")} {{ color: {c.TEXT_OFF}; }}
+{_scoped("QPushButton:flat")} {{ background: transparent; }}
+QPushButton[role="primary"] {{ font-size: 12pt; font-weight: bold; padding: 10px 22px;
+                               background: {c.ACCENT}; color: #ffffff; border-radius: 6px; }}
+QPushButton[role="primary"]:hover {{ background: {c.ACCENT}; }}
+QPushButton[role="primary"]:pressed {{ background: {c.ACCENT_DOWN}; }}
+QPushButton[role="primary"]:disabled {{ background: {c.CONTROL}; color: {c.TEXT_OFF}; }}
 QPushButton[role="stop"] {{ background: {c.RED}; color: {c.ON_RED}; font-weight: bold;
                             padding: 8px 22px; border-radius: 4px; }}
+QPushButton[role="stop"]:hover {{ background: {c.RED}; }}
+QPushButton[role="stop"]:pressed {{ background: {c.RED}; }}
 QPushButton[role="stop"]:disabled {{ background: {c.STOP_OFF_BG}; color: {c.STOP_OFF_FG}; }}
 QFrame[role="sep"] {{ color: {c.SEP}; }}
 QLabel[role="big"] {{ font-size: 20pt; font-weight: bold; }}
@@ -142,44 +167,39 @@ QLabel[role="sim"] {{ background: {c.SIM_BG}; color: {c.SIM_FG}; font-weight: bo
 """
 
 
-def dark_palette() -> QPalette:
+def make_palette(c: Colors, dark: bool) -> QPalette:
+    """Palette for the whole program (also the camera window, combo boxes, spin boxes, tabs):
+    window, fields and controls as in macOS System Settings."""
+    ctl = QColor(c.CONTROL)
+    # Fusion draws bevels and frames from Light ... Shadow
+    light, midlight = (ctl.lighter(118), ctl.lighter(108)) if dark else ("#ffffff", "#f0f0f3")
+    mid, dark_ = (ctl.darker(160), ctl.darker(300)) if dark else ("#c7c7cc", "#a1a1a6")
     p = QPalette()
     roles = {
-        QPalette.ColorRole.Window: _WINDOW, QPalette.ColorRole.WindowText: _TEXT,
-        QPalette.ColorRole.Base: _FIELD, QPalette.ColorRole.AlternateBase: _ALT,
-        QPalette.ColorRole.Text: _TEXT, QPalette.ColorRole.Button: _CONTROL,
-        QPalette.ColorRole.ButtonText: _TEXT, QPalette.ColorRole.BrightText: "#ff453a",
-        QPalette.ColorRole.Highlight: _ACCENT, QPalette.ColorRole.HighlightedText: "#ffffff",
-        QPalette.ColorRole.ToolTipBase: _CONTROL, QPalette.ColorRole.ToolTipText: _TEXT,
-        QPalette.ColorRole.Link: _ACCENT, QPalette.ColorRole.LinkVisited: "#bf5af2",
-        QPalette.ColorRole.PlaceholderText: _TEXT3,
-        # Fusion draws bevels and frames from these
-        QPalette.ColorRole.Light: "#565656", QPalette.ColorRole.Midlight: "#474747",
-        QPalette.ColorRole.Mid: "#333333", QPalette.ColorRole.Dark: "#141414",
-        QPalette.ColorRole.Shadow: "#000000",
+        QPalette.ColorRole.Window: c.WINDOW, QPalette.ColorRole.WindowText: c.TEXT,
+        QPalette.ColorRole.Base: c.FIELD,
+        QPalette.ColorRole.AlternateBase: "#232323" if dark else "#f5f5f7",
+        QPalette.ColorRole.Text: c.TEXT, QPalette.ColorRole.Button: c.CONTROL,
+        QPalette.ColorRole.ButtonText: c.TEXT, QPalette.ColorRole.BrightText: c.RED,
+        QPalette.ColorRole.Highlight: c.ACCENT, QPalette.ColorRole.HighlightedText: "#ffffff",
+        QPalette.ColorRole.ToolTipBase: c.BOX, QPalette.ColorRole.ToolTipText: c.TEXT,
+        QPalette.ColorRole.Link: c.ACCENT,
+        QPalette.ColorRole.LinkVisited: "#bf5af2" if dark else "#af52de",
+        QPalette.ColorRole.PlaceholderText: c.TEXT_OFF,
+        QPalette.ColorRole.Light: light, QPalette.ColorRole.Midlight: midlight,
+        QPalette.ColorRole.Mid: mid, QPalette.ColorRole.Dark: dark_,
+        QPalette.ColorRole.Shadow: "#000000" if dark else "#8e8e93",
     }
     for role, col in roles.items():
         p.setColor(role, QColor(col))
     disabled = QPalette.ColorGroup.Disabled
     for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
                  QPalette.ColorRole.ButtonText):
-        p.setColor(disabled, role, QColor(_TEXT3))
-    p.setColor(disabled, QPalette.ColorRole.Button, QColor("#303030"))
-    p.setColor(disabled, QPalette.ColorRole.Base, QColor(_WINDOW))
-    p.setColor(disabled, QPalette.ColorRole.Highlight, QColor(_LINE))
-    p.setColor(disabled, QPalette.ColorRole.HighlightedText, QColor(_TEXT2))
-    return p
-
-
-def light_palette(app) -> QPalette:
-    """Fusion's light palette with Apple's blue for selection and links."""
-    p = app.style().standardPalette()
-    for role, col in ((QPalette.ColorRole.Highlight, "#007aff"),
-                      (QPalette.ColorRole.HighlightedText, "#ffffff"),
-                      (QPalette.ColorRole.Link, "#007aff"),
-                      (QPalette.ColorRole.LinkVisited, "#af52de")):
-        p.setColor(QPalette.ColorGroup.Active, role, QColor(col))
-        p.setColor(QPalette.ColorGroup.Inactive, role, QColor(col))
+        p.setColor(disabled, role, QColor(c.TEXT_OFF))
+    p.setColor(disabled, QPalette.ColorRole.Button, QColor(c.BOX))
+    p.setColor(disabled, QPalette.ColorRole.Base, QColor(c.WINDOW))
+    p.setColor(disabled, QPalette.ColorRole.Highlight, QColor(c.BORDER))
+    p.setColor(disabled, QPalette.ColorRole.HighlightedText, QColor(c.TEXT2))
     return p
 
 
@@ -194,7 +214,7 @@ def apply_theme(app, dark: bool | None = None) -> None:
     for f in fields(Colors):
         setattr(C, f.name, getattr(src, f.name))
     theme.dark = dark
-    app.setPalette(dark_palette() if dark else light_palette(app))
+    app.setPalette(make_palette(C, dark))
     app.setStyleSheet(style_sheet())
     theme.changed.emit()
 
