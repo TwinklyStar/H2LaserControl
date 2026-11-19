@@ -63,7 +63,6 @@ Needed: Windows 10/11, internet access for the installers.
    opencv-python, imageio, pytest, pytest-qt and ruff. Versions tested on 2026-11-18:
    Python 3.12.16, pyserial 3.5, PySide6 6.12.0, numpy 2.5.5, pyqtgraph 0.14.0, uproot 5.7.7,
    picosdk 1.1, ids-peak 1.17.0, pytest 9.2.0, pytest-qt 4.5.0, ruff 0.17.5.
-   For reading the PDF manuals in `ref/` an agent may also want `pip install pypdf`.
 7. Optional: put a desktop shortcut to `H2LaserControl.bat`.
 
 ## 3. Running
@@ -124,15 +123,15 @@ the top right.
 
 Run these in order, with the env active (`conda activate H2LaserControl`), from the project folder:
 
-1. **Tests** (no hardware needed). Expected: 292 passed, 21 skipped on 2026-11-18. The skipped
+1. **Tests** (no hardware needed). Expected: 323 passed, 21 skipped on 2026-11-19. The skipped
    ones are 18 real-camera tests and 3 that need the old 12 MB reference BMP. The real-camera
    tests open and close the camera many times, which the old notes say kills this camera's
    USB 2.0 link, so they run only with `$env:H2_CAMERA_HW = "1"`.
    ```powershell
    $env:QT_QPA_PLATFORM = "offscreen"; python -m pytest -q
    ```
-2. **Simulation GUI:** `H2LaserControl-simulation.bat`. Six tabs appear; the first three connect;
-   the DAQ tabs start with their Start buttons (simulated scopes / camera).
+2. **Simulation GUI:** `H2LaserControl-simulation.bat`. The **Control** tab's devices connect by
+   themselves; the **DAQ** tab's scopes and camera start with their Start buttons (simulated).
 3. **Read-only hardware check** (nothing moves): `python scripts/status.py`. Each device should
    report its identity and position. If a device is "not found", see §7. DAQ devices:
    `python tools/daq_probe.py` (opens and closes each scope; camera: one short stream).
@@ -174,7 +173,7 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
   insert_position = 2   # which of the two positions (1 or 2) is "insert"
   ```
 - Another device of a known type = a new config entry only. A new device type = a driver, a
-  simulator and a GUI panel (see `memory-bank/architecture.md`).
+  simulator and a GUI panel (see §8).
 
 ## 7. Troubleshooting
 
@@ -195,26 +194,43 @@ Run these in order, with the env active (`conda activate H2LaserControl`), from 
 
 ---
 
-## 8. For developers and AI agents: catching up
-
-Read in this order (≈15 min):
-
-1. **`CLAUDE.md`**: working rules for agents (motion permission, record before code, git).
-2. **`memory-bank/progress.md`**: current status, the dated log of everything done and
-   verified on hardware, **open questions** and **next steps**. Start here for "what next".
-3. `memory-bank/design-document.md`: requirements (F-numbers) from the user.
-4. `memory-bank/architecture.md`: layers, source layout, key mechanisms, pitfalls found.
-5. `memory-bank/implementation-plan.md`: phases 0–4 and the steps in each.
-6. `memory-bank/tech-stack.md`: libraries and why.
-7. `memory-bank/merge-plan.md`: the DAQ merge (PicoScope + camera, F8): steps and status.
-8. `docs/protocols.md`: every device's command set, byte by byte. Each fact is marked as from
-   the manual, a capture, or a hardware test. `docs/captures/` holds compact capture logs.
-9. `ref/`: vendor manuals (HIT-MV in Japanese, ELLx, APT protocol, DG645) and the system paper.
-
-Architecture in one picture:
+## 8. Project structure (for developers)
 
 ```
-GUI (PySide6, one tab per device: gui/panels/*)        never touches ports
+H2LaserControl.bat, H2LaserControl-simulation.bat   launchers (real / simulated devices)
+pyproject.toml          package, dependencies, ruff settings
+config/
+  devices.toml          which devices exist, their USB serials and tab labels (§6)
+  saved_angles.json     ELL14 max-energy angle
+  picoscope/*.toml      PicoScope acquisition setups (Config drop-down)
+  camera/*.toml         camera settings
+src/h2lasercontrol/
+  gui/                  PySide6 GUI
+    app.py              start-up (python -m h2lasercontrol.gui)
+    main_window.py      Control / DAQ tabs with one sub-tab per device, operator name
+    panels/             Control tab: one panel per device type (HIT-MV, ELL14, flip mounts)
+    daq/                DAQ tab: scope monitor / snapshot tabs, camera tab
+    log_panel.py        operation history under the tabs
+    style.py            light / dark theme (follows Windows)
+  services/             DeviceService: one worker thread per device
+  drivers/              protocol logic and safety checks: hitmv.py, ell14.py, mff.py
+  transport/            serial port, FTDI D2XX, and a fake transport for tests
+  daq/picoscope/        PicoScope acquisition, averaging, history, simulated scope
+  laserdaq/             camera program (IDS camera, analysis, storage, its window)
+  sim.py                simulated HIT-MV / ELL14 / flip mounts
+  oplog.py              operation log (logs/oplog-*.jsonl)
+  config.py             reads config/devices.toml
+scripts/                status.py (read-only status), ctl.py (one action from the command line)
+tools/                  list_ports.py, daq_probe.py, bmp_to_root.py, read-only probes
+tests/                  pytest suite (runs on simulators, no hardware needed)
+docs/protocols.md       every device's command set, byte by byte (manual / capture / hardware test)
+ref/                    vendor manuals (HIT-MV in Japanese, ELLx, APT protocol, DG645)
+```
+
+How the parts connect:
+
+```
+GUI (PySide6, one sub-tab per device: gui/panels/*)    never touches ports
   │ submit(action)            ▲ state/progress signals
 DeviceService (one QThread per device)                 services/device_service.py
   │ driver.execute(action)    → op-log entry (oplog.py)
@@ -222,15 +238,19 @@ Driver (protocol logic, safety checks)                 drivers/hitmv.py, ell14.p
   │ bytes
 Transport (Serial / FTDI D2XX / Fake for tests)        transport/
 
-DAQ tabs (streaming, F8), next to the above:
+DAQ tab (streaming), next to the above:
 ScopeTab (Start/Pause/Stop) → PicoSession → Digitizer threads (one per scope)   daq/picoscope/
-CameraTab (start page ↔ old camera window, unchanged)                          laserdaq/
+CameraTab (start page ↔ camera window)                                         laserdaq/
 ```
 
-Phases: 0 capture vendor traffic ✅ · 1 drivers + scripts ✅ (DG645 pending) · 2 GUI ✅ (in use;
-finishing touches) · DAQ merge (F8) in code, hardware test pending · 3 interlock/ordering rules
-across devices · 4 user macros.
+**Adding a device:** another unit of a known type needs only a new entry in
+`config/devices.toml`. A new device type needs a driver (`drivers/`), a simulator (`sim.py`),
+a GUI panel (`gui/panels/`) and tests. Every action must go through `Driver.execute` so that
+it is written to the operation log.
 
-Tests run against simulators (`sim.py`, `daq/picoscope/virtual.py`, the camera's `MockCamera`)
-that reproduce the real devices. Lint: `ruff check .` (the copied camera package and its tests
-keep their original, smaller rule set: see `pyproject.toml`).
+**Tests and lint:** tests run against simulators (`sim.py`, `daq/picoscope/virtual.py`, the
+camera's `MockCamera`) that reproduce the real devices. Lint: `ruff check .` (the camera package
+and its tests keep their original, smaller rule set: see `pyproject.toml`).
+
+**Planned:** SRS DG645 delay generator (will appear in the Control tab); interlock / ordering
+rules across devices; user macros.
