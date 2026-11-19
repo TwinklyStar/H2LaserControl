@@ -14,3 +14,8 @@ DAQ_oldcode/
 
 # DAQ output (F8)
 data/
+
+# AI-assistant files stay on this PC only (user 2026-11-19)
+CLAUDE.md
+memory-bank/
+.claude/
