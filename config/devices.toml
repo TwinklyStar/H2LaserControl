@@ -85,6 +85,9 @@ nominal_s = 0.036580467    # C on 2026-11-20 = nominal (user)
 min_offset_us = -1.5       # hard limits around nominal (user 2026-11-20)
 max_offset_us = 3.0
 step_us = 0.1              # step buttons (user 2026-11-20)
+# Any communication locks the DG645 front panel (REM on) until Unlock (LCAL) or its key "3".
+# So the program reads rarely (user 2026-11-20); "Read now" in the tab reads at once.
+read_interval_s = 300
 
 # ---------------------------------------------------------------------------------------------
 # DAQ devices (F8, merged from the old H2LaserDAQ and IDS-Camera programs).

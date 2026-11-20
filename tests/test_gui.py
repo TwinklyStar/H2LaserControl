@@ -251,6 +251,24 @@ def test_delay_generator_steps_and_limits(window, qtbot):
                       "DLAY 4,0,0.036580467000\n"]  # channel C only
 
 
+def test_delay_generator_unlock(window, qtbot):
+    """User 2026-11-20: lock status + Unlock (LCAL); Unlock must not read (= lock) again."""
+    dg = panel(window, "dg645")
+    sim = dg.service.driver.transport.responder
+    assert "Locked by this program" in dg.lock_label.text() and sim.remote
+    assert "locks its front panel" in dg.lock_note.text() and "“3”" in dg.lock_note.text()
+    n = len(sim.received)
+    dg.unlock_btn.click()
+    qtbot.waitUntil(lambda: "Unlocked" in dg.lock_label.text() and not dg.busy, timeout=5000)
+    qtbot.wait(300)
+    assert sim.received[n:] == ["LCAL"] and not sim.remote  # no reading after Unlock
+    dg.read_btn.click()
+    qtbot.waitUntil(lambda: "Locked by this program" in dg.lock_label.text() and not dg.busy,
+                    timeout=5000)
+    assert sim.remote
+    assert "Values read at" in dg.read_note.text()
+
+
 def test_delay_generator_maintenance_nominal(window, qtbot):
     """Maintenance (user 2026-11-20): change the nominal value of C; nothing sent to the DG645."""
     dg = panel(window, "dg645")

@@ -23,7 +23,7 @@ from ..transport import FakeTransport, TransportError
 
 log = logging.getLogger(__name__)
 
-# DG645: one poll = 8 `DLAY?` queries, ~0.25 s at 9600 baud
+# DG645: read_interval_s in its config (every read locks its front panel)
 POLL_MS = {"hitmv": 1000, "ell14": 2000, "mff": 1000, "dg645": 2000}
 LOST_AFTER = 2  # consecutive failed polls before the connection is reported lost
 
@@ -98,7 +98,11 @@ class DeviceService(QObject):
     def _on_started(self) -> None:
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._poll)
-        self._timer.start(POLL_MS.get(self.cfg.type, 1000))
+        # `read_interval_s` in the device's config overrides the default (DG645: every read
+        # locks its front panel, so it is read rarely, user 2026-11-20)
+        seconds = self.cfg.settings.get("read_interval_s")
+        self._timer.start(int(float(seconds) * 1000) if seconds
+                          else POLL_MS.get(self.cfg.type, 1000))
 
     @Slot()
     def _on_shutdown(self) -> None:
@@ -145,6 +149,12 @@ class DeviceService(QObject):
             self.action_done.emit(action, result)
         finally:
             self._set_busy(False, action)
+        # after a "quiet" action (DG645 Unlock) show the cached state: a read would undo it
+        if action in getattr(self.driver, "QUIET_ACTIONS", ()) and self.connected:
+            state = self.driver.cached_state()
+            if state is not None:
+                self.state_changed.emit(state)
+                return
         self._poll()
 
     @Slot()

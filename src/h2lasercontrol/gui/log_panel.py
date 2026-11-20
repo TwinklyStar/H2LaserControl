@@ -23,7 +23,8 @@ from .style import C, theme
 
 MAX_ROWS = 2000
 COLOR_ROLE = Qt.ItemDataRole.UserRole + 1  # name of the row's theme colour (style.C), or None
-HIDDEN_ACTIONS = {"status", "identify"}  # routine queries: kept in the file, not shown
+# routine queries: kept in the file, not shown
+HIDDEN_ACTIONS = {"status", "identify", "read_now"}
 
 
 class _Bridge(QObject):

@@ -44,6 +44,10 @@ ERROR_TEXT = {
 }
 
 
+def _now() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
 def channel_index(name: str) -> int:
     try:
         return CHANNELS.index(name.upper())
@@ -143,13 +147,27 @@ class Dg645(Driver):
         saved_nominal = self._saved().get("nominal") or {}
         self.nominal_s = float(saved_nominal.get("nominal_s", self.config_nominal_s))
 
+        # front-panel lock (F3i): any communication puts our unit in remote (REM on, keys locked;
+        # test 2026-11-20). The program cannot read the REM LED: "locked" = there has been
+        # communication since our last LCAL (the key "3" on the DG645 also unlocks, unseen).
+        self.locked = False
+        self.locked_at: str | None = None
+        self.unlocked_at: str | None = None
+        self._last_state: dict[str, Any] | None = None
+
     # --- low level --------------------------------------------------------------------------
+    def _send(self, tx: bytes) -> None:
+        self.transport.reset_input()
+        self.transport.write(tx)
+        if not self.locked:
+            self.locked = True
+            self.locked_at = _now()
+
     def _query(self, cmd: str) -> str:
         if not cmd.endswith("?") and "?" not in cmd:
             raise ValueError(f"not a query: {cmd!r}")
         tx = cmd.encode("ascii") + b"\n"
-        self.transport.reset_input()
-        self.transport.write(tx)
+        self._send(tx)
         try:
             raw = self.transport.read_until(b"\r\n", self.reply_timeout)
         except TransportTimeout as e:
@@ -169,26 +187,52 @@ class Dg645(Driver):
             raise DeviceError(f"{self.name}: refused to send {cmd!r} (only our channel "
                               f"{self.channel} may be changed)")
         tx = cmd.encode("ascii") + b"\n"
-        self.transport.reset_input()
-        self.transport.write(tx)
+        self._send(tx)
         self._record(tx, None)
 
     def _local(self) -> None:
-        """`LCAL`: back to local, front panel unlocked. Our unit goes to remote (REM LED, keys
-        locked) on ANY command over RS-232, queries included (test 2026-11-20), so every
-        exchange ends with this. Changes no settings. Errors here are only logged."""
-        if not self.transport.is_open:
-            return
-        try:
-            self.transport.write(b"LCAL\n")
-        except Exception:  # the real operation's result matters more
-            log.warning("%s: LCAL failed", self.name, exc_info=True)
+        """`LCAL`: back to local, front panel usable again. Changes no settings, no reply."""
+        tx = b"LCAL\n"
+        self.transport.reset_input()
+        self.transport.write(tx)
+        self._record(tx, None)
+        self.locked = False
+        self.unlocked_at = _now()
 
-    def execute(self, action_name: str, **args: Any) -> Any:
+    def _panel(self) -> dict[str, Any]:
+        return {"panel_locked": self.locked, "locked_at": self.locked_at,
+                "unlocked_at": self.unlocked_at}
+
+    # --- front panel (F3i) ------------------------------------------------------------------
+    # after these actions the GUI shows cached_state() instead of reading the DG645 again
+    # (a read would lock the front panel at once)
+    QUIET_ACTIONS = frozenset({"unlock"})
+
+    @action()
+    def unlock(self) -> dict[str, Any]:
+        """Release the front panel (`LCAL`). Nothing else is sent."""
+        self._local()
+        return {"panel": "unlocked"}
+
+    @action()
+    def read_now(self) -> None:
+        """Read all channels now (the GUI's poll right after this action does the reading)."""
+
+    def cached_state(self) -> dict[str, Any] | None:
+        """The last reading with the current lock status, without talking to the DG645."""
+        if self._last_state is None:
+            return None
+        return {**self._last_state, **self._panel()}
+
+    @action()
+    def disconnect(self) -> None:
+        """Leave the front panel usable (one LCAL if we locked it), then close."""
         try:
-            return super().execute(action_name, **args)
-        finally:
-            self._local()
+            if self.locked and self.transport.is_open:
+                self._local()
+        except Exception:  # closing matters more
+            log.warning("%s: LCAL before closing failed", self.name, exc_info=True)
+        self.transport.close()
 
     def _errors(self) -> list[int]:
         """Pop the DG645 error queue (`LERR?` until 0; at most 21 entries)."""
@@ -268,10 +312,9 @@ class Dg645(Driver):
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
-        try:
-            return self._snapshot()
-        finally:
-            self._local()  # polling must not leave the front panel locked
+        state = self._snapshot()
+        self._last_state = state
+        return {**state, **self._panel()}
 
     def _snapshot(self) -> dict[str, Any]:
         raw = self._read_all()
@@ -313,6 +356,7 @@ class Dg645(Driver):
             "last_set": last_set,
             "changed_outside": outside,
             "last_change": saved.get("last_change"),
+            "read_at": _now(),
         }
 
     def _in_limits(self, offset_s: float) -> bool:
