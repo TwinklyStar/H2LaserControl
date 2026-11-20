@@ -251,6 +251,24 @@ def test_delay_generator_steps_and_limits(window, qtbot):
                       "DLAY 4,0,0.036580467000\n"]  # channel C only
 
 
+def test_device_tabs_scroll_when_taller_than_window(window, qtbot):
+    """User 2026-11-20: the Delay generator tab (Maintenance open) was cut off, no scroll bar."""
+    from PySide6.QtWidgets import QScrollArea
+
+    dg = panel(window, "dg645")
+    dg.maint_toggle.click()
+    sub = window.sub_tabs["Control"]
+    sub.setCurrentIndex(sub.count() - 1)
+    window.resize(1000, 600)
+    window.show()
+    qtbot.waitExposed(window)
+    page = sub.currentWidget()
+    assert isinstance(page, QScrollArea) and page.widget() is dg
+    qtbot.waitUntil(lambda: page.verticalScrollBar().maximum() > 0, timeout=3000)
+    page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+    assert dg.maint.visibleRegion().boundingRect().height() > 0  # the bottom can be reached
+
+
 def test_delay_generator_unlock(window, qtbot):
     """User 2026-11-20: lock status + Unlock (LCAL); Unlock must not read (= lock) again."""
     dg = panel(window, "dg645")

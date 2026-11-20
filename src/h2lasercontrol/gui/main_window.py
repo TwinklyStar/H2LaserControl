@@ -8,11 +8,13 @@ import logging
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QCloseEvent, QGuiApplication
 from PySide6.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QScrollArea,
     QSplitter,
     QTabWidget,
     QVBoxLayout,
@@ -104,7 +106,7 @@ class MainWindow(QMainWindow):
             labels[key] = label
             service = DeviceService(cfg, oplog, sim=sim, state_dir=state_dir)
             panel = panel_cls(service, cfg)
-            self._add_sub_tab("Control", panel, label)
+            self._add_sub_tab("Control", panel, label, scroll=True)
             panel._emit_tab_state()
             self.services.append(service)
             self.panels.append(panel)
@@ -145,9 +147,17 @@ class MainWindow(QMainWindow):
         self.setGeometry(free.x() + (free.width() - w) // 2, free.y() + (free.height() - h) // 2,
                          w, h)
 
-    def _add_sub_tab(self, group: str, widget: QWidget, label: str) -> None:
+    def _add_sub_tab(self, group: str, widget: QWidget, label: str,
+                     scroll: bool = False) -> None:
         sub = self.sub_tabs[group]
-        index = sub.addTab(widget, label)
+        page = widget
+        if scroll:  # a device tab taller than the window scrolls (user 2026-11-20)
+            page = QScrollArea()
+            page.setWidget(widget)
+            page.setWidgetResizable(True)
+            page.setFrameShape(QFrame.Shape.NoFrame)
+            page.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        index = sub.addTab(page, label)
         self._set_sub_state(group, index, "off")
         widget.tab_state_changed.connect(
             lambda s, g=group, i=index: self._set_sub_state(g, i, s))
