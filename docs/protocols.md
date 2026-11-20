@@ -428,8 +428,11 @@ printed page = PDF page − 14), plus *Operation* pp. 17, 27, 36–38. 📖 unle
 - `*IDN?` → `Stanford Research Systems,DG645,s/n004497,ver1.17.116` (CR LF terminated).
 - Replies in 10–30 ms. Command terminator LF accepted; a space after the mnemonic
   (`DLAY? 2`) is accepted too.
-- The front panel does **not** go to remote over RS-232 for queries: only `REMT` locks it
-  (manual pp. 26, 58, 59; `LCAL` = back to local; LOCAL key = "3"). Never send `REMT`.
+- ~~The front panel does not go to remote over RS-232 for queries: only `REMT` locks it~~ —
+  **wrong, it was only my inference**: the manual never says what puts the unit in remote
+  (printed p. 12: REM "turns on when the DG645 is placed in remote mode by one of the remote
+  interfaces"; p. 44 REM = "remote lock out", LOCAL key "3"; p. 59 `REMT` / `LCAL`). Tested
+  2026-11-20: **any command, queries included, turns REM on** (see below). Never send `REMT`.
 - Settings read (do not change; other groups' channels):
 
   | Ch | Delay (`DLAY?`) | `LINK?` |
