@@ -114,7 +114,7 @@ class Dg645Panel(DevicePanel):
         self.rows: dict[str, tuple[QLabel, QLabel, QLabel]] = {}
         for i, ch in enumerate(WATCHED, 1):
             ours = ch in (self.ch, self.width_ch)
-            name = QLabel(f"{ch}  (ours)" if ours else ch)
+            name = QLabel(f"{ch}  (laser)" if ours else ch)  # user 2026-11-20: not "ours"
             rel, absolute = QLabel("—"), QLabel("—")
             for col, w in enumerate((name, rel, absolute)):
                 if ours:

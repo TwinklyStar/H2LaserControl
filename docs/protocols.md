@@ -534,6 +534,17 @@ idle gap is not practical: a `DLAY` command takes ≈25 ms to transmit at 9600 b
 acts on its terminator; the gap position cannot be measured finer than one 9.5 ms poll; USB
 adapter latency adds jitter. Front-panel changes abort the same way (user: never a problem).
 
+### Hardware set test ✅ (2026-11-20, user's permission; through the program's driver)
+1. `DLAY 4,0,0.036580567000` (C = nominal + 0.1 µs): no reply (as the manual says), `LERR?` → 0,
+   read back `DLAY?4` → `0,+0.036580567000`; D followed (`4,+0.000000500000` → abs 36.581 067 ms,
+   width 0.500 µs); A, B, E–H byte-identical before/after.
+2. `DLAY 4,0,0.036580467000` (back to nominal): read back `0,+0.036580467000`, D back to
+   36.580 967 ms, other channels unchanged. C was at +0.1 µs for ≈5 min (user offsite).
+3. Out-of-range requests (+3.5 µs, −2.0 µs) refused by the driver: 0 bytes sent.
+- A set + checks takes 3 × 8 `DLAY?` + 2–3 `LERR?` + 1 set ≈ 0.8 s.
+- ⏳ By eye (user offsite): front-panel display shows the new C after a remote set; REM LED off
+  and keys usable while/after the program talks; ERR LED off.
+
 ### Things to verify on the real unit ⏳
 1. ✅ 2026-11-20: `*IDN?` reply, CR LF terminator, 9600 RTS/CTS with the PL2303 adapter.
 2. ✅ `DLAY?c` format (12 decimals). ⏳ how a non-multiple of 5 ps is rounded (needs a set).
