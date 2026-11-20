@@ -23,7 +23,7 @@ def make(tmp_path, sim=None, oplog=None):
 
 def sets(t):
     """The set commands sent (everything that is not a query)."""
-    return [w.decode().strip() for w in t.written if b"?" not in w]
+    return [w.decode().strip() for w in t.written if b"?" not in w and w != b"LCAL\n"]
 
 
 def test_parse_and_format():
@@ -48,6 +48,22 @@ def test_connect_reads_every_channel(tmp_path):
     assert st["channels"]["D"]["abs_s"] == pytest.approx(NOMINAL + 5e-7)
     assert st["problems"] == [] and not st["changed_outside"]
     assert sets(t) == []  # reading only
+
+
+def test_front_panel_never_left_locked(tmp_path):
+    """Our unit goes to remote (keys locked) on any command, queries too (2026-11-20): every
+    poll and every action must end with LCAL."""
+    drv, sim, t = make(tmp_path)
+    drv.execute("connect")
+    assert t.written[-1] == b"LCAL\n" and not sim.remote
+    drv.snapshot()
+    assert t.written[-1] == b"LCAL\n" and not sim.remote
+    drv.execute("step", delta_us=0.1)
+    assert t.written[-1] == b"LCAL\n" and not sim.remote
+    with pytest.raises(DeviceError):
+        drv.execute("set_offset", offset_us=9)  # also after a refused action
+    assert t.written[-1] == b"LCAL\n" and not sim.remote
+    assert sim.errors == []  # LCAL is not an error for the DG645
 
 
 def test_set_offset_writes_only_channel_c(tmp_path):

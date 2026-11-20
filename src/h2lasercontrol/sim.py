@@ -216,6 +216,7 @@ class Dg645Sim:
         self.delays: dict[int, tuple[int, float]] = dict(self.REAL)
         self.errors: list[int] = []
         self.received: list[str] = []
+        self.remote = False  # REM LED: front panel locked
 
     def __call__(self, tx: bytes) -> bytes | None:
         reply = None
@@ -245,6 +246,10 @@ class Dg645Sim:
             if mnemonic == "*CLS":
                 self.errors.clear()
                 return None
+            if mnemonic in ("LCAL", "REMT"):  # real unit: any command -> remote; LCAL -> local
+                self.remote = mnemonic == "REMT"
+                return None
+            self.remote = True
             if mnemonic == "DLAY" and query:
                 ref, t = self.delays[int(args[0])]
                 return f"{ref},{t:+.12f}"

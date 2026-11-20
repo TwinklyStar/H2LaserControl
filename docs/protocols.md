@@ -544,6 +544,16 @@ adapter latency adds jitter. Front-panel changes abort the same way (user: never
 - A set + checks takes 3 × 8 `DLAY?` + 2–3 `LERR?` + 1 set ≈ 0.8 s.
 - ⏳ By eye (user offsite): front-panel display shows the new C after a remote set; REM LED off
   and keys usable while/after the program talks; ERR LED off.
+- ❌ **2026-11-20 (user on site, after the tests): REM LED ON and front-panel keys locked**,
+  although no `REMT` was ever sent and the program was not running (last traffic 14:10).
+  So, against the manual's p. 59 wording, our unit goes to remote when it receives remote
+  commands over RS-232 and stays there. Not yet known whether queries alone do it or only
+  the `DLAY` set. Recovery: LOCAL key ("3") on the front panel, or `LCAL` over RS-232.
+  Consequence for the driver: it must send `LCAL` after its commands, so the other groups'
+  front panel is never left locked.
+  ✅ Tested the same day with the user: LOCAL key → REM off; then **queries only** (`*IDN?`,
+  `DLAY?2..9`) → **REM on again** (queries alone lock the panel); then `LCAL` (user's
+  permission) → REM off, keys work, ERR off. `LCAL` replies nothing.
 
 ### Things to verify on the real unit ⏳
 1. ✅ 2026-11-20: `*IDN?` reply, CR LF terminator, 9600 RTS/CTS with the PL2303 adapter.

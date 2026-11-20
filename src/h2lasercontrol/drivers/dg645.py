@@ -17,6 +17,7 @@ User decisions (2026-11-20, design-document F3b-F3g):
 
 from __future__ import annotations
 
+import logging
 import math
 from datetime import datetime
 from typing import Any
@@ -25,6 +26,8 @@ from ..energy import AngleStore
 from ..oplog import OpLog
 from ..transport import Transport, TransportTimeout
 from .base import DeviceError, DeviceTimeout, Driver, action
+
+log = logging.getLogger(__name__)
 
 CHANNELS = ("T0", "T1", "A", "B", "C", "D", "E", "F", "G", "H")  # manual p. 56, Table 31
 WATCHED = CHANNELS[2:]  # A..H: delays that can be read and set
@@ -170,6 +173,23 @@ class Dg645(Driver):
         self.transport.write(tx)
         self._record(tx, None)
 
+    def _local(self) -> None:
+        """`LCAL`: back to local, front panel unlocked. Our unit goes to remote (REM LED, keys
+        locked) on ANY command over RS-232, queries included (test 2026-11-20), so every
+        exchange ends with this. Changes no settings. Errors here are only logged."""
+        if not self.transport.is_open:
+            return
+        try:
+            self.transport.write(b"LCAL\n")
+        except Exception:  # the real operation's result matters more
+            log.warning("%s: LCAL failed", self.name, exc_info=True)
+
+    def execute(self, action_name: str, **args: Any) -> Any:
+        try:
+            return super().execute(action_name, **args)
+        finally:
+            self._local()
+
     def _errors(self) -> list[int]:
         """Pop the DG645 error queue (`LERR?` until 0; at most 21 entries)."""
         codes = []
@@ -248,6 +268,12 @@ class Dg645(Driver):
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
+        try:
+            return self._snapshot()
+        finally:
+            self._local()  # polling must not leave the front panel locked
+
+    def _snapshot(self) -> dict[str, Any]:
         raw = self._read_all()
         self._update_seen(raw, since="the previous reading")
         delays = {c: parse_delay(v) for c, v in raw.items()}

@@ -246,7 +246,7 @@ def test_delay_generator_steps_and_limits(window, qtbot):
     sent = [e["exchanges"] for e in read_oplog(window.oplog.today_path())
             if e["device"] == "dg645" and e["event"] == "done"
             and e["action"] in ("step", "set_offset")]
-    writes = [tx for ex in sent for tx, rx in ex if "?" not in tx]
+    writes = [tx for ex in sent for tx, rx in ex if "?" not in tx and tx != "LCAL\n"]
     assert writes == ["DLAY 4,0,0.036580567000\n", "DLAY 4,0,0.036578967000\n",
                       "DLAY 4,0,0.036580467000\n"]  # channel C only
 
