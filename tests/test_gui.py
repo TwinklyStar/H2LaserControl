@@ -270,20 +270,15 @@ def test_device_tabs_scroll_when_taller_than_window(window, qtbot):
 
 
 def test_delay_generator_unlock(window, qtbot):
-    """User 2026-11-20: lock status + Unlock (LCAL); Unlock must not read (= lock) again."""
+    """User 2026-11-20: an Unlock button (LCAL) for a locked front panel, with a note."""
     dg = panel(window, "dg645")
     sim = dg.service.driver.transport.responder
-    assert "Locked by this program" in dg.lock_label.text() and sim.remote
-    assert "locks its front panel" in dg.lock_note.text() and "“3”" in dg.lock_note.text()
-    n = len(sim.received)
+    assert "REM light on" in dg.lock_note.text() and "“3”" in dg.lock_note.text()
+    assert "LCAL" not in sim.received  # never sent by itself
+    sim.remote = True
     dg.unlock_btn.click()
-    qtbot.waitUntil(lambda: "Unlocked" in dg.lock_label.text() and not dg.busy, timeout=5000)
-    qtbot.wait(300)
-    assert sim.received[n:] == ["LCAL"] and not sim.remote  # no reading after Unlock
-    dg.read_btn.click()
-    qtbot.waitUntil(lambda: "Locked by this program" in dg.lock_label.text() and not dg.busy,
-                    timeout=5000)
-    assert sim.remote
+    qtbot.waitUntil(lambda: "LCAL" in sim.received and not dg.busy, timeout=5000)
+    assert not sim.remote
     assert "Values read at" in dg.read_note.text()
 
 

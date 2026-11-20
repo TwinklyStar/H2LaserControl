@@ -23,7 +23,7 @@ def make(tmp_path, sim=None, oplog=None):
 
 def sets(t):
     """The set commands sent (everything that is not a query)."""
-    return [w.decode().strip() for w in t.written if b"?" not in w and w != b"LCAL\n"]
+    return [w.decode().strip() for w in t.written if b"?" not in w]
 
 
 def test_parse_and_format():
@@ -50,23 +50,20 @@ def test_connect_reads_every_channel(tmp_path):
     assert sets(t) == []  # reading only
 
 
-def test_front_panel_lock_status_and_unlock(tmp_path):
-    """Our unit goes to remote (keys locked) on any command, queries too (2026-11-20). The
-    driver tracks it ("locked" = communication since the last LCAL); Unlock sends LCAL only;
-    no automatic LCAL after each exchange (user: not healthy)."""
+def test_unlock_sends_only_lcal(tmp_path):
+    """User 2026-11-20: keep an Unlock button (LCAL) for a locked front panel; the program
+    never sends LCAL by itself (no automatic switching)."""
     drv, sim, t = make(tmp_path)
     drv.execute("connect")
-    assert sim.remote and drv.snapshot()["panel_locked"]
-    assert b"LCAL\n" not in t.written
+    drv.snapshot()
+    drv.execute("step", delta_us=0.1)
+    drv.execute("disconnect")
+    assert b"LCAL\n" not in t.written  # nothing automatic
+    drv.execute("connect")
+    sim.remote = True  # e.g. left locked, as once on 2026-11-20
     n = len(t.written)
-    drv.execute("unlock")
+    assert drv.execute("unlock") == {"panel": "unlocked"}
     assert t.written[n:] == [b"LCAL\n"] and not sim.remote  # nothing else sent
-    st = drv.cached_state()  # what the GUI shows after Unlock: no new reading
-    assert not st["panel_locked"] and st["unlocked_at"] and len(t.written) == n + 1
-    drv.snapshot()  # the next reading locks again
-    assert sim.remote and drv.locked
-    drv.execute("disconnect")  # leaves the front panel usable
-    assert t.written[-1] == b"LCAL\n" and not sim.remote
     assert sim.errors == []  # LCAL is not an error for the DG645
 
 

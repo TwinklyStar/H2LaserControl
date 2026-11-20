@@ -554,9 +554,19 @@ adapter latency adds jitter. Front-panel changes abort the same way (user: never
   the `DLAY` set. Recovery: LOCAL key ("3") on the front panel, or `LCAL` over RS-232.
   Consequence for the driver: it must send `LCAL` after its commands, so the other groups'
   front panel is never left locked.
-  ✅ Tested the same day with the user: LOCAL key → REM off; then **queries only** (`*IDN?`,
-  `DLAY?2..9`) → **REM on again** (queries alone lock the panel); then `LCAL` (user's
-  permission) → REM off, keys work, ERR off. `LCAL` replies nothing.
+  Tested the same day with the user: LOCAL key → REM off(?); then **queries only** (`*IDN?`,
+  `DLAY?2..9`) → user reported REM on; then `LCAL` (user's permission) → REM off, keys work,
+  ERR off. `LCAL` replies nothing.
+  ❗ **Contradicted at 15:59–16:00 the same day:** a single `*IDN?` and then exactly the same
+  batch (`*IDN?`, `DLAY?2..9`) → **REM stayed off, no blink** (user watching). So queries do
+  NOT lock the panel. The earlier "on again" was probably REM still on from the morning's
+  `DLAY` set commands (the LOCAL key press may not have released it). Current hypothesis:
+  only set commands put the unit in remote. ⏳ To test (needs permission): one set command.
+  ✅ 16:03 (user's permission): `DLAY 4,0,0.036580467000` (C to its own value; `LERR?` 0,
+  read back unchanged) → REM **blinked once, then off**. 16:04: 5 s of `*STB?` polling (523
+  queries) → REM off afterwards. **Conclusion (user): commands do not leave the panel
+  locked.** The lasting lock seen ~15:20 (after the 14:00–14:10 driver tests) is unexplained;
+  `LCAL` / key "3" release it. The program keeps an Unlock button for that case.
 
 ### Things to verify on the real unit ⏳
 1. ✅ 2026-11-20: `*IDN?` reply, CR LF terminator, 9600 RTS/CTS with the PL2303 adapter.

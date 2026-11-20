@@ -26,7 +26,7 @@ from .base import DevicePanel
 BUSY_TEXT = {"set_offset": "Setting the trigger delay", "step": "Stepping the trigger delay",
              "set_nominal": "Saving the nominal value",
              "use_current_as_nominal": "Saving the nominal value",
-             "unlock": "Unlocking the front panel", "read_now": "Reading"}
+             "unlock": "Unlocking the front panel"}
 EPS_US = 1e-6  # 1 ps, for comparisons with the limits
 
 
@@ -65,28 +65,20 @@ class Dg645Panel(DevicePanel):
         top.addWidget(self.warn_label)
         self.body.addLayout(top)
 
-        # front-panel lock (user 2026-11-20, F3i)
+        # front panel (user 2026-11-20, F3i′): only an Unlock button, for the rare case
         lockbox = QGroupBox("DG645 front panel")
-        lk = QGridLayout(lockbox)
-        lk.setHorizontalSpacing(10)
-        self.lock_label = QLabel("—")
-        self.lock_label.setStyleSheet("font-weight: bold;")
-        lk.addWidget(self.lock_label, 0, 0)
-        self.unlock_btn = QPushButton("Unlock")
-        self.unlock_btn.setToolTip("Send LCAL: the DG645 front-panel keys work again")
-        self.unlock_btn.clicked.connect(lambda: self.run("unlock"))
-        self.read_btn = QPushButton("Read now")
-        self.read_btn.setToolTip("Read all channels now (this locks the front panel)")
-        self.read_btn.clicked.connect(lambda: self.run("read_now"))
-        lk.addWidget(self.unlock_btn, 0, 2)
-        lk.addWidget(self.read_btn, 0, 3)
-        self.lock_note = QLabel("Any communication with the DG645 locks its front panel (REM "
-                                "light on). Click Unlock, or press the key “3” on the DG645, "
-                                "to release it.")
+        lk = QHBoxLayout(lockbox)
+        lk.setSpacing(10)
+        self.lock_note = QLabel("If the DG645 front panel is locked (REM light on, keys do "
+                                "not work), click Unlock, or press the key “3” on the DG645.")
         self.lock_note.setWordWrap(True)
         set_role(self.lock_note, "muted")
-        lk.addWidget(self.lock_note, 1, 0, 1, 4)
-        lk.setColumnStretch(1, 1)
+        self.unlock_btn = QPushButton("Unlock")
+        self.unlock_btn.setToolTip("Send LCAL: the DG645 front-panel keys work again "
+                                   "(changes no settings)")
+        self.unlock_btn.clicked.connect(lambda: self.run("unlock"))
+        lk.addWidget(self.lock_note, 1)
+        lk.addWidget(self.unlock_btn)
         self.body.addWidget(lockbox)
 
         # adjust
@@ -150,13 +142,11 @@ class Dg645Panel(DevicePanel):
             self.rows[ch] = (name, rel, absolute)
         a.setColumnStretch(3, 1)
         self.body.addWidget(allbox)
-        minutes = float(self.cfg.settings.get("read_interval_s", 300)) / 60
         self.read_note = QLabel()
         self.read_note.setWordWrap(True)
         set_role(self.read_note, "muted")
-        self._read_note_text = (f"The DG645 is read every {minutes:g} min (each reading locks its "
-                                f"front panel) and with “Read now”. Changes made on the front "
-                                f"panel are written to the operation history at the next reading.")
+        self._read_note_text = ("Changes made on the front panel are noticed within a few "
+                                "seconds and written to the operation history.")
         self.body.addWidget(self.read_note)
         self._build_maintenance()
 
@@ -262,19 +252,7 @@ class Dg645Panel(DevicePanel):
         read_at = st.get("read_at")
         self.read_note.setText((f"Values read at {str(read_at)[11:19]}. " if read_at else "")
                                + self._read_note_text)
-        if not st:
-            self.lock_label.setText("—")
-            self.lock_label.setStyleSheet(f"font-weight: bold; color:{C.GREY}")
-        elif st.get("panel_locked"):
-            self.lock_label.setText(f"● Locked by this program since "
-                                    f"{str(st.get('locked_at'))[11:16]} (REM light on)")
-            self.lock_label.setStyleSheet(f"font-weight: bold; color:{C.ORANGE}")
-        else:
-            self.lock_label.setText(f"● Unlocked {str(st.get('unlocked_at'))[11:16]}: "
-                                    f"front-panel keys work")
-            self.lock_label.setStyleSheet(f"font-weight: bold; color:{C.GREEN}")
-        for b in (self.unlock_btn, self.read_btn):
-            b.setEnabled(self.can_act)
+        self.unlock_btn.setEnabled(self.can_act)
         self.limits_label.setText(
             f"Allowed: {self.min_us:+.1f} … {self.max_us:+.1f} µs from nominal "
             f"(T0 + {ms_text(nominal)}). {self.width_ch} moves with {self.ch}, so the pulse "

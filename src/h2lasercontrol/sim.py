@@ -246,10 +246,9 @@ class Dg645Sim:
             if mnemonic == "*CLS":
                 self.errors.clear()
                 return None
-            if mnemonic in ("LCAL", "REMT"):  # real unit: any command -> remote; LCAL -> local
-                self.remote = mnemonic == "REMT"
+            if mnemonic in ("LCAL", "REMT"):  # REM LED on / off (other commands only blink it,
+                self.remote = mnemonic == "REMT"  # test 2026-11-20)
                 return None
-            self.remote = True
             if mnemonic == "DLAY" and query:
                 ref, t = self.delays[int(args[0])]
                 return f"{ref},{t:+.12f}"
