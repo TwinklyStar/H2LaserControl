@@ -85,6 +85,9 @@ nominal_s = 0.036580467    # C on 2026-11-20 = nominal (user)
 min_offset_us = -1.5       # hard limits around nominal (user 2026-11-20)
 max_offset_us = 3.0
 step_us = 0.1              # step buttons (user 2026-11-20)
+# During each reading (~0.5 s) the DG645 front-panel keys do not respond, so it is read only
+# every 5 min (user 2026-11-20); "Read now" in the tab reads at once.
+read_interval_s = 300
 # ---------------------------------------------------------------------------------------------
 # DAQ devices (F8, merged from the old H2LaserDAQ and IDS-Camera programs).
 # PicoScope tabs: the acquisition setup is chosen on the tab's start page from the config files

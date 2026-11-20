@@ -98,7 +98,11 @@ class DeviceService(QObject):
     def _on_started(self) -> None:
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._poll)
-        self._timer.start(POLL_MS.get(self.cfg.type, 1000))
+        # `read_interval_s` in the device's config overrides the default (DG645: its keys do not
+        # respond during a reading, so it is read every 5 min, user 2026-11-20)
+        seconds = self.cfg.settings.get("read_interval_s")
+        self._timer.start(int(float(seconds) * 1000) if seconds
+                          else POLL_MS.get(self.cfg.type, 1000))
 
     @Slot()
     def _on_shutdown(self) -> None:

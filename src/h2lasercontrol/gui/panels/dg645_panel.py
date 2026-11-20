@@ -26,7 +26,7 @@ from .base import DevicePanel
 BUSY_TEXT = {"set_offset": "Setting the trigger delay", "step": "Stepping the trigger delay",
              "set_nominal": "Saving the nominal value",
              "use_current_as_nominal": "Saving the nominal value",
-             "unlock": "Unlocking the front panel"}
+             "unlock": "Unlocking the front panel", "read_now": "Reading"}
 EPS_US = 1e-6  # 1 ps, for comparisons with the limits
 
 
@@ -77,7 +77,11 @@ class Dg645Panel(DevicePanel):
         self.unlock_btn.setToolTip("Send LCAL: the DG645 front-panel keys work again "
                                    "(changes no settings)")
         self.unlock_btn.clicked.connect(lambda: self.run("unlock"))
+        self.read_btn = QPushButton("Read now")
+        self.read_btn.setToolTip("Read all channels now (the keys do not respond for ~0.5 s)")
+        self.read_btn.clicked.connect(lambda: self.run("read_now"))
         lk.addWidget(self.lock_note, 1)
+        lk.addWidget(self.read_btn)
         lk.addWidget(self.unlock_btn)
         self.body.addWidget(lockbox)
 
@@ -145,8 +149,13 @@ class Dg645Panel(DevicePanel):
         self.read_note = QLabel()
         self.read_note.setWordWrap(True)
         set_role(self.read_note, "muted")
-        self._read_note_text = ("Changes made on the front panel are noticed within a few "
-                                "seconds and written to the operation history.")
+        seconds = self.cfg.settings.get("read_interval_s")
+        every = (f"every {float(seconds) / 60:g} min" if seconds and float(seconds) >= 60
+                 else f"every {float(seconds):g} s" if seconds else "every few seconds")
+        self._read_note_text = (f"The DG645 is read {every} and with “Read now” (its keys do not "
+                                f"respond during a reading, about 0.5 s). Changes made on the "
+                                f"front panel are written to the operation history at the next "
+                                f"reading.")
         self.body.addWidget(self.read_note)
         self._build_maintenance()
 
@@ -253,6 +262,7 @@ class Dg645Panel(DevicePanel):
         self.read_note.setText((f"Values read at {str(read_at)[11:19]}. " if read_at else "")
                                + self._read_note_text)
         self.unlock_btn.setEnabled(self.can_act)
+        self.read_btn.setEnabled(self.can_act)
         self.limits_label.setText(
             f"Allowed: {self.min_us:+.1f} … {self.max_us:+.1f} µs from nominal "
             f"(T0 + {ms_text(nominal)}). {self.width_ch} moves with {self.ch}, so the pulse "

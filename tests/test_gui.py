@@ -297,6 +297,20 @@ def test_delay_generator_unlock(window, qtbot):
     assert "Values read at" in dg.read_note.text()
 
 
+def test_delay_generator_read_every_5_min_and_read_now(window, qtbot):
+    """User 2026-11-20: reading every 2 s disturbs the front panel (~0.5 s unresponsive):
+    read every 5 min, plus Read now."""
+    dg = panel(window, "dg645")
+    assert dg.service._timer.interval() == 300_000
+    assert "every 5 min" in dg.read_note.text()
+    sim = dg.service.driver.transport.responder
+    n = len(sim.received)
+    dg.read_btn.click()
+    qtbot.waitUntil(lambda: len(sim.received) >= n + 8 and not dg.busy, timeout=5000)
+    assert [c for c in sim.received[n:] if c.startswith("DLAY?")] == [
+        f"DLAY?{i}" for i in range(2, 10)]
+
+
 def test_delay_generator_maintenance_nominal(window, qtbot):
     """Maintenance (user 2026-11-20): change the nominal value of C; nothing sent to the DG645."""
     dg = panel(window, "dg645")

@@ -188,6 +188,10 @@ class Dg645(Driver):
         self._record(tx, None)
         return {"panel": "unlocked"}
 
+    @action()
+    def read_now(self) -> None:
+        """Read all channels now: the GUI's reading right after every action does it."""
+
     def _errors(self) -> list[int]:
         """Pop the DG645 error queue (`LERR?` until 0; at most 21 entries)."""
         codes = []
