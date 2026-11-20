@@ -1,10 +1,12 @@
 """Delay generator tab (SRS DG645): adjust our laser-trigger edge (C) in µs around nominal, within
-hard limits; every channel shown read-only (user 2026-11-20, design-document F3b-F3g)."""
+hard limits; every channel shown read-only; Maintenance (collapsed) changes the nominal value
+(user 2026-11-20, design-document F3b-F3h)."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QGridLayout,
@@ -12,6 +14,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -20,7 +23,9 @@ from ...drivers.dg645 import WATCHED, delay_text, ms_text, us_text
 from ..style import C, set_role
 from .base import DevicePanel
 
-BUSY_TEXT = {"set_offset": "Setting the trigger delay", "step": "Stepping the trigger delay"}
+BUSY_TEXT = {"set_offset": "Setting the trigger delay", "step": "Stepping the trigger delay",
+             "set_nominal": "Saving the nominal value",
+             "use_current_as_nominal": "Saving the nominal value"}
 EPS_US = 1e-6  # 1 ps, for comparisons with the limits
 
 
@@ -90,13 +95,10 @@ class Dg645Panel(DevicePanel):
                                                                             offset_us=0.0))
         g.addWidget(self.nominal_btn, 1, 3)
 
-        limits = QLabel(f"Allowed: {self.min_us:+.1f} … {self.max_us:+.1f} µs from nominal "
-                        f"(T0 + {ms_text(self.nominal_s)}). {self.width_ch} moves with "
-                        f"{self.ch}, so the pulse width stays the same. A change acts at once "
-                        f"(one trigger cycle may be cut short, as with the front-panel knob).")
-        limits.setWordWrap(True)
-        set_role(limits, "muted")
-        g.addWidget(limits, 2, 0, 1, 5)
+        self.limits_label = QLabel()  # text set in update_view (the nominal value can change)
+        self.limits_label.setWordWrap(True)
+        set_role(self.limits_label, "muted")
+        g.addWidget(self.limits_label, 2, 0, 1, 5)
         self.last_label = QLabel()
         self.last_label.setWordWrap(True)
         g.addWidget(self.last_label, 3, 0, 1, 5)
@@ -128,6 +130,77 @@ class Dg645Panel(DevicePanel):
         note.setWordWrap(True)
         set_role(note, "muted")
         self.body.addWidget(note)
+        self._build_maintenance()
+
+    def _build_maintenance(self) -> None:
+        """Collapsed, like the rotation mount's (user 2026-11-20): change the nominal value."""
+        self.maint_toggle = QToolButton()
+        self.maint_toggle.setText("Maintenance")
+        self.maint_toggle.setCheckable(True)
+        self.maint_toggle.setArrowType(Qt.ArrowType.RightArrow)
+        self.maint_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.maint_toggle.setStyleSheet(
+            "QToolButton { border: none; background: transparent; font-weight: bold; }")
+        self.maint_toggle.toggled.connect(self._toggle_maintenance)
+        self.body.addWidget(self.maint_toggle)
+
+        self.maint = QGroupBox()
+        m = QGridLayout(self.maint)
+        m.setHorizontalSpacing(10)
+        m.setVerticalSpacing(10)
+        self.maint_controls: list[QWidget] = []
+        m.addWidget(QLabel(f"Nominal value of {self.ch}"), 0, 0)
+        self.nominal_label = QLabel("—")
+        self.nominal_label.setStyleSheet("font-weight: bold;")
+        m.addWidget(self.nominal_label, 0, 1, 1, 3)
+        self.use_current_btn = QPushButton(f"Use current {self.ch} as nominal …")
+        self.use_current_btn.clicked.connect(self._use_current)
+        m.addWidget(self.use_current_btn, 1, 0, 1, 2)
+        m.addWidget(QLabel("Set nominal to   T0 +"), 2, 0)
+        self.nominal_spin = QDoubleSpinBox()
+        self.nominal_spin.setRange(0.000001, 999.999999)
+        self.nominal_spin.setDecimals(6)  # 1 ns
+        self.nominal_spin.setSingleStep(0.0001)  # 0.1 µs
+        self.nominal_spin.setSuffix(" ms")
+        self.nominal_spin.setMinimumWidth(150)
+        m.addWidget(self.nominal_spin, 2, 1)
+        set_nominal = QPushButton("Set …")
+        set_nominal.clicked.connect(self._set_nominal)
+        m.addWidget(set_nominal, 2, 2)
+        self.maint_controls += [self.use_current_btn, self.nominal_spin, set_nominal]
+        note = QLabel(f"Only the program's reference changes: nothing is sent to the DG645 and "
+                      f"{self.ch} stays where it is. The allowed range "
+                      f"({self.min_us:+.1f} … {self.max_us:+.1f} µs) and “Back to nominal” "
+                      f"move with the nominal value.")
+        note.setWordWrap(True)
+        set_role(note, "muted")
+        m.addWidget(note, 3, 0, 1, 4)
+        m.setColumnStretch(3, 1)
+        self.maint.hide()
+        self.body.addWidget(self.maint)
+
+    def _toggle_maintenance(self, on: bool) -> None:
+        self.maint.setVisible(on)
+        self.maint_toggle.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
+
+    def _nominal(self) -> float:
+        return float(self.state.get("nominal_s", self.nominal_s))
+
+    def _use_current(self) -> None:
+        cur = self.state.get("delay_s")
+        if cur is None:
+            return
+        if self.confirm("Nominal value", f"Use the current {self.ch} as the nominal value?\n\n"
+                        f"Old: T0 + {ms_text(self._nominal())}\nNew: T0 + {ms_text(cur)}\n\n"
+                        f"Nothing is sent to the DG645. The allowed range moves with it."):
+            self.run("use_current_as_nominal")
+
+    def _set_nominal(self) -> None:
+        new_ms = self.nominal_spin.value()
+        if self.confirm("Nominal value", f"Change the nominal value of {self.ch}?\n\n"
+                        f"Old: T0 + {ms_text(self._nominal())}\nNew: T0 + {ms_text(new_ms * 1e-3)}"
+                        f"\n\nNothing is sent to the DG645. The allowed range moves with it."):
+            self.run("set_nominal", nominal_ms=new_ms)
 
     def _button(self, text: str, slot) -> QPushButton:
         b = QPushButton(text)
@@ -142,15 +215,36 @@ class Dg645Panel(DevicePanel):
         return BUSY_TEXT.get(action, super().busy_text(action).rstrip(" …")) + " …"
 
     def on_action_done(self, action: str, result: Any) -> None:
-        if action == "connect":  # start the editor from the device's value
-            self._init_editor = True
+        if action == "connect":
+            self._init_editor = True  # start the editors from the device's values
         elif action in ("set_offset", "step") and isinstance(result, dict):
             self.spin.setValue(float(result.get("new_us", self.spin.value())))
+        elif action in ("set_nominal", "use_current_as_nominal") and isinstance(result, dict):
+            new = float(result["new_s"])
+            self.nominal_spin.setValue(new * 1e3)
+            cur = self.state.get("delay_s")
+            if cur is not None:  # C itself did not move; its offset from the new nominal
+                self.spin.setValue(min(max((cur - new) * 1e6, self.min_us), self.max_us))
 
     def update_view(self) -> None:
         st = self.state if self.connected else {}
         offset_s = st.get("offset_s")
         problems = list(st.get("problems") or [])
+        nominal = float(st.get("nominal_s", self.nominal_s))
+        self.limits_label.setText(
+            f"Allowed: {self.min_us:+.1f} … {self.max_us:+.1f} µs from nominal "
+            f"(T0 + {ms_text(nominal)}). {self.width_ch} moves with {self.ch}, so the pulse "
+            f"width stays the same. A change acts at once (one trigger cycle may be cut short, "
+            f"as with the front-panel knob).")
+        saved_nominal = st.get("nominal")
+        if not st:
+            self.nominal_label.setText("—")
+        elif saved_nominal:
+            by = f" by {saved_nominal['by']}" if saved_nominal.get("by") else ""
+            self.nominal_label.setText(f"T0 + {ms_text(nominal)}   (set{by}, "
+                                       f"{_when(saved_nominal.get('at'))})")
+        else:
+            self.nominal_label.setText(f"T0 + {ms_text(nominal)}   (from the configuration file)")
         if offset_s is None:
             self.offset_label.setText("—")
             self.offset_label.setStyleSheet(f"font-size: 28pt; color:{C.GREY}")
@@ -165,16 +259,17 @@ class Dg645Panel(DevicePanel):
             wtext = (f"{self.width_ch} = {self.ch} + {us_text(width, sign=False)} "
                      f"(pulse width, moves with {self.ch})" if width is not None else "")
             self.abs_label.setText(f"{self.ch} = T0 + {ms_text(st['delay_s'])}    ·    "
-                                   f"nominal T0 + {ms_text(self.nominal_s)}    ·    {wtext}")
+                                   f"nominal T0 + {ms_text(nominal)}    ·    {wtext}")
             if getattr(self, "_init_editor", False):
                 self._init_editor = False
                 self.spin.setValue(min(max(off_us, self.min_us), self.max_us))
+                self.nominal_spin.setValue(nominal * 1e3)
             self.last_label.setText(self._last_change_text(st))
         if st.get("changed_outside"):
             last = st.get("last_set") or {}
             problems.append(
                 f"{self.ch} is not the value this program set last "
-                f"({us_text(float(last['delay_s']) - self.nominal_s)}, {_when(last.get('at'))}): "
+                f"({us_text(float(last['delay_s']) - nominal)}, {_when(last.get('at'))}): "
                 f"it was changed on the front panel, or the DG645 was switched off and on "
                 f"(it then returns to its last front-panel setting).")
         self.warn_label.setText("\n".join(problems))
@@ -185,6 +280,9 @@ class Dg645Panel(DevicePanel):
         ok = self.can_act and offset_s is not None and not blocked
         for w in self.controls:
             w.setEnabled(ok)
+        # the nominal value can be changed even when C is outside the range (that may be why)
+        for w in self.maint_controls:
+            w.setEnabled(self.can_act and offset_s is not None)
         if ok:
             off_us = offset_s * 1e6
             self.minus_btn.setEnabled(off_us - self.step_us >= self.min_us - EPS_US)
@@ -209,7 +307,12 @@ class Dg645Panel(DevicePanel):
         last = st.get("last_change")
         if not last:
             return ""
-        what = f"{us_text(last['old_us'] * 1e-6)} → {us_text(last['new_us'] * 1e-6)}"
+        nominal = st.get("nominal_s", self.nominal_s)
+        if "old_s" in last and "new_s" in last:  # shown from the current nominal value
+            old_s, new_s = last["old_s"] - nominal, last["new_s"] - nominal
+        else:
+            old_s, new_s = last["old_us"] * 1e-6, last["new_us"] * 1e-6
+        what = f"{us_text(old_s)} → {us_text(new_s)}"
         if last.get("outside"):
             return f"Last change: {what}, outside the program (noticed {_when(last.get('at'))})"
         by = f" by {last['by']}" if last.get("by") else ""

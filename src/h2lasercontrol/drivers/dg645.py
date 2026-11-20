@@ -129,13 +129,16 @@ class Dg645(Driver):
             raise ValueError("channel and width_channel must be A..H")
         if not min_offset_s < 0 < max_offset_s:
             raise ValueError("limits must be below and above the nominal value")
-        self.nominal_s = float(nominal_s)
+        self.config_nominal_s = float(nominal_s)
         self.min_offset_s = float(min_offset_s)
         self.max_offset_s = float(max_offset_s)
         self.store = store
         self.reply_timeout = reply_timeout
         self.info: dict[str, Any] = {}
         self._seen: dict[str, str] = {}  # channel -> raw `DLAY?` reply last seen
+        # a nominal value set in Maintenance (F3h) overrides the one in devices.toml
+        saved_nominal = self._saved().get("nominal") or {}
+        self.nominal_s = float(saved_nominal.get("nominal_s", self.config_nominal_s))
 
     # --- low level --------------------------------------------------------------------------
     def _query(self, cmd: str) -> str:
@@ -211,6 +214,7 @@ class Dg645(Driver):
             if ch == self.channel:
                 now = datetime.now().astimezone().isoformat(timespec="seconds")
                 self._remember(last_change={
+                    "old_s": old_abs[ch], "new_s": new_abs[ch],
                     "old_us": round((old_abs[ch] - self.nominal_s) * 1e6, 6),
                     "new_us": round((new_abs[ch] - self.nominal_s) * 1e6, 6),
                     "by": None, "at": now, "outside": True})
@@ -278,6 +282,7 @@ class Dg645(Driver):
             "nominal_s": self.nominal_s,
             "min_offset_s": self.min_offset_s,
             "max_offset_s": self.max_offset_s,
+            "nominal": saved.get("nominal"),  # None: the value from devices.toml
             "problems": problems,
             "last_set": last_set,
             "changed_outside": outside,
@@ -287,6 +292,31 @@ class Dg645(Driver):
     def _in_limits(self, offset_s: float) -> bool:
         eps = RESOLUTION_S / 2
         return self.min_offset_s - eps <= offset_s <= self.max_offset_s + eps
+
+    # --- maintenance: the nominal value (F3h). Nothing is sent to the DG645. -------------------
+    @action()
+    def set_nominal(self, nominal_ms: float) -> dict[str, Any]:
+        """New nominal value of our channel, T0 + `nominal_ms`. Only the program's reference
+        changes (and with it the allowed range); the DG645 is not touched."""
+        new = round(float(nominal_ms) * 1e-3, 12)
+        if not (math.isfinite(new) and 0 < new <= 2000):  # DG645 range 0 .. 2000 s
+            raise ValueError(f"nominal value must be within 0 … 2000 s, not {nominal_ms} ms")
+        old = self.nominal_s
+        self.nominal_s = new
+        user = self.oplog.user if self.oplog else None
+        now = datetime.now().astimezone().isoformat(timespec="seconds")
+        self._remember(nominal={"nominal_s": new, "by": user, "at": now})
+        return {"text": f"nominal {self.channel}: T0 + {ms_text(old)} → T0 + {ms_text(new)} "
+                        f"(nothing sent to the DG645)",
+                "channel": self.channel, "old_s": old, "new_s": new}
+
+    @action()
+    def use_current_as_nominal(self) -> dict[str, Any]:
+        """Take our channel's present value as the nominal value."""
+        ref, value = parse_delay(self._read(self.channel))
+        if ref != "T0":
+            raise DeviceError(f"{self.name}: {self.channel} is relative to {ref}, not T0")
+        return self.set_nominal(value * 1e3)
 
     @action()
     def set_offset(self, offset_us: float) -> dict[str, Any]:
@@ -345,7 +375,7 @@ class Dg645(Driver):
         now = datetime.now().astimezone().isoformat(timespec="seconds")
         change = {"old_us": round((old - self.nominal_s) * 1e6, 6),
                   "new_us": round((new - self.nominal_s) * 1e6, 6),
-                  "delay_s": new, "by": user, "at": now}
+                  "old_s": old, "new_s": new, "delay_s": new, "by": user, "at": now}
         self._remember(last_seen=self._seen, last_set={"delay_s": new, "by": user, "at": now},
                        last_change={**change, "outside": False})
         result = {"channel": self.channel, "old_us": change["old_us"], "new_us": change["new_us"],

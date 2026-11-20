@@ -166,6 +166,29 @@ def test_change_of_c_outside_the_program_is_flagged(tmp_path):
     assert sets(t) == ["DLAY 4,0,0.036580767000"]  # nothing re-applied by itself
 
 
+def test_nominal_value_can_be_changed_without_touching_the_dg645(tmp_path):
+    """Maintenance (user 2026-11-20): the nominal value moves, the limits move with it."""
+    drv, sim, t = make(tmp_path)
+    drv.execute("connect")
+    drv.execute("set_offset", offset_us=2.0)
+    r = drv.execute("use_current_as_nominal")
+    assert r["new_s"] == pytest.approx(NOMINAL + 2e-6) and "→" in r["text"]
+    assert sets(t) == ["DLAY 4,0,0.036582467000"]  # only the set_offset above
+    st = drv.snapshot()
+    assert st["offset_s"] == pytest.approx(0, abs=1e-12) and st["problems"] == []
+    assert st["nominal"]["nominal_s"] == pytest.approx(NOMINAL + 2e-6)
+    drv.execute("set_offset", offset_us=3.0)  # = old nominal + 5 µs: allowed now
+    with pytest.raises(DeviceError, match="allowed range"):
+        drv.execute("set_offset", offset_us=-1.6)
+    # a typed value; kept after a restart (overrides devices.toml)
+    drv.execute("set_nominal", nominal_ms=36.5805)
+    drv2, _, _ = make(tmp_path, sim=sim)
+    assert drv2.nominal_s == pytest.approx(0.0365805)
+    assert drv2.config_nominal_s == NOMINAL
+    with pytest.raises(ValueError):
+        drv.execute("set_nominal", nominal_ms=-1)
+
+
 def test_change_while_program_closed_is_logged_at_connect(tmp_path):
     oplog = OpLog(tmp_path / "logs", user="tester")
     drv, sim, _t = make(tmp_path, oplog=oplog)

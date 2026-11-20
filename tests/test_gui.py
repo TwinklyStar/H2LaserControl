@@ -249,3 +249,21 @@ def test_delay_generator_steps_and_limits(window, qtbot):
     writes = [tx for ex in sent for tx, rx in ex if "?" not in tx]
     assert writes == ["DLAY 4,0,0.036580567000\n", "DLAY 4,0,0.036578967000\n",
                       "DLAY 4,0,0.036580467000\n"]  # channel C only
+
+
+def test_delay_generator_maintenance_nominal(window, qtbot):
+    """Maintenance (user 2026-11-20): change the nominal value of C; nothing sent to the DG645."""
+    dg = panel(window, "dg645")
+    assert dg.maint.isHidden()
+    dg.maint_toggle.click()
+    assert not dg.maint.isHidden()
+    assert "from the configuration file" in dg.nominal_label.text()
+    dg.plus_btn.click()
+    qtbot.waitUntil(lambda: dg.offset_label.text().startswith("+0.100 µs") and not dg.busy,
+                    timeout=5000)
+    dg.use_current_btn.click()  # confirmation answered "Yes" by the fixture
+    qtbot.waitUntil(lambda: dg.offset_label.text().startswith("+0.000 µs") and not dg.busy,
+                    timeout=5000)
+    assert "36.580 567 ms" in dg.nominal_label.text() and "by tester" in dg.nominal_label.text()
+    assert "T0 + 36.580 567 ms" in dg.limits_label.text()
+    assert dg.nominal_spin.value() == pytest.approx(36.580567)
