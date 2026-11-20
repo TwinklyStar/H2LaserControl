@@ -134,6 +134,10 @@ def _summary(action: str | None, result: Any) -> str:
     if isinstance(result, float):
         return f"{result:.2f}°"  # ELL14 angles
     if isinstance(result, dict):
+        if "text" in result:  # e.g. DG645 change made outside the program
+            return _short(result["text"])
+        if "new_us" in result:  # DG645: our channel, offset from nominal
+            return f"{result.get('channel', '')} {result['old_us']:+.3f} → {result['new_us']:+.3f} µs"
         if "position" in result and len(result) <= 2:
             return f"position {result['position']}"
         return _short(", ".join(f"{k} {v}" for k, v in result.items()))

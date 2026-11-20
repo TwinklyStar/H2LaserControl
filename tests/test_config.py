@@ -9,7 +9,14 @@ from h2lasercontrol.transport import D2xxTransport, FakeTransport
 
 def test_real_config_loads():
     cfg = load_config(DEFAULT_CONFIG)
-    assert set(cfg) == {"hitmv", "ell14", "flipmounts", "scope_monitor", "vuv_pd", "camera"}
+    assert set(cfg) == {"hitmv", "ell14", "flipmounts", "dg645", "scope_monitor", "vuv_pd",
+                        "camera"}
+    # DG645 (2026-11-20): PL2303 adapter, 9600 + RTS/CTS; only channel C, D linked
+    dg = cfg["dg645"]
+    assert (dg.usb_serial, dg.baudrate, dg.rtscts) == ("CGBHB2A4517", 9600, True)
+    assert (dg.settings["channel"], dg.settings["width_channel"]) == ("C", "D")
+    assert dg.settings["nominal_s"] == 0.036580467
+    assert (dg.settings["min_offset_us"], dg.settings["max_offset_us"]) == (-1.5, 3.0)
     assert {k: c.type for k, c in cfg.items() if k in ("scope_monitor", "vuv_pd", "camera")} == {
         "scope_monitor": "picoscope", "vuv_pd": "picoscope", "camera": "ids_camera"}
     assert cfg["hitmv"].baudrate == 38400 and cfg["hitmv"].rtscts

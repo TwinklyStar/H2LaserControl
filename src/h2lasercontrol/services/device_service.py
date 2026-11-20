@@ -18,12 +18,13 @@ from ..config import DeviceConfig
 from ..drivers import Driver, create_driver
 from ..drivers.base import DeviceTimeout
 from ..oplog import OpLog
-from ..sim import Ell14Sim, HitMvSim, MffSim
+from ..sim import Dg645Sim, Ell14Sim, HitMvSim, MffSim
 from ..transport import FakeTransport, TransportError
 
 log = logging.getLogger(__name__)
 
-POLL_MS = {"hitmv": 1000, "ell14": 2000, "mff": 1000}
+# DG645: one poll = 8 `DLAY?` queries, ~0.25 s at 9600 baud
+POLL_MS = {"hitmv": 1000, "ell14": 2000, "mff": 1000, "dg645": 2000}
 LOST_AFTER = 2  # consecutive failed polls before the connection is reported lost
 
 
@@ -37,6 +38,8 @@ def make_sim_transport(cfg: DeviceConfig) -> FakeTransport | dict[str, FakeTrans
         return FakeTransport(HitMvSim(busy_polls=60), name=f"{cfg.key}-sim")
     if cfg.type == "ell14":
         return FakeTransport(Ell14Sim(clean_polls=3), name=f"{cfg.key}-sim")
+    if cfg.type == "dg645":
+        return FakeTransport(Dg645Sim(), name=f"{cfg.key}-sim")
     raise ValueError(f"no simulator for device type {cfg.type!r}")
 
 

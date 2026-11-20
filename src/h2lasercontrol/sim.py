@@ -5,6 +5,7 @@ without hardware. They are simplified: motion completes after a few status polls
 from __future__ import annotations
 
 import struct
+from typing import ClassVar
 
 N = 8
 
@@ -197,6 +198,74 @@ class Ell14Sim:
                 self.cleaning = 0
                 return "GS00" if self.st_replies else None
         return "GS03"
+
+
+class Dg645Sim:
+    """DG645 (ASCII). Settings and replies as our unit s/n004497 on 2026-11-20 (read-only probe).
+    Set commands reply nothing; errors go to a queue read with `LERR?`."""
+
+    IDN = "Stanford Research Systems,DG645,s/n004497,ver1.17.116"
+    REAL: ClassVar[dict[int, tuple[int, float]]] = {  # channel -> (reference channel, seconds)
+        2: (0, 0.0370266), 3: (2, -0.0000001),
+        4: (0, 0.036580467), 5: (4, 0.0000005),
+        6: (0, 0.0369991), 7: (6, 0.00004),
+        8: (0, 0.0370306), 9: (8, 0.0000025),
+    }
+
+    def __init__(self) -> None:
+        self.delays: dict[int, tuple[int, float]] = dict(self.REAL)
+        self.errors: list[int] = []
+        self.received: list[str] = []
+
+    def __call__(self, tx: bytes) -> bytes | None:
+        reply = None
+        for cmd in tx.decode("ascii").replace("\r", "\n").replace(";", "\n").split("\n"):
+            cmd = cmd.strip()
+            if cmd:
+                self.received.append(cmd)
+                reply = self.handle(cmd)
+        return None if reply is None else (reply + "\r\n").encode("ascii")
+
+    def _abs(self, ch: int) -> float:
+        if ch in (0, 1):
+            return 0.0
+        ref, t = self.delays[ch]
+        return self._abs(ref) + t
+
+    def handle(self, cmd: str) -> str | None:
+        mnemonic = cmd[:4].upper()  # "DLAY", "LERR", "*IDN", "*CLS" (manual p. 44)
+        rest = cmd[len(mnemonic):].strip()
+        query = rest.startswith("?")
+        args = [a.strip() for a in rest.lstrip("?").split(",")] if rest.lstrip("?") else []
+        try:
+            if mnemonic == "*IDN" and query:
+                return self.IDN
+            if mnemonic == "LERR" and query:
+                return str(self.errors.pop(0) if self.errors else 0)
+            if mnemonic == "*CLS":
+                self.errors.clear()
+                return None
+            if mnemonic == "DLAY" and query:
+                ref, t = self.delays[int(args[0])]
+                return f"{ref},{t:+.12f}"
+            if mnemonic == "LINK" and query:
+                return str(self.delays[int(args[0])][0])
+            if mnemonic == "DLAY" and len(args) == 3:
+                c, d, t = int(args[0]), int(args[1]), float(args[2])
+                if c < 2 or d == 1 or d == c or c not in self.delays:
+                    self.errors.append(13)
+                    return None
+                old = self.delays[c]
+                self.delays[c] = (d, round(t / 5e-12) * 5e-12)
+                if not 0 <= self._abs(c) <= 2000:
+                    self.delays[c] = old
+                    self.errors.append(12)
+                return None
+        except (ValueError, IndexError, KeyError):
+            self.errors.append(10)
+            return None
+        self.errors.append(110)
+        return None
 
 
 class MffSim:

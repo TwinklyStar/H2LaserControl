@@ -69,7 +69,22 @@ insert_position = 2        # user 2026-11-18: same as unit 1
 # its DIG IO 2 was a factory "input-goto" (flips bounced back); set to output in Kinesis and
 # persisted to the device on 2026-11-18 — see docs/protocols.md § MFF101 Unit 2
 
-# [devices.dg645]          — added when installed (Phase 0 step 0.5)
+[devices.dg645]
+type = "dg645"             # SRS DG645 delay generator (docs/protocols.md § DG645)
+label = "Delay generator"  # tab title
+usb_serial = "CGBHB2A4517" # Prolific PL2303GT RS-232 -> USB adapter (read 2026-11-20)
+port = "COM7"
+baudrate = 9600            # DG645 default; RTS/CTS fixed by the DG645
+rtscts = true
+# Ours is output CD (user 2026-11-20): C = rising edge = trigger to the laser side, D linked to
+# C (D = C + 500 ns, fixed width). The program writes ONLY channel C (relative to T0); all other
+# channels belong to other groups and are only read (changes made by hand are logged).
+channel = "C"
+width_channel = "D"
+nominal_s = 0.036580467    # C on 2026-11-20 = nominal (user)
+min_offset_us = -1.5       # hard limits around nominal (user 2026-11-20)
+max_offset_us = 3.0
+step_us = 0.1              # step buttons (user 2026-11-20)
 
 # ---------------------------------------------------------------------------------------------
 # DAQ devices (F8, merged from the old H2LaserDAQ and IDS-Camera programs).

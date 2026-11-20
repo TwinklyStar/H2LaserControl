@@ -526,6 +526,13 @@ value included) is auto-saved.
 instrument delay settings" → a delay change during a running cycle (trigger → last edge,
 ≈37 ms here) ends that cycle early; whether its remaining edges (all outputs) are lost for that
 one shot is not described ⏳.
+✅ 2026-11-20 (read-only, 5 s of `*STB?` polling; `*STB?` does not clear): bit 1 BUSY (delay
+cycle running) set in **94 %** of 525 polls (round trip 9.5 ms each at 9600 baud), idle gaps
+never longer than one poll → idle ≈ 3 ms per cycle, consistent with ≈25 Hz external trigger
+and a ≈37 ms cycle. So almost every delay change aborts one cycle. Timing a change into the
+idle gap is not practical: a `DLAY` command takes ≈25 ms to transmit at 9600 baud and only
+acts on its terminator; the gap position cannot be measured finer than one 9.5 ms poll; USB
+adapter latency adds jitter. Front-panel changes abort the same way (user: never a problem).
 
 ### Things to verify on the real unit ⏳
 1. ✅ 2026-11-20: `*IDN?` reply, CR LF terminator, 9600 RTS/CTS with the PL2303 adapter.

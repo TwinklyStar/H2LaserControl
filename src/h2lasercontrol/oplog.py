@@ -51,12 +51,15 @@ class OpLog:
         error: str | None = None,
         exchanges: list[tuple[bytes, bytes | None]] | None = None,
         duration_s: float | None = None,
+        user: str | None = None,
     ) -> dict[str, Any]:
-        """Append one entry. `event` is "start" (long action begun), "done" or "failed"."""
+        """Append one entry. `event` is "start" (long action begun), "done" or "failed".
+        `user` overrides the operator, e.g. for a change noticed on a device but made outside
+        the program."""
         now = self._clock()
         entry: dict[str, Any] = {
             "time": now.isoformat(timespec="milliseconds"),
-            "user": self.user,
+            "user": user or self.user,
             "device": device,
             "action": action,
             "event": event,

@@ -4,7 +4,8 @@ A Windows desktop program for controlling and monitoring the devices in the H2 l
 one window.
 
 - **Control** tab: VUV feedthroughs (Sigma Koki HIT-MV), rotation mount (Thorlabs ELL14),
-  flip mounts (Thorlabs MFF101).
+  flip mounts (Thorlabs MFF101), laser trigger delay (SRS DG645: only our channel is changed,
+  within fixed limits; the other channels are shown read-only).
 - **DAQ** tab: PicoScope photodiode monitor, VUV photodiode snapshot, IDS beam camera.
 - Every action is recorded in an operation log, with the operator's name.
 - A simulation mode lets you try everything without hardware.
@@ -17,6 +18,7 @@ one window.
 - Device drivers, depending on what you use:
   - Flip mounts: FTDI D2XX driver ([FTDI](https://ftdichip.com/drivers/d2xx-drivers/), also
     installed with Thorlabs Kinesis)
+  - Delay generator: the driver of its RS-232–USB adapter (Prolific PL2303)
   - PicoScopes: [PicoSDK, 64-bit](https://www.picotech.com/downloads)
   - Camera: [IDS peak](https://ids-imaging.com/ids-peak)
 

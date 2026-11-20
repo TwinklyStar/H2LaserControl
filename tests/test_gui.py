@@ -8,7 +8,7 @@ from h2lasercontrol.config import DEFAULT_CONFIG, load_config
 from h2lasercontrol.gui.main_window import MainWindow
 from h2lasercontrol.oplog import OpLog, read_oplog
 from h2lasercontrol.services import device_service
-from h2lasercontrol.sim import Ell14Sim, HitMvSim, MffSim
+from h2lasercontrol.sim import Dg645Sim, Ell14Sim, HitMvSim, MffSim
 from h2lasercontrol.transport import FakeTransport
 
 pytest.importorskip("pytestqt")
@@ -22,6 +22,8 @@ def window(qtbot, tmp_path, monkeypatch, request):
         if cfg.type == "mff":
             return {k: FakeTransport(MffSim(serial=int(u["usb_serial"])))
                     for k, u in cfg.settings["units"].items()}
+        if cfg.type == "dg645":
+            return FakeTransport(Dg645Sim())
         return FakeTransport(Ell14Sim(clean_polls=1))
 
     monkeypatch.setattr(device_service, "make_sim_transport", fast_sim)
@@ -51,7 +53,7 @@ def test_group_tabs_with_one_sub_tab_per_device(window):
 
     assert texts(window.tabs) == ["Control", "DAQ"]  # user 2026-11-19
     assert texts(window.sub_tabs["Control"]) == ["VUV feedthroughs", "Rotation mount",
-                                                 "Flip mounts"]
+                                                 "Flip mounts", "Delay generator"]
     assert texts(window.sub_tabs["DAQ"]) == ["Scope monitor", "VUV PD snapshot", "Camera"]
 
 
@@ -219,3 +221,31 @@ def test_rotation_mount_refuses_bad_offset(window, qtbot):
     ell.run("set_home_offset", deg=0.5)  # below the 0.7 deg minimum
     qtbot.waitUntil(lambda: ell.has_error, timeout=5000)  # (window not shown: no isVisible)
     assert "home offset" in ell.error_label.text()
+
+
+def test_delay_generator_steps_and_limits(window, qtbot):
+    """User 2026-11-20: only C is adjusted, in µs from nominal, steps 0.1 µs, −1.5 … +3 µs."""
+    dg = panel(window, "dg645")
+    assert dg.offset_label.text().startswith("+0.000 µs")
+    assert "36.580 467 ms" in dg.abs_label.text()
+    assert dg.rows["E"][2].text() == "36.999 100 ms"  # other groups' channels shown, read only
+    assert dg.stop_btn.isHidden()
+    dg.plus_btn.click()
+    qtbot.waitUntil(lambda: dg.offset_label.text().startswith("+0.100 µs") and not dg.busy,
+                    timeout=5000)
+    assert "Last change: +0.000 µs → +0.100 µs by tester" in dg.last_label.text()
+    dg.spin.setValue(-1.5)
+    dg.set_btn.click()
+    qtbot.waitUntil(lambda: dg.offset_label.text().startswith("-1.500 µs") and not dg.busy,
+                    timeout=5000)
+    assert not dg.minus_btn.isEnabled() and dg.plus_btn.isEnabled()  # at the lower limit
+    assert dg.spin.minimum() == -1.5 and dg.spin.maximum() == 3.0
+    dg.nominal_btn.click()
+    qtbot.waitUntil(lambda: dg.offset_label.text().startswith("+0.000 µs") and not dg.busy,
+                    timeout=5000)
+    sent = [e["exchanges"] for e in read_oplog(window.oplog.today_path())
+            if e["device"] == "dg645" and e["event"] == "done"
+            and e["action"] in ("step", "set_offset")]
+    writes = [tx for ex in sent for tx, rx in ex if "?" not in tx]
+    assert writes == ["DLAY 4,0,0.036580567000\n", "DLAY 4,0,0.036578967000\n",
+                      "DLAY 4,0,0.036580467000\n"]  # channel C only

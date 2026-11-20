@@ -10,6 +10,7 @@ from ..energy import AngleStore
 from ..oplog import OpLog
 from ..transport import D2xxTransport, SerialTransport, Transport
 from .base import Aborted, DeviceError, DeviceTimeout, Driver, action
+from .dg645 import Dg645
 from .ell14 import Ell14
 from .hitmv import Axis, HitMv
 from .mff import FlipUnit, Mff
@@ -19,6 +20,7 @@ __all__ = [
     "Axis",
     "DeviceError",
     "DeviceTimeout",
+    "Dg645",
     "Driver",
     "Ell14",
     "FlipUnit",
@@ -35,7 +37,8 @@ def create_driver(cfg: DeviceConfig, oplog: OpLog | None = None,
     """Build the driver for one configured device. Without `transport`, a SerialTransport on
     the port found by USB serial number is used (not opened yet: call `connect`).
     Flip mounts (`mff`): one D2XX transport per unit, or `transport` = {unit key: Transport}.
-    `state_dir`: where program-written state lives (saved_angles.json); default config/."""
+    `state_dir`: where program-written state lives (saved_angles.json, dg645_state.json);
+    default config/."""
     s = cfg.settings
     if cfg.type == "mff":
         units = []
@@ -58,6 +61,16 @@ def create_driver(cfg: DeviceConfig, oplog: OpLog | None = None,
             terminator=s.get("terminator", "\x07").encode("ascii"),
             positions={k: float(v) for k, v in s.get("positions", {}).items()},
             angle_store=AngleStore(Path(state_dir or DEFAULT_CONFIG.parent) / "saved_angles.json"),
+        )
+    if cfg.type == "dg645":
+        return Dg645(
+            cfg.key, transport, oplog,
+            channel=s.get("channel", "C"),
+            width_channel=s.get("width_channel", "D"),
+            nominal_s=float(s["nominal_s"]),
+            min_offset_s=float(s.get("min_offset_us", -1.5)) * 1e-6,
+            max_offset_s=float(s.get("max_offset_us", 3.0)) * 1e-6,
+            store=AngleStore(Path(state_dir or DEFAULT_CONFIG.parent) / "dg645_state.json"),
         )
     if cfg.type == "hitmv":
         axes = {}

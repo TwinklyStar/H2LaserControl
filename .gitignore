@@ -15,6 +15,9 @@ DAQ_oldcode/
 # DAQ output (F8)
 data/
 
+# DG645 runtime state (last value set / last seen, written by the program)
+config/dg645_state.json
+
 # AI-assistant files stay on this PC only (user 2026-11-19)
 CLAUDE.md
 memory-bank/
