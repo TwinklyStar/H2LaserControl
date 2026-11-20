@@ -515,6 +515,17 @@ over the remote interface** (to protect the memory). After a power cycle it reca
 saved settings → **a delay set by our program is lost at power-off** unless we `*SAV`
 explicitly (and even then, which slot is recalled at power-on is unclear: the manual's `*SAV`
 description says "1.TODO"). ⏳ decide with the user; verify on hardware.
+Exact wording (p. 17, re-read 2026-11-20): at power on the DG645 "will recall the latest known
+instrument settings from nonvolatile memory"; it "will save the current instrument settings to
+nonvolatile memory after approximately five seconds of inactivity" following **front-panel key
+presses**, but not after remote commands. So the power-on state is this auto-saved state, not
+one of the `*SAV` slots 1–9. 📖 inference (not tested): a remote change is lost at power-off,
+unless any front-panel key is pressed later, after which the whole current state (our remote
+value included) is auto-saved.
+`ABORT_DELAY` (INSR bit 5, p. 61): "a delay cycle was aborted prematurely in order to change
+instrument delay settings" → a delay change during a running cycle (trigger → last edge,
+≈37 ms here) ends that cycle early; whether its remaining edges (all outputs) are lost for that
+one shot is not described ⏳.
 
 ### Things to verify on the real unit ⏳
 1. ✅ 2026-11-20: `*IDN?` reply, CR LF terminator, 9600 RTS/CTS with the PL2303 adapter.
