@@ -414,12 +414,40 @@ fwd period, rev period; freq = 14740 / period kHz):
 
 ---
 
-## SRS DG645 (not installed yet) — digital delay generator
+## SRS DG645 — digital delay generator
 
 Source: `ref/DG645m.pdf`, chapter *Remote Programming* (printed pp. 41–70 = PDF pp. 55–84;
-printed page = PDF page − 14), plus *Operation* pp. 17, 27, 36–38. Everything here is 📖
-(manual only) until the unit is installed. **Our need (user, 2026-11-17): adjust the delay of
-one channel. No other operations.**
+printed page = PDF page − 14), plus *Operation* pp. 17, 27, 36–38. 📖 unless marked ✅.
+**Our need (user, 2026-11-17): adjust the delay of one channel. No other operations.**
+**The other channels are used by other groups (user, 2026-11-20): every hardware change
+(any set command) needs the user's permission; read-only queries are allowed.**
+
+### Our unit on this PC ✅ (2026-11-20, read-only queries only)
+- RS-232 via a **Prolific PL2303GT** USB adapter: `VID_067B&PID_23A3`, USB serial
+  **`CGBHB2A4517`**, COM7 at the time. 9600 8N1 RTS/CTS works (CTS and DSR asserted on open).
+- `*IDN?` → `Stanford Research Systems,DG645,s/n004497,ver1.17.116` (CR LF terminated).
+- Replies in 10–30 ms. Command terminator LF accepted; a space after the mnemonic
+  (`DLAY? 2`) is accepted too.
+- The front panel does **not** go to remote over RS-232 for queries: only `REMT` locks it
+  (manual pp. 26, 58, 59; `LCAL` = back to local; LOCAL key = "3"). Never send `REMT`.
+- Settings read (do not change; other groups' channels):
+
+  | Ch | Delay (`DLAY?`) | `LINK?` |
+  |---|---|---|
+  | A | T0 + 0.037026600000 s (37.026 600 ms) | 0 (T0) |
+  | B | A − 0.000000100000 s (−100 ns) | 2 (A) |
+  | C | T0 + 0.036580467000 s | 0 |
+  | D | C + 0.000000500000 s (500 ns) | 4 (C) |
+  | E | T0 + 0.036999100000 s | 0 |
+  | F | E + 0.000040000000 s (40 µs) | 6 (E) |
+  | G | T0 + 0.037030600000 s | 0 |
+  | H | G + 0.000002500000 s (2.5 µs) | 8 (G) |
+
+  `TSRC?` 1 (external, rising edge) · `TRAT?` +50.000000 (internal rate, unused with external
+  trigger) · `IFCF?1` 9600 · `TIMB?` 0 (internal timebase) · `BURM?` 0 (burst off).
+- Reply format confirmed: `DLAY?c` → `<ref>,<signed seconds with 12 decimals>`; a delay may be
+  **negative** relative to its reference (B = A − 100 ns).
+- Not queried on purpose: `LERR?` (pops the error queue), `*ESR?` / `INSR?` (clear on read).
 
 ### Interfaces 📖 (pp. 41–44)
 | Interface | Settings | Notes |
@@ -489,11 +517,11 @@ explicitly (and even then, which slot is recalled at power-on is unclear: the ma
 description says "1.TODO"). ⏳ decide with the user; verify on hardware.
 
 ### Things to verify on the real unit ⏳
-1. `*IDN?` reply, CR LF reply terminator, RTS/CTS needed with our USB-RS232 adapter (null-modem
-   or straight cable? DG645 is DCE → straight cable to a PC).
-2. `DLAY?c` reply format and number of decimals; how a non-multiple of 5 ps is rounded.
-3. Space after the mnemonic accepted (manual examples use it; syntax section says no spaces).
-4. Front panel stays usable while we talk over RS-232 (no `REMT`), and the display updates.
+1. ✅ 2026-11-20: `*IDN?` reply, CR LF terminator, 9600 RTS/CTS with the PL2303 adapter.
+2. ✅ `DLAY?c` format (12 decimals). ⏳ how a non-multiple of 5 ps is rounded (needs a set).
+3. ✅ Space after the mnemonic accepted (query form tested).
+4. ⏳ Front panel stays usable while we talk (manual: yes without `REMT`; check by eye), and
+   the display updates after a remote set.
 5. Behaviour of `*SAV` / power-on recall (only if the user wants the delay kept over power-off).
 
 ---
