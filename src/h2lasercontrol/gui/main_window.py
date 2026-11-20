@@ -38,6 +38,16 @@ class TopBar(QWidget):
     """Operator row (a named class so the style sheet can address it, see style.OWN)."""
 
 
+class DeviceScrollArea(QScrollArea):
+    """Scroll area for a device tab that does not jump (user 2026-11-20). A device tab disables
+    its buttons while an action runs; Qt then moves the focus away from the clicked button and
+    QScrollArea.focusNextPrevChild scrolled to wherever it landed. Here the focus still moves,
+    but the view stays where the user put it."""
+
+    def focusNextPrevChild(self, next: bool) -> bool:
+        return QWidget.focusNextPrevChild(self, next)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, config: dict[str, DeviceConfig], oplog: OpLog, *, sim: bool = False,
                  settings: QSettings | None = None, state_dir: str | None = None,
@@ -152,7 +162,7 @@ class MainWindow(QMainWindow):
         sub = self.sub_tabs[group]
         page = widget
         if scroll:  # a device tab taller than the window scrolls (user 2026-11-20)
-            page = QScrollArea()
+            page = DeviceScrollArea()
             page.setWidget(widget)
             page.setWidgetResizable(True)
             page.setFrameShape(QFrame.Shape.NoFrame)

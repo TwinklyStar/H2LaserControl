@@ -267,6 +267,21 @@ def test_device_tabs_scroll_when_taller_than_window(window, qtbot):
     qtbot.waitUntil(lambda: page.verticalScrollBar().maximum() > 0, timeout=3000)
     page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
     assert dg.maint.visibleRegion().boundingRect().height() > 0  # the bottom can be reached
+    # user 2026-11-20: the scroll bar jumped on a button click. A clicked button has the focus;
+    # the panel disables its buttons while busy, Qt moves the focus on, and QScrollArea
+    # scrolled to the newly focused widget.
+    bar = page.verticalScrollBar()
+    bar.setValue(bar.maximum() // 2)
+    before = bar.value()
+    window.activateWindow()
+    dg.plus_btn.setFocus()
+    qtbot.waitUntil(dg.plus_btn.hasFocus, timeout=3000)
+    dg._on_busy(True, "step")  # what happens while an action runs: all controls disabled
+    qtbot.wait(50)
+    assert bar.value() == before
+    dg._on_busy(False, "step")
+    qtbot.wait(50)
+    assert bar.value() == before
 
 
 def test_delay_generator_unlock(window, qtbot):
