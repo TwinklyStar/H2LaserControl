@@ -48,6 +48,7 @@ from .daq.scope_views import ContinuousView, SnapshotView
 from .style import C, set_role, theme
 
 REFRESH_MS = 500
+PREVIEW_HEIGHT = 260  # px: waveform + statistics, or camera image + histogram
 # which drop-down each measurement box has: (choice key, label)
 BOX_CHOICE = {"vuv_energy": ("vuv", "VUV PD config:"), "profile_122": ("122", "Camera config:"),
               "profile_355": ("355", "Camera config:")}
@@ -283,8 +284,10 @@ class ShifterTab(QWidget):
         self.camera_holder = QVBoxLayout(self.camera_page)
         self.camera_holder.setContentsMargins(0, 0, 0, 0)
         self.preview_stack.addWidget(self.camera_page)
-        self.preview_stack.setMinimumHeight(360)
+        # short (user 2026-11-24): the preview must not make the tab taller than the boxes
+        self.preview_stack.setFixedHeight(PREVIEW_HEIGHT)
         lay.addWidget(self.preview_stack)
+        lay.addStretch(1)
         return box
 
     def _fill_combos(self) -> None:
