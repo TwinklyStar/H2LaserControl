@@ -48,7 +48,7 @@ from .daq.scope_views import ContinuousView, SnapshotView
 from .style import C, set_role, theme
 
 REFRESH_MS = 500
-PREVIEW_HEIGHT = 260  # px: waveform + statistics, or camera image + histogram
+PREVIEW_ASPECT = 3 / 2  # width : height of the preview (user 2026-11-24)
 # which drop-down each measurement box has: (choice key, label)
 BOX_CHOICE = {"vuv_energy": ("vuv", "VUV PD config:"), "profile_122": ("122", "Camera config:"),
               "profile_355": ("355", "Camera config:")}
@@ -57,6 +57,22 @@ BOX_TEXT = {
     "profile_122": "Beam profile of the 122 nm light on the profiler camera",
     "profile_355": "Beam profile of the 355 nm light (at reduced energy) on the profiler camera",
 }
+
+
+class PreviewBox(QGroupBox):
+    """Group box whose preview area keeps PREVIEW_ASPECT: its height follows its width, so it is
+    neither squeezed nor stretched to the full tab height."""
+
+    def __init__(self, title: str) -> None:
+        super().__init__(title)
+        self.area: QWidget | None = None
+
+    def resizeEvent(self, event: Any) -> None:
+        super().resizeEvent(event)
+        if self.area is not None:
+            h = round(self.area.width() / PREVIEW_ASPECT)
+            if self.area.height() != h:
+                self.area.setFixedHeight(h)
 
 
 def _mark(state: str) -> tuple[str, str]:
@@ -201,7 +217,7 @@ class ShifterTab(QWidget):
         idle = QWidget()
         ilay = QVBoxLayout(idle)
         self.monitor_idle_label = QLabel()
-        self.monitor_idle_label.setWordWrap(True)
+        self.monitor_idle_label.setTextFormat(Qt.TextFormat.RichText)
         self.monitor_start_btn = QPushButton("▶  Start the NO cell monitor")
         self.monitor_start_btn.setToolTip("Starts the Scope monitor (DAQ tab) with its selected "
                                           "config: data is taken and saved as usual")
@@ -267,7 +283,7 @@ class ShifterTab(QWidget):
         return ctrl
 
     def _build_preview(self) -> QWidget:
-        box = QGroupBox("Preview")
+        box = PreviewBox("Preview")
         lay = QVBoxLayout(box)
         self.preview_stack = QStackedWidget()
         idle = QLabel("The preview appears here during a measurement: the VUV PD waveform "
@@ -284,8 +300,8 @@ class ShifterTab(QWidget):
         self.camera_holder = QVBoxLayout(self.camera_page)
         self.camera_holder.setContentsMargins(0, 0, 0, 0)
         self.preview_stack.addWidget(self.camera_page)
-        # short (user 2026-11-24): the preview must not make the tab taller than the boxes
-        self.preview_stack.setFixedHeight(PREVIEW_HEIGHT)
+        self.preview_stack.setFixedHeight(300)  # until the first resize (then 3:2)
+        box.area = self.preview_stack
         lay.addWidget(self.preview_stack)
         lay.addStretch(1)
         return box

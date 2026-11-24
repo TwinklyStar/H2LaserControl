@@ -320,3 +320,15 @@ def test_camera_config_trigger_mode_round_trip(tmp_path):
     save_config(cfg, out)
     back = load_cam(out)
     assert (back.trigger_mode, back.trigger_fps) == ("hardware", 25.0)
+
+
+def test_preview_keeps_3_to_2(window, qtbot):
+    """User 2026-11-24: the preview is about 3:2 (not squeezed, not the full tab height)."""
+    w = window
+    w.resize(1900, 1000)
+    w.show()
+    qtbot.waitExposed(w)
+    stack = w.shifter.preview_stack
+    qtbot.waitUntil(lambda: abs(stack.width() / stack.height() - 1.5) < 0.02, timeout=3000)
+    w.resize(1400, 1000)
+    qtbot.waitUntil(lambda: abs(stack.width() / stack.height() - 1.5) < 0.02, timeout=3000)
