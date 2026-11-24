@@ -380,6 +380,7 @@ class ShifterTab(QWidget):
 
     def _on_finished(self, outcome: str, message: str) -> None:
         self._lock("")
+        self._close_preview()  # user 2026-11-24: the result stays in the box
         seq = self.runner.sequence
         if seq is not None and seq.key in self.boxes:
             self.boxes[seq.key].result_label.setText(self._result_html(outcome, message))
@@ -440,6 +441,14 @@ class ShifterTab(QWidget):
                 self.camera_holder.addWidget(self.live_view)
             self.preview_stack.setCurrentWidget(self.camera_page)
 
+    def _close_preview(self) -> None:
+        self.preview_mode = ""
+        if self.snapshot_view is not None:
+            self.snapshot_holder.removeWidget(self.snapshot_view)
+            self.snapshot_view.deleteLater()
+            self.snapshot_view = None
+        self.preview_stack.setCurrentIndex(0)
+
     def _on_vuv_items(self, items: list[dict[str, Any]]) -> None:
         if self.preview_mode != "vuv":
             return
@@ -453,6 +462,8 @@ class ShifterTab(QWidget):
                 signal_channel=dcfg.get("snapshot_channel", dcfg["channels"][0]),
                 snapshot_dir=os.path.join(session.data_path(dcfg), "snapshots"),
                 n_avg=default_n(dcfg.get("refresh_trigger_cnt")))
+            # a shifter only looks: no Average / Clear / Freeze / Save row (user 2026-11-24)
+            self.snapshot_view.controls_bar.hide()
             self.snapshot_holder.addWidget(self.snapshot_view)
         self.snapshot_view.show_items(items)
 

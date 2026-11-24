@@ -586,7 +586,8 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin, _Themed):
         vlay.setSpacing(4)
         panel, self._wfm_curves, self._wfm_plots = self._make_wfm_panel()
         vlay.addWidget(panel, stretch=1)
-        vlay.addWidget(self._make_stats_bar())
+        self.controls_bar = self._make_stats_bar()  # Average ▲▼, Clear, Freeze, Save
+        vlay.addWidget(self.controls_bar)
         status = QtWidgets.QWidget()
         status.setObjectName("statusRow")
         status.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)

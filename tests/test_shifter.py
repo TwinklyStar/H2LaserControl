@@ -149,13 +149,17 @@ def test_vuv_energy_measurement(window, qtbot, tmp_path):
     qtbot.waitUntil(lambda: runner.index == 2, timeout=15000)
     info = hit.state["axes"]["vuv_photodiode"]
     assert info["named"] == "INSERTED"
+    # preview: the same snapshot view (128-average), without the Average/Clear/Freeze/Save row
+    qtbot.waitUntil(lambda: sh.snapshot_view is not None, timeout=10000)
+    assert sh.snapshot_view.n_avg == 128 and sh.snapshot_view.controls_bar.isHidden()
+    assert sh.preview_stack.currentWidget() is sh.snapshot_page
     qtbot.waitUntil(lambda: not runner.running, timeout=30000)
     assert runner.outcome == DONE, runner.message
     assert not hit.locked and not daq(w, "vuv_pd").locked
     assert daq(w, "vuv_pd").session.state == STOPPED  # closed again
-    # preview: the same snapshot view (128-average), result: all 40 pulses
-    assert sh.snapshot_view is not None and sh.snapshot_view.n_avg == 128
-    r = runner.summary()
+    # the preview closes when the measurement has finished (user 2026-11-24)
+    assert sh.snapshot_view is None and sh.preview_stack.currentIndex() == 0
+    r = runner.summary()  # result: all 40 pulses
     assert r["n"] == 40 and r["stderr_nVs"] > 0
     csv = r["csv"]
     assert csv.endswith(".csv")
@@ -227,7 +231,7 @@ def test_profile_122_and_355(window, qtbot, tmp_path):
     photos = sh.runner.summary()["photos"]
     assert photos["photos"] == 3
     assert len(list((tmp_path / "data" / "camera").rglob("*.bmp"))) >= 3
-    assert sh.preview_stack.currentWidget() is sh.camera_page
+    assert sh.preview_stack.currentIndex() == 0  # preview closed after the measurement
 
     # 355 nm: 820 blocker in, 10 % energy, back to max
     sh._refresh()
