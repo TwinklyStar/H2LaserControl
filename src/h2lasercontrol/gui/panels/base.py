@@ -33,6 +33,7 @@ class DevicePanel(QWidget):
         self.busy = False
         self.state: dict[str, Any] = {}
         self.has_error = False
+        self.locked = ""  # reason, while the Shifter tab uses this device (F9)
         self._conn_message = ""
         theme.changed.connect(self._retheme)
 
@@ -70,6 +71,11 @@ class DevicePanel(QWidget):
         set_role(self.error_label, "error")
         self.error_label.hide()
         root.addWidget(self.error_label)
+        self.lock_label = QLabel()
+        self.lock_label.setWordWrap(True)
+        set_role(self.lock_label, "warning")
+        self.lock_label.hide()
+        root.addWidget(self.lock_label)
 
         self.body = QVBoxLayout()
         self.body.setSpacing(12)
@@ -116,7 +122,14 @@ class DevicePanel(QWidget):
 
     @property
     def can_act(self) -> bool:
-        return self.connected and not self.busy
+        return self.connected and not self.busy and not self.locked
+
+    def set_locked(self, reason: str) -> None:
+        """Lock the device's buttons while the Shifter tab uses it ("" = unlock). STOP stays."""
+        self.locked = reason
+        self.lock_label.setText(f"🔒 {reason}" if reason else "")
+        self.lock_label.setVisible(bool(reason))
+        self._refresh()
 
     # --- internals ----------------------------------------------------------------------------
     def show_error(self, message: str) -> None:
@@ -179,7 +192,7 @@ class DevicePanel(QWidget):
 
     def _refresh(self) -> None:
         self.stop_btn.setEnabled(self.busy and self.connected)
-        self.connect_btn.setEnabled(not self.busy)
+        self.connect_btn.setEnabled(not self.busy and not self.locked)
         self.update_view()
         self._emit_tab_state()
 

@@ -167,8 +167,17 @@ class HitMvPanel(DevicePanel):
         self.progress_info = {}
         self.run(action, axis=axis)
 
+    def _on_busy(self, busy: bool, action: str) -> None:
+        self._busy_action = action
+        super()._on_busy(busy, action)
+
     def on_progress(self, info: dict) -> None:
         self.progress_info = info
+        if self.moving is None and self.busy and "axis" in info:
+            # a move started elsewhere (Shifter tab, F9): show it like our own
+            action = getattr(self, "_busy_action", "")
+            self.moving = (info["axis"], action)
+            self.busy_label.setText(self.busy_text(action))
         self.update_view()
 
     def update_view(self) -> None:

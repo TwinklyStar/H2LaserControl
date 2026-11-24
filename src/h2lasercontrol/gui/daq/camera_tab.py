@@ -41,6 +41,10 @@ class CameraHeader(QWidget):
 
 class CameraTab(QWidget):
     tab_state_changed = Signal(str)
+    # for the Shifter tab (F9): camera opened / closed, every displayed frame, finished recording
+    open_changed = Signal(bool)
+    frame_ready = Signal(object)
+    recording_done = Signal(object)  # RecordStats
 
     def __init__(self, cfg: DeviceConfig, oplog: OpLog, *, sim: bool = False,
                  base_dir: str | os.PathLike[str] = ".", parent: QWidget | None = None) -> None:
@@ -55,6 +59,7 @@ class CameraTab(QWidget):
         self.configs_dir = PROGRAM_DIR / s.get("config_dir", "config/camera")
         self.default_config = s.get("default_config", "default.toml")
         self.window: Any = None  # laserdaq MainWindow while the camera is open
+        self.locked = ""  # reason, while the Shifter tab uses the camera (F9)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -109,6 +114,11 @@ class CameraTab(QWidget):
         self.close_btn.setToolTip("Stop the live view, close the camera, back to the start page")
         self.close_btn.clicked.connect(self.close_camera)
         head.addWidget(self.open_label)
+        self.lock_label = QLabel()
+        set_role(self.lock_label, "warning")
+        self.lock_label.hide()
+        head.addSpacing(16)
+        head.addWidget(self.lock_label)
         head.addStretch(1)
         head.addWidget(self.close_btn)
         olay.addWidget(header)
@@ -133,6 +143,60 @@ class CameraTab(QWidget):
 
     def _emit_state(self, state: str) -> None:
         self.tab_state_changed.emit(state)
+
+    # --- used by the Shifter tab (F9) --------------------------------------------------------
+    def config_names(self) -> list[str]:
+        """Camera config files (the camera window's drop-down list)."""
+        return sorted(p.name for p in self.configs_dir.glob("*.toml"))
+
+    def current_config(self) -> str | None:
+        """Name of the config file selected in the camera window (None = camera closed)."""
+        if self.window is None:
+            return None
+        return self.window._config_combo.currentText() or None
+
+    def load_config(self, name: str) -> None:
+        """Select and load a config file in the camera window, as if chosen in its drop-down:
+        exposure, gain and (if stored) trigger mode / FPS. Raises if it cannot be loaded."""
+        win = self.window
+        if win is None:
+            raise RuntimeError("the camera is not open")
+        path = self.configs_dir / name
+        if not path.is_file():
+            raise FileNotFoundError(f"camera config {name} not found in {self.configs_dir}")
+        from ...laserdaq.config import load_config
+        load_config(path)  # raises with the reason if the file is broken
+        win._refresh_config_list()
+        combo = win._config_combo
+        combo.blockSignals(True)
+        combo.setCurrentIndex(combo.findText(name))
+        combo.blockSignals(False)
+        win._load_session_config(path)
+        self.oplog.write(device=self.cfg.key, action="load_config", args={"config": name},
+                         result={"exposure_us": win._exposure_spin.value(),
+                                 "trigger": win._config.trigger_mode or "unchanged"})
+
+    def start_burst(self, n: int) -> None:
+        """Record the next n frames as a normal Multi-shot run. Raises if it cannot start."""
+        win = self.window
+        if win is None:
+            raise RuntimeError("the camera is not open")
+        if not win._start_recording(n):
+            raise RuntimeError(win._status_label.text() or "the camera is not ready (live view)")
+
+    def stop_burst(self) -> None:
+        if self.window is not None and self.running:
+            self.window._stop_run()
+
+    def set_locked(self, reason: str) -> None:
+        """Lock the camera window while the Shifter tab uses it ("" = unlock)."""
+        self.locked = reason
+        self.lock_label.setText(f"🔒 {reason}" if reason else "")
+        self.lock_label.setVisible(bool(reason))
+        self.close_btn.setEnabled(not reason)
+        self.start_btn.setEnabled(not reason)
+        if self.window is not None:
+            self.window.setEnabled(not reason)
 
     # --- start / close ----------------------------------------------------------------------
     def start(self) -> None:
@@ -185,14 +249,17 @@ class CameraTab(QWidget):
                              args={"serial": self.serial})
             self._emit_state("error")
             return
+        win._load_trigger_from_config()  # trigger mode / FPS stored in the config (F9c)
         self.window = win
         win._controller.recording_finished.connect(self._on_recording_finished)
+        win._controller.frame_ready.connect(self.frame_ready)
         self.window_holder.addWidget(win, 1)
         win.show()
         self.stack.setCurrentWidget(self.open_page)
         self.oplog.write(device=self.cfg.key, action="open", args={"serial": self.serial},
                          result={"link": win._camera_label})
         self._emit_state("ok")
+        self.open_changed.emit(True)
 
     def close_camera(self, *, ask: bool = True) -> bool:
         win = self.window
@@ -218,6 +285,7 @@ class CameraTab(QWidget):
             self.oplog.write(device=self.cfg.key, action="close")
             self._emit_state("off")
             self.start_status.setText("Camera closed.")  # grey: role "muted"
+            self.open_changed.emit(False)
         return True
 
     def shutdown(self) -> None:
@@ -231,3 +299,4 @@ class CameraTab(QWidget):
                     "submitted": stats.submitted, "dropped": stats.dropped},
             error=f"{stats.dropped} frame(s) dropped (disk too slow)" if stats.dropped else None,
             duration_s=stats.elapsed_s)
+        self.recording_done.emit(stats)

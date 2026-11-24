@@ -1,0 +1,29 @@
+# Shifter tab (design-document F9): one-click measurements. Device keys / units / axes as in
+# devices.toml. Changing a number here needs a program restart.
+
+pulses = 1000                  # VUV energy measurement: VUV PD waveforms (= ROOT file entries)
+photos = 100                   # profile measurements: camera frames per burst
+energy_percent_355 = 10        # 355 nm profile: rotation mount to this % of the max energy (cos²)
+trigger_rate_hz = 25           # laser repetition rate, only for the time estimates
+max_energy_tolerance_deg = 0.1 # operating state: rotation mount within this of the max angle
+
+# devices (keys of devices.toml)
+hitmv = "hitmv"
+vuv_pd_axis = 0                # HIT-MV axis of the VUV photodiode
+mirror_axis = 1                # HIT-MV axis of the projection mirror (to the profiler)
+flipmounts = "flipmounts"
+blocker_355 = "flip1"          # insert = 355 nm blocked (only 122 nm on the profiler)
+blocker_820 = "flip2"          # insert = 820 nm blocked (no 122 nm: only 355 nm on the profiler)
+ell14 = "ell14"
+dg645 = "dg645"
+vuv_scope = "vuv_pd"
+monitor_scope = "scope_monitor"
+camera = "camera"
+
+# defaults of the drop-down lists in the function boxes
+vuv_scope_config = "H2PD_261103.toml"
+camera_config_122 = "H2_122_Jun20.toml"
+camera_config_355 = "H2_355_Jun20.toml"
+
+# NO cell monitor in the Shifter tab: channels of the scope monitor shown (trend + waveform)
+monitor_channels = ["NO_cell"]

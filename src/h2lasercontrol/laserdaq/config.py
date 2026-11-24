@@ -29,6 +29,12 @@ class AppConfig:
     analog_gain: float = 1.0
     digital_gain: float = 1.0
 
+    # Trigger (H2LaserControl, Shifter tab F9c): "free_run" or "hardware", and the free-run
+    # frame rate. Empty / 0 = not stored: loading the file leaves the camera's trigger as it is.
+    # Written only when set, so files without them stay unchanged.
+    trigger_mode: str = ""
+    trigger_fps: float = 0.0
+
     # Auto gain (Feature 11): ROI over the laser spot; NOT a fit ROI
     gain_roi: ROIConfig = field(default_factory=ROIConfig)
     gain_roi_enabled: bool = False
@@ -72,7 +78,11 @@ def _write_toml(d: dict, prefix: str = "") -> list[str]:
 
 def save_config(cfg: AppConfig, path: str | Path) -> None:
     """Write *cfg* to a TOML file at *path*."""
-    lines = _write_toml(asdict(cfg))
+    d = asdict(cfg)
+    for key, unset in (("trigger_mode", ""), ("trigger_fps", 0.0)):
+        if d.get(key) == unset:
+            del d[key]
+    lines = _write_toml(d)
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

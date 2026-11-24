@@ -48,6 +48,8 @@ class PicoSession:
         self.rates: dict[str, float] = {}
         self.state = STOPPED
         self._stop_requested = False
+        self.max_triggers: int | None = None
+        self.last_result: dict[str, Any] = {}  # files etc. of the last finished run
 
     # --- channel layout for the views ---------------------------------------------------------
     def channel_names(self) -> list[str]:
@@ -60,7 +62,9 @@ class PicoSession:
         return str(resolve_data_path(cfg.get("data_path", "data/picoscope"), self.base_dir))
 
     # --- user actions -------------------------------------------------------------------------
-    def start(self) -> None:
+    def start(self, max_triggers: int | None = None) -> None:
+        """Start all digitizers. `max_triggers`: each stops by itself after that many waveforms
+        (the run then ends like a Stop, logged as "acquire" done)."""
         if self.state != STOPPED:
             return
         while True:  # drop leftovers of the previous run
@@ -71,6 +75,9 @@ class PicoSession:
         cls = VirtualDigitizer if self.sim else Digitizer
         self.digitizers = {name: cls(name, cfg, self.queue, self.data_path(cfg))
                            for name, cfg in self.configs.items()}
+        for d in self.digitizers.values():
+            d.max_triggers = max_triggers
+        self.max_triggers = max_triggers
         self.states = {name: STARTING for name in self.digitizers}
         self.errors, self.warnings, self.rates = {}, {}, {}
         self._stop_requested = False
@@ -80,6 +87,7 @@ class PicoSession:
             "mode": self.mode,
             "scopes": {n: f"{c.get('model')} {c.get('serial')}" for n, c in self.configs.items()},
             "outputs": {n: c.get("output_name") for n, c in self.configs.items()},
+            **({"max_triggers": max_triggers} if max_triggers else {}),
         })
         for d in self.digitizers.values():
             d.start()
@@ -171,6 +179,11 @@ class PicoSession:
                     result["reconnects"] = reconnects
                 if self._stop_requested:
                     self.oplog.write(device=self.key, action="stop", result=result)
+                elif self.max_triggers and not self.errors:  # finished by itself after max_triggers waveforms
+                    result["waveforms"] = {n: d.total_triggers
+                                           for n, d in self.digitizers.items()}
+                    self.oplog.write(device=self.key, action="acquire", result=result)
+                self.last_result = result
                 self.state = STOPPED
             return
         if self._stop_requested:

@@ -50,7 +50,11 @@ class DeviceService(QObject):
     progress = Signal(dict)  # driver progress during long actions
     action_done = Signal(str, object)  # action, result
     action_failed = Signal(str, str)  # action, message for the user
-    _submit = Signal(str, dict)
+    # the same, for a `request` (tag = the caller's own id, e.g. the Shifter tab's step); emitted
+    # after action_done / action_failed, so the device's own tab is updated first
+    request_done = Signal(str, object)  # tag, result
+    request_failed = Signal(str, str)  # tag, message
+    _submit = Signal(str, dict, str)
     _shutdown = Signal()
 
     def __init__(self, cfg: DeviceConfig, oplog: OpLog, *, sim: bool = False,
@@ -78,7 +82,12 @@ class DeviceService(QObject):
         self._thread.start()
 
     def submit(self, action: str, **kwargs: Any) -> None:
-        self._submit.emit(action, kwargs)
+        self._submit.emit(action, kwargs, "")
+
+    def request(self, tag: str, action: str, **kwargs: Any) -> None:
+        """Like submit; the outcome also comes as request_done / request_failed with `tag`, so a
+        caller (the Shifter tab) knows which action finished."""
+        self._submit.emit(action, kwargs, tag)
 
     def request_stop(self) -> None:
         """Call DIRECTLY from the GUI thread (not through a signal connection: this object lives
@@ -121,17 +130,22 @@ class DeviceService(QObject):
         drv.progress = self.progress.emit
         return drv
 
-    @Slot(str, dict)
-    def _run(self, action: str, kwargs: dict[str, Any]) -> None:
+    @Slot(str, dict, str)
+    def _run(self, action: str, kwargs: dict[str, Any], tag: str = "") -> None:
+        def failed(message: str) -> None:
+            self.action_failed.emit(action, message)
+            if tag:
+                self.request_failed.emit(tag, message)
+
         if action == "connect" and not self.connected:
             try:
                 self.driver = self._new_driver()  # port looked up again on every connect
             except Exception as e:  # noqa: BLE001 - e.g. USB serial not found
                 self.connection_changed.emit(False, str(e))
-                self.action_failed.emit(action, str(e))
+                failed(str(e))
                 return
         if self.driver is None:
-            self.action_failed.emit(action, "not connected")
+            failed("not connected")
             return
         self.driver.clear_stop()  # before "busy" enables the STOP button, so no stop is lost
         self._set_busy(True, action)
@@ -141,14 +155,18 @@ class DeviceService(QObject):
             self.action_failed.emit(action, str(e))
             if isinstance(e, TransportError) or not self.driver.is_connected:
                 self._set_connected(False, str(e))
+            outcome: tuple[Any, ...] = (self.request_failed, str(e))
         else:
             if action == "connect":
                 self._set_connected(True, self.driver.connection_text())
             elif action == "disconnect":
                 self._set_connected(False, "disconnected")
             self.action_done.emit(action, result)
+            outcome = (self.request_done, result)
         finally:
             self._set_busy(False, action)
+        if tag:  # after "not busy": the caller may submit its next action at once
+            outcome[0].emit(tag, outcome[1])
         self._poll()
 
     @Slot()

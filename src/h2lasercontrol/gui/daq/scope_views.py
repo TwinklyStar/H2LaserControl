@@ -502,6 +502,50 @@ class ContinuousView(QtWidgets.QWidget, _RangeMixin, _Themed):
         return {ch: len(v) for ch, v in self._val.items()}
 
 
+def write_snapshot_csv(snapshot_dir: str, device: str, ch: str, ch_label: str, t_s: np.ndarray,
+                       live_v: np.ndarray, st: Any,
+                       frozen: tuple[np.ndarray, np.ndarray, float] | None = None) -> str:
+    """Write the old snapshot CSV `snapshot_<device>_<YYYYMMDD>_<NNN>.csv`: the averaged signal
+    waveform (+ a frozen reference: t, V, area) and its statistics `st` (averaging.Stats).
+    Returns the path. Used by Save in the snapshot tab and by the Shifter tab (F9d)."""
+    os.makedirs(snapshot_dir, exist_ok=True)
+    dev_tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in device).strip("_")
+    dev_tag = dev_tag or "unknown"
+    prefix = f"snapshot_{dev_tag}_{datetime.now().strftime('%Y%m%d')}_"
+    nums = []
+    for f in os.listdir(snapshot_dir):
+        if f.startswith(prefix) and f.endswith(".csv"):
+            try:
+                nums.append(int(f[len(prefix):-4]))
+            except ValueError:
+                pass
+    seq = (max(nums) + 1) if nums else 1
+    fname = os.path.join(snapshot_dir, f"{prefix}{seq:03d}.csv")
+    with open(fname, "w", encoding="utf-8", newline="") as fp:
+        fp.write("# H2LaserDAQ Snapshot\n")
+        fp.write(f"# Saved   : {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}\n")
+        fp.write(f"# Device  : {device}\n")
+        fp.write(f"# Channel : {ch} ({ch_label})\n")
+        fp.write(f"# Area (live)  : {st.area:.6g} ± {st.stderr:.4g}  nV·s"
+                 f"  (N = {st.n} triggers)\n")
+        fp.write(f"# Offset       : {st.offset_mv:.6g}  mV  (mean of the first 5 % of the "
+                 f"points, subtracted from the area; std {st.std:.4g} nV·s)\n")
+        if frozen is not None:
+            frozen_t, frozen_v, frozen_area = frozen
+            fp.write(f"# Area (frozen): {frozen_area:.6g}  nV·s\n")
+            fp.write(f"# Area (Math)  : {st.area - frozen_area:+.6g}  nV·s\n")
+        fp.write("#\n")
+        if frozen is not None:
+            fp.write("time_s,live_V,frozen_V\n")
+            frozen_i = np.interp(t_s, frozen_t, frozen_v, left=np.nan, right=np.nan)
+            fp.writelines(f"{ts:.6e},{lv:.6e},{fv:.6e}\n"
+                          for ts, lv, fv in zip(t_s, live_v, frozen_i, strict=True))
+        else:
+            fp.write("time_s,live_V\n")
+            fp.writelines(f"{ts:.6e},{lv:.6e}\n" for ts, lv in zip(t_s, live_v, strict=True))
+    return fname
+
+
 # ----------------------------------------------------------------------------------------------
 # Snapshot monitor
 # ----------------------------------------------------------------------------------------------
@@ -763,43 +807,11 @@ class SnapshotView(QtWidgets.QWidget, _RangeMixin, _Themed):
         except ValueError:
             ch_label = ch
         frozen_t, frozen_v = self._frozen_curves[ch].getData()
-        has_frozen = frozen_t is not None and len(frozen_t) > 0
-
-        os.makedirs(self.snapshot_dir, exist_ok=True)
-        dev_tag = "".join(c if c.isalnum() or c in "-_" else "_" for c in self.device).strip("_")
-        dev_tag = dev_tag or "unknown"
-        prefix = f"snapshot_{dev_tag}_{datetime.now().strftime('%Y%m%d')}_"
-        nums = []
-        for f in os.listdir(self.snapshot_dir):
-            if f.startswith(prefix) and f.endswith(".csv"):
-                try:
-                    nums.append(int(f[len(prefix):-4]))
-                except ValueError:
-                    pass
-        seq = (max(nums) + 1) if nums else 1
-        fname = os.path.join(self.snapshot_dir, f"{prefix}{seq:03d}.csv")
-        with open(fname, "w", encoding="utf-8", newline="") as fp:
-            fp.write("# H2LaserDAQ Snapshot\n")
-            fp.write(f"# Saved   : {datetime.now().strftime('%Y-%m-%d  %H:%M:%S')}\n")
-            fp.write(f"# Device  : {self.device}\n")
-            fp.write(f"# Channel : {ch} ({ch_label})\n")
-            fp.write(f"# Area (live)  : {st.area:.6g} ± {st.stderr:.4g}  nV·s"
-                     f"  (N = {st.n} triggers)\n")
-            fp.write(f"# Offset       : {st.offset_mv:.6g}  mV  (mean of the first 5 % of the "
-                     f"points, subtracted from the area; std {st.std:.4g} nV·s)\n")
-            if has_frozen:
-                fp.write(f"# Area (frozen): {self._frozen_area:.6g}  nV·s\n")
-                fp.write(f"# Area (Math)  : {st.area - self._frozen_area:+.6g}  nV·s\n")
-            fp.write("#\n")
-            if has_frozen:
-                fp.write("time_s,live_V,frozen_V\n")
-                frozen_i = np.interp(t_s, frozen_t, frozen_v, left=np.nan, right=np.nan)
-                fp.writelines(f"{ts:.6e},{lv:.6e},{fv:.6e}\n"
-                              for ts, lv, fv in zip(t_s, live_v, frozen_i, strict=True))
-            else:
-                fp.write("time_s,live_V\n")
-                fp.writelines(f"{ts:.6e},{lv:.6e}\n" for ts, lv in zip(t_s, live_v, strict=True))
-        return fname
+        frozen = None
+        if frozen_t is not None and len(frozen_t) > 0 and self._frozen_area is not None:
+            frozen = (frozen_t, frozen_v, self._frozen_area)
+        return write_snapshot_csv(self.snapshot_dir, self.device, ch, ch_label, t_s, live_v, st,
+                                  frozen)
 
     def _on_save(self) -> None:
         fname = self.save_snapshot()

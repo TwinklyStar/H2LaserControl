@@ -242,6 +242,7 @@ QFrame[role="sep"] {{ color: {c.SEP}; }}
 QLabel[role="big"] {{ font-size: 20pt; font-weight: bold; }}
 QLabel[role="muted"] {{ color: {c.GREY}; }}
 QLabel[role="alarm"] {{ color: {c.RED}; font-weight: bold; }}
+QLabel[role="warning"] {{ color: {c.ORANGE}; font-weight: bold; }}
 QLabel[role="error"] {{ background: {c.ERROR_BG}; color: {c.RED}; border: 1px solid {c.ERROR_BORDER};
                         border-radius: 4px; padding: 6px 10px; }}
 QLabel[role="sim"] {{ background: {c.SIM_BG}; color: {c.SIM_FG}; font-weight: bold; padding: 6px;

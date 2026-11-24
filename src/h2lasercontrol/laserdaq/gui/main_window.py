@@ -425,6 +425,9 @@ class MainWindow(QMainWindow):
             return
         fps = self._cam_fps_spin.value()
         mode = "free_run" if self._free_radio.isChecked() else "hardware"
+        # remembered in the config, so "Save" stores it and a run's saved config shows it
+        self._config.trigger_mode = mode
+        self._config.trigger_fps = float(fps)
         self._display_fps = None
         self._camera_fps = None
         self._controller.pause()
@@ -563,6 +566,19 @@ class MainWindow(QMainWindow):
                 analog_gain=self._analog_gain_slider.value() / _GAIN_SCALE,
                 digital_gain=self._digital_gain_slider.value() / _GAIN_SCALE,
             )
+        self._load_trigger_from_config()
+
+    def _load_trigger_from_config(self) -> None:
+        """Trigger mode / FPS stored in the config (H2LaserControl F9c): set the radio buttons
+        and the FPS, and apply them to the camera. Not stored -> trigger left as it is."""
+        mode, fps = self._config.trigger_mode, self._config.trigger_fps
+        if mode not in ("free_run", "hardware"):
+            return
+        self._free_radio.setChecked(mode == "free_run")
+        self._hw_radio.setChecked(mode == "hardware")
+        if fps:
+            self._cam_fps_spin.setValue(float(fps))
+        self._apply_trigger_config()
 
     # ---------------------------------------------------- Exposure / gain --
 

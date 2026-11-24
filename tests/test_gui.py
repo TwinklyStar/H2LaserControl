@@ -51,7 +51,9 @@ def test_group_tabs_with_one_sub_tab_per_device(window):
     def texts(tw):
         return [tw.tabText(i) for i in range(tw.count())]
 
-    assert texts(window.tabs) == ["Control", "DAQ"]  # user 2026-11-19
+    # user 2026-11-19 (Control, DAQ) + 2026-11-24 (Shifter first, shown at start)
+    assert texts(window.tabs) == ["Shifter", "Control", "DAQ"]
+    assert window.tabs.currentIndex() == 0
     assert texts(window.sub_tabs["Control"]) == ["VUV feedthroughs", "Rotation mount",
                                                  "Flip mounts", "Delay generator"]
     assert texts(window.sub_tabs["DAQ"]) == ["Scope monitor", "VUV PD snapshot", "Camera"]
@@ -73,7 +75,7 @@ def test_dark_theme_switch_while_connected(window, themes):
     assert theme.dark and C.GREEN == DARK.GREEN
     assert window.palette().color(QPalette.ColorRole.Window).name() == DARK.WINDOW
     assert DARK.GREEN in hit.status_label.text()  # redrawn without reconnecting
-    icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
+    icon = window.tabs.tabIcon(1).pixmap(12, 12).toImage()
     assert icon.pixelColor(6, 6).name() == DARK.GREEN  # Control: all connected
     themes(False)
     assert LIGHT.GREEN in hit.status_label.text()
@@ -83,13 +85,13 @@ def test_dark_theme_switch_while_connected(window, themes):
 def test_group_tab_shows_error_of_hidden_device(window):
     from h2lasercontrol.gui.style import C
 
-    window.tabs.setCurrentIndex(1)  # DAQ shown, Control hidden
+    window.tabs.setCurrentIndex(2)  # DAQ shown, Control hidden
     window._set_sub_state("Control", 1, "error")
     assert window._sub_states["Control"][1] == "error"
-    icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
+    icon = window.tabs.tabIcon(1).pixmap(12, 12).toImage()
     assert icon.pixelColor(6, 6).name() == C.RED  # red dot on the Control tab
     window._set_sub_state("Control", 1, "ok")
-    icon = window.tabs.tabIcon(0).pixmap(12, 12).toImage()
+    icon = window.tabs.tabIcon(1).pixmap(12, 12).toImage()
     assert icon.pixelColor(6, 6).name() != C.RED
 
 
@@ -257,6 +259,7 @@ def test_device_tabs_scroll_when_taller_than_window(window, qtbot):
 
     dg = panel(window, "dg645")
     dg.maint_toggle.click()
+    window.tabs.setCurrentWidget(window.sub_tabs["Control"])  # the Shifter tab is shown at start
     sub = window.sub_tabs["Control"]
     sub.setCurrentIndex(sub.count() - 1)
     window.resize(1000, 600)

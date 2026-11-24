@@ -1,5 +1,5 @@
-"""Main window: two group tabs (Control, DAQ), each with one sub-tab per device, above the
-operation history."""
+"""Main window: the Shifter tab (one-click measurements, F9) and two group tabs (Control, DAQ),
+each with one sub-tab per device, above the operation history."""
 
 from __future__ import annotations
 
@@ -24,9 +24,11 @@ from PySide6.QtWidgets import (
 from ..config import PROGRAM_DIR, DeviceConfig
 from ..oplog import OpLog
 from ..services import DeviceService
+from ..shifter import ShifterContext, load_shifter_settings
 from .daq import DAQ_TABS
 from .log_panel import LogPanel
 from .panels import PANELS, DevicePanel
+from .shifter_tab import ShifterTab
 from .style import dot_icon, set_role, state_color, theme
 
 log = logging.getLogger(__name__)
@@ -125,6 +127,22 @@ class MainWindow(QMainWindow):
                 self.tabs.addTab(sub, group)
                 self._update_group_icon(group)
 
+        # Shifter tab (F9): first, shown at start; uses the services and DAQ tabs above
+        self.shifter_ctx = ShifterContext(
+            load_shifter_settings(), {s.key: s for s in self.services},
+            {p.cfg.key: p for p in self.panels}, {t.cfg.key: t for t in self.daq_tabs}, oplog)
+        self.shifter = ShifterTab(self.shifter_ctx)
+        page = DeviceScrollArea()
+        page.setWidget(self.shifter)
+        page.setWidgetResizable(True)
+        page.setFrameShape(QFrame.Shape.NoFrame)
+        self.tabs.insertTab(0, page, "Shifter")
+        self._shifter_page = page
+        self._shifter_state = "off"
+        self.shifter.tab_state_changed.connect(self._set_shifter_state)
+        self._set_shifter_state(self.shifter._last_tab_state or "off")
+        labels["shifter"] = "Shifter"
+
         self.log_panel = LogPanel(oplog, labels)
         split = QSplitter(Qt.Orientation.Vertical)
         split.addWidget(self.tabs)
@@ -136,9 +154,7 @@ class MainWindow(QMainWindow):
 
         theme.changed.connect(self._retheme)
 
-        last = self.settings.value("group", 0, int)
-        if 0 <= last < self.tabs.count():
-            self.tabs.setCurrentIndex(last)
+        self.tabs.setCurrentIndex(0)  # the Shifter tab at start (user 2026-11-24)
         for group, sub in self.sub_tabs.items():
             last = self.settings.value(f"subtab/{group}", 0, int)
             if 0 <= last < sub.count():
@@ -177,7 +193,12 @@ class MainWindow(QMainWindow):
         self._sub_states[group][index] = state
         self._update_group_icon(group)
 
+    def _set_shifter_state(self, state: str) -> None:
+        self._shifter_state = state
+        self.tabs.setTabIcon(self.tabs.indexOf(self._shifter_page), dot_icon(state_color(state)))
+
     def _retheme(self) -> None:
+        self._set_shifter_state(self._shifter_state)
         for group, states in self._sub_states.items():
             for index, state in states.items():
                 self.sub_tabs[group].setTabIcon(index, dot_icon(state_color(state)))
@@ -206,7 +227,8 @@ class MainWindow(QMainWindow):
             self.settings.setValue("operator", name)
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        busy = [p.cfg.settings.get("label", p.cfg.key) for p in self.panels if p.busy]
+        busy = ["Shifter: " + self.shifter.runner.sequence.title] if self.shifter.running else []
+        busy += [p.cfg.settings.get("label", p.cfg.key) for p in self.panels if p.busy]
         busy += [t.cfg.settings.get("label", t.cfg.key) for t in self.daq_tabs if t.running]
         if busy:
             box = QMessageBox(
@@ -218,9 +240,9 @@ class MainWindow(QMainWindow):
             if box.exec() != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
-        self.settings.setValue("group", self.tabs.currentIndex())
         for group, sub in self.sub_tabs.items():
             self.settings.setValue(f"subtab/{group}", sub.currentIndex())
+        self.shifter.shutdown()
         for s in self.services:
             s.shutdown()
         self.shutdown_daq()

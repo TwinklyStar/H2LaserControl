@@ -67,6 +67,8 @@ class ScopeStartPage(QWidget):
 
 class ScopeTab(QWidget):
     tab_state_changed = Signal(str)  # "ok" | "busy" | "off" | "error" (same as device tabs)
+    # every batch of data items taken from the session (also shown by the Shifter tab, F9)
+    items_received = Signal(list)
 
     def __init__(self, cfg: DeviceConfig, oplog: OpLog, *, sim: bool = False,
                  base_dir: str | os.PathLike[str] = ".", parent: QWidget | None = None) -> None:
@@ -85,6 +87,7 @@ class ScopeTab(QWidget):
         self.view: Any = None  # plot view while started
         self.trend_window = DEFAULT_WINDOW  # monitor trend span, kept between runs
         self.snapshot_n: int | None | str = "config"  # averaged waveforms, kept between runs
+        self.locked = ""  # reason, while the Shifter tab uses this scope (F9)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -126,14 +129,19 @@ class ScopeTab(QWidget):
         self.start_btn.setFixedWidth(260)
         self.start_btn.setToolTip("Open the scope(s) with the selected config and start taking "
                                   "and saving data")
-        self.start_btn.clicked.connect(self.start)
+        self.start_btn.clicked.connect(lambda: self.start())  # not start(checked)
         self.start_error = QLabel()
         self.start_error.setWordWrap(True)
         set_role(self.start_error, "error")
         self.start_error.hide()
         lay.addWidget(title)
         lay.addLayout(row)
-        for w in (self.config_info, self.config_errors, note, self.start_btn, self.start_error):
+        self.start_lock_label = QLabel()
+        self.start_lock_label.setWordWrap(True)
+        set_role(self.start_lock_label, "warning")
+        self.start_lock_label.hide()
+        for w in (self.config_info, self.config_errors, note, self.start_lock_label,
+                  self.start_btn, self.start_error):
             lay.addWidget(w)
         lay.addStretch(1)
         self.stack.addWidget(start)
@@ -158,6 +166,11 @@ class ScopeTab(QWidget):
         header.addWidget(self.pause_btn)
         header.addWidget(self.stop_btn)
         rlay.addLayout(header)
+        self.lock_label = QLabel()
+        self.lock_label.setWordWrap(True)
+        set_role(self.lock_label, "warning")
+        self.lock_label.hide()
+        rlay.addWidget(self.lock_label)
         self.detail_label = QLabel()
         self.detail_label.setWordWrap(True)
         set_role(self.detail_label, "muted")
@@ -257,15 +270,33 @@ class ScopeTab(QWidget):
         paths = ", ".join(sorted({s.data_path(c) for c in s.configs.values()}))
         return f"{scopes}<br>Mode: {mode}<br>Data is saved to <b>{paths}</b>."
 
+    def select_config(self, name: str) -> bool:
+        """Choose a config file by name (Shifter tab). False if it is not in the list."""
+        if self.running:
+            return False
+        idx = self.config_combo.findData(name)
+        if idx < 0:
+            return False
+        self.config_combo.setCurrentIndex(idx)  # -> _on_config_selected (new session)
+        return self.scope_config is not None and self.scope_config.name == name
+
+    def set_locked(self, reason: str) -> None:
+        """Lock the tab's buttons while the Shifter tab uses this scope ("" = unlock)."""
+        self.locked = reason
+        for lbl in (self.lock_label, self.start_lock_label):
+            lbl.setText(f"🔒 {reason}" if reason else "")
+            lbl.setVisible(bool(reason))
+        self._refresh()
+
     # --- actions ------------------------------------------------------------------------------
-    def start(self) -> None:
+    def start(self, max_triggers: int | None = None) -> None:
         s = self.session
         if s is None or s.state != STOPPED:
             return
         self.start_error.hide()
         self.error_label.hide()
         self._make_view()
-        s.start()
+        s.start(max_triggers=max_triggers)
         self.stack.setCurrentWidget(self.run_page)
         self._refresh()
 
@@ -337,6 +368,8 @@ class ScopeTab(QWidget):
         items = self.session.poll()
         if items and self.view is not None:
             self.view.show_items(items)
+        if items:
+            self.items_received.emit(items)
         self._refresh()
 
     def _errors_html(self) -> str:
@@ -362,12 +395,13 @@ class ScopeTab(QWidget):
                                  + (f"  <span style='color:{C.GREY}'>— {self.scope_config.title} "
                                     f"({self.scope_config.name})</span>"
                                     if self.scope_config else ""))
-        self.start_btn.setEnabled(s is not None and state == STOPPED)
-        self.config_combo.setEnabled(state == STOPPED)
-        self.reload_btn.setEnabled(state == STOPPED)
-        self.pause_btn.setEnabled(state in (RUNNING, PAUSED, STARTING))
+        free = not self.locked
+        self.start_btn.setEnabled(free and s is not None and state == STOPPED)
+        self.config_combo.setEnabled(free and state == STOPPED)
+        self.reload_btn.setEnabled(free and state == STOPPED)
+        self.pause_btn.setEnabled(free and state in (RUNNING, PAUSED, STARTING))
         self.pause_btn.setText("▶  Resume" if state == PAUSED else "⏸  Pause")
-        self.stop_btn.setEnabled(state in (RUNNING, PAUSED, STARTING))
+        self.stop_btn.setEnabled(state in (RUNNING, PAUSED, STARTING))  # Stop always works
 
         if s is not None:
             lines = []

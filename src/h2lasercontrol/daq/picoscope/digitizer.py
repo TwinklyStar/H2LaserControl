@@ -83,6 +83,10 @@ class Digitizer(threading.Thread):
         self.config = config
         self.update_queue = update_queue
         self.trigger_per_file = TRIGGERS_PER_FILE
+        # stop by itself after this many waveforms (Shifter VUV measurement: exactly N in the
+        # ROOT file); None = run until stopped
+        self.max_triggers: int | None = None
+        self.total_triggers = 0  # waveforms written in this run
 
         self.run_mode = config.get("run_mode")
         self.serial = config.get("serial")
@@ -292,6 +296,9 @@ class Digitizer(threading.Thread):
                         self.ch_offset[ch_idx],
                     )
                 self.root_pointer.fill(**wave)
+                self.total_triggers += 1
+                if self.max_triggers is not None and self.total_triggers >= self.max_triggers:
+                    self._stop_evt.set()  # this waveform is still sent; then the files close
 
                 if self.run_mode == "continuous":
                     # every waveform also goes to the display (sliding average there, redrawn

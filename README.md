@@ -3,6 +3,9 @@
 A Windows desktop program for controlling and monitoring the devices in the H2 laser room from
 one window.
 
+- **Shifter** tab (shown at start): the state of the setup at a glance, the NO cell monitor,
+  and one-click measurements (VUV energy, 122 nm profile, 355 nm profile) that move the
+  devices in the right order and return them afterwards.
 - **Control** tab: VUV feedthroughs (Sigma Koki HIT-MV), rotation mount (Thorlabs ELL14),
   flip mounts (Thorlabs MFF101), laser trigger delay (SRS DG645: only our channel is changed,
   within fixed limits; the other channels are shown read-only).
@@ -50,6 +53,13 @@ PicoScope 7, IDS peak Cockpit).
   first. A running acquisition continues while you look at other tabs.
 - The history of today's actions is shown under the tabs.
 
+**Shifter tab.** The top shows whether everything is in the operating state (feedthroughs and
+blockers retracted, full 355 nm energy, camera open, NO cell monitor running) and, if not, what
+is not. Each measurement box has a **Start** button; it is available only from the operating
+state, asks once before it starts, and then shows which step is running. **Stop** stops the
+measurement where it is; **Return to operating state** puts everything back (it can be used at
+any time). While a measurement runs, the device tabs it uses are locked.
+
 > The feedthroughs sit on a live beamline. **Insert** puts them into the beam. Only insert when
 > the beamline situation allows it. The two feedthroughs can never be inserted at the same time.
 
@@ -58,7 +68,7 @@ PicoScope 7, IDS peak Cockpit).
 | What | Where |
 |---|---|
 | PicoScope waveforms (ROOT) and trend data (CSV) | `data/picoscope/` |
-| Snapshots | `data/picoscope/snapshots/` |
+| Snapshots (also the VUV energy measurement) | `data/picoscope/snapshots/` |
 | Camera images | `data/camera/<date>/` |
 | Operation log | `logs/oplog-<date>.jsonl` |
 | Simulation output | `logs/sim/` (never mixed with real data) |
@@ -80,7 +90,10 @@ Devices are listed in `config/devices.toml` and are found by their **USB serial 
 COM port number does not matter. If a device is replaced, enter its new serial there.
 
 - PicoScope setups: `config/picoscope/*.toml`
-- Camera settings: `config/camera/*.toml`
+- Camera settings: `config/camera/*.toml`. To store the trigger mode in a camera config: set
+  it in the camera tab, press **Apply**, then **Save**.
+- Shifter tab: `config/shifter.toml` (number of pulses and photos, energy for the 355 nm
+  profile, which devices and default configs are used). Restart the program after a change.
 
 ## Troubleshooting
 
@@ -91,6 +104,7 @@ COM port number does not matter. If a device is replaced, enter its new serial t
 | The launcher closes at once / "Conda not found" | Conda is installed in an unusual place. Edit the folder list at the top of the `.bat` file. |
 | Feedthroughs show "POSITION UNKNOWN" | The controller was switched off and lost its position. Check both feedthroughs by eye and home them with the vendor software, then reconnect. |
 | PicoScope or camera does not open | Close PicoScope 7 / IDS peak Cockpit and the old DAQ programs, then re-plug the USB cable. |
+| A Shifter measurement cannot start | The box says which device is not ready. Press **Return to operating state**, or fix it in the device tab. |
 | "No trigger for 10 s" | No trigger signal arrives (laser off, cable, trigger level). The acquisition keeps waiting. |
 
 Debug logs are in `logs/h2lasercontrol.log` and `logs/fault.log`.
