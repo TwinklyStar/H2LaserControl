@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QLockFile
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from ..config import DEFAULT_CONFIG, load_config
@@ -17,6 +18,20 @@ from .main_window import MainWindow
 from .style import AppStyle, follow_system
 
 LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
+ICON = Path(__file__).resolve().parent / "icon" / "h2lasercontrol.ico"  # tools/make_icon.py
+
+
+def _set_app_id() -> None:
+    """Windows groups taskbar buttons by process: without its own app ID the program shows
+    the python(w).exe icon in the taskbar instead of its window icon."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("H2LaserControl")
+    except (AttributeError, OSError):
+        pass
 
 
 def _setup_logging(log_dir: Path):
@@ -53,7 +68,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-connect", action="store_true", help="do not connect at start")
     args = ap.parse_args(argv)
 
+    _set_app_id()
     app = QApplication.instance() or QApplication(sys.argv[:1])
+    app.setWindowIcon(QIcon(str(ICON)))
     app.setStyle(AppStyle())  # Fusion; slider click jumps to the clicked point
     follow_system(app)  # light / dark like Windows, also when it is switched while running
 

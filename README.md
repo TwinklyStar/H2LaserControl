@@ -38,7 +38,9 @@ conda activate H2LaserControl
 pip install -e ".[dev]"
 ```
 
-Optionally, put a desktop shortcut to `H2LaserControl.bat`.
+Optionally, put a desktop shortcut to `H2LaserControl.bat`. To give it the program icon:
+right-click the shortcut → **Properties** → **Change Icon…** → choose
+`src\h2lasercontrol\gui\icon\h2lasercontrol.ico`.
 
 ## Usage
 

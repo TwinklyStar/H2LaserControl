@@ -330,3 +330,16 @@ def test_delay_generator_maintenance_nominal(window, qtbot):
     assert "36.580 567 ms" in dg.nominal_label.text() and "by tester" in dg.nominal_label.text()
     assert "T0 + 36.580 567 ms" in dg.limits_label.text()
     assert dg.nominal_spin.value() == pytest.approx(36.580567)
+
+
+def test_program_icon_loads(qtbot):
+    """The window / taskbar icon (gui/icon, made by tools/make_icon.py) exists and has the
+    small and large sizes."""
+    from PySide6.QtGui import QIcon
+
+    from h2lasercontrol.gui.app import ICON
+
+    icon = QIcon(str(ICON))
+    assert not icon.isNull()
+    sizes = {s.width() for s in icon.availableSizes()}
+    assert {16, 32, 256} <= sizes
