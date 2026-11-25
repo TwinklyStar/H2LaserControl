@@ -14,6 +14,9 @@ one window.
 - A simulation mode lets you try everything without hardware.
 - Light and dark theme, following the Windows setting.
 
+**User manual:** [manual/H2LaserControl_manual.pdf](manual/H2LaserControl_manual.pdf)
+(source: `manual/manual.md`; rebuild with `python manual/build_pdf.py`).
+
 ## Requirements
 
 - Windows 10 or 11
