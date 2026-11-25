@@ -1,5 +1,7 @@
 # H2 Laser Control — User Manual
 
+*Meng Lyu, The University of Tokyo*
+
 *For shifters and other users of the H2 laser room. Version 2026-11-25.*
 
 ## Preface
